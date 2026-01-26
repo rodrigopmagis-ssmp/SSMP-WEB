@@ -1,0 +1,12 @@
+{
+    "buildCommand": "cd SSMP-WEB && npm run build",
+    "outputDirectory": "SSMP-WEB/dist",
+    "installCommand": "cd SSMP-WEB && npm install",
+    "framework": "vite",
+    "rewrites": [
+        {
+            "source": "/(.*)",
+            "destination": "/index.html"
+        }
+    ]
+}
