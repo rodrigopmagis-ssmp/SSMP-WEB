@@ -1,0 +1,8 @@
+
+{
+  "name": "AestheticClinic OS",
+  "description": "A comprehensive patient follow-up and procedure management system for aesthetic clinics, featuring automated WhatsApp scripts and recovery tracking.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
