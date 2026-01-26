@@ -250,8 +250,8 @@ const App: React.FC = () => {
           </div>
         </main>
       </div>
-      <footer className="px-10 py-6 border-t border-[#f3e7ea] dark:border-[#3d242a] text-center bg-white dark:bg-background-dark">
-        <p className="text-xs text-[#9a4c5f] dark:text-[#c4a1a9]">© 2023 AestheticClinic Patient Follow-up System. Professional recovery tracking made simple.</p>
+      <footer className="px-10 py-6 border-t border-[#DBDBDB] dark:border-[#262626] text-center bg-white dark:bg-background-dark">
+        <p className="text-xs text-[#8E8E8E] dark:text-[#A8A8A8]">© 2023 AestheticClinic Patient Follow-up System. Professional recovery tracking made simple.</p>
       </footer>
     </div>
   );
