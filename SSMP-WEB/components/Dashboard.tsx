@@ -13,6 +13,8 @@ interface DashboardProps {
 
 const Dashboard: React.FC<DashboardProps> = ({ patients, procedures, activeTreatments = [], onPatientSelect, onNewRegistration }) => {
   const [statusFilter, setStatusFilter] = useState<string>('Todos');
+  const [procedureFilter, setProcedureFilter] = useState<string>('Todos');
+  const [timeFilter, setTimeFilter] = useState<string>('Todos');
 
   // Map treatments to display rows (joining with patient data)
   // Map treatments to display rows (joining with patient data)
@@ -61,10 +63,55 @@ const Dashboard: React.FC<DashboardProps> = ({ patients, procedures, activeTreat
     };
   }).filter((row): row is NonNullable<typeof row> => row !== null);
 
-  // Aplicar filtro de status
-  const filteredRows = statusFilter === 'Todos'
-    ? treatmentRows
-    : treatmentRows.filter(row => row.dynamicStatus === statusFilter);
+  // Aplicar filtros combinados
+  const filteredRows = treatmentRows.filter(row => {
+    // 1. Status Filter
+    if (statusFilter !== 'Todos' && row.dynamicStatus !== statusFilter) return false;
+
+    // 2. Procedure Filter
+    if (procedureFilter !== 'Todos' && row.treatment.procedureName !== procedureFilter) return false;
+
+    // 3. Time Filter
+    if (timeFilter !== 'Todos') {
+      if (!row.dueDate) return false;
+
+      const now = new Date();
+      const todayStart = new Date(now);
+      todayStart.setHours(0, 0, 0, 0);
+
+      const due = new Date(row.dueDate);
+      const dueStart = new Date(row.dueDate);
+      dueStart.setHours(0, 0, 0, 0);
+
+      const diffTime = due.getTime() - now.getTime();
+      // Days difference based on calendar days, not 24h chunks from now
+      const diffDays = Math.ceil((dueStart.getTime() - todayStart.getTime()) / (1000 * 60 * 60 * 24));
+
+      if (timeFilter === '1h') {
+        if (diffTime < 0 || diffTime > 1 * 60 * 60 * 1000) return false;
+      } else if (timeFilter === '4h') {
+        if (diffTime < 0 || diffTime > 4 * 60 * 60 * 1000) return false;
+      } else if (timeFilter === '12h') {
+        if (diffTime < 0 || diffTime > 12 * 60 * 60 * 1000) return false;
+      } else if (timeFilter === 'Hoje') {
+        const isToday = dueStart.getTime() === todayStart.getTime();
+        if (!isToday) return false;
+      } else if (timeFilter === 'Amanha') {
+        const tomorrow = new Date(todayStart);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const isTomorrow = dueStart.getTime() === tomorrow.getTime();
+        if (!isTomorrow) return false;
+      } else if (timeFilter === 'Semana') {
+        // Next 7 days
+        if (diffDays < 0 || diffDays > 7) return false;
+      } else if (timeFilter === 'Mes') {
+        // Next 30 days
+        if (diffDays < 0 || diffDays > 30) return false;
+      }
+    }
+
+    return true;
+  });
 
   // Calcular estatísticas
   const stats = {
@@ -142,18 +189,56 @@ const Dashboard: React.FC<DashboardProps> = ({ patients, procedures, activeTreat
             Protocolos Ativos
           </h3>
 
-          <div className="flex items-center gap-2">
-            <label className="text-xs font-bold text-gray-600 uppercase">Status:</label>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="bg-white dark:bg-[#2d181e] border border-gray-300 dark:border-gray-700 rounded-md text-sm font-medium text-gray-700 dark:text-gray-200 py-1 pl-2 pr-8 focus:ring-primary focus:border-primary"
-            >
-              <option value="Todos">Todos</option>
-              <option value={PatientStatus.DUE_TODAY}>Atenção</option>
-              <option value={PatientStatus.LATE}>Atrasado</option>
-              <option value={PatientStatus.ON_TIME}>No Prazo</option>
-            </select>
+          <div className="flex items-center gap-3 flex-wrap justify-end">
+
+            {/* Procedure Filter */}
+            <div className="flex items-center gap-2">
+              <label className="text-xs font-bold text-gray-600 uppercase hidden md:block">Procedimento:</label>
+              <select
+                value={procedureFilter}
+                onChange={(e) => setProcedureFilter(e.target.value)}
+                className="bg-white dark:bg-[#2d181e] border border-gray-300 dark:border-gray-700 rounded-md text-sm font-medium text-gray-700 dark:text-gray-200 py-1 pl-2 pr-8 focus:ring-primary focus:border-primary max-w-[150px]"
+              >
+                <option value="Todos">Todos</option>
+                {procedures.map(p => (
+                  <option key={p.id} value={p.name}>{p.name}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Time Filter */}
+            <div className="flex items-center gap-2">
+              <label className="text-xs font-bold text-gray-600 uppercase hidden md:block">Vencimento:</label>
+              <select
+                value={timeFilter}
+                onChange={(e) => setTimeFilter(e.target.value)}
+                className="bg-white dark:bg-[#2d181e] border border-gray-300 dark:border-gray-700 rounded-md text-sm font-medium text-gray-700 dark:text-gray-200 py-1 pl-2 pr-8 focus:ring-primary focus:border-primary"
+              >
+                <option value="Todos">Todos</option>
+                <option value="1h">Próxima 1h</option>
+                <option value="4h">Próximas 4h</option>
+                <option value="12h">Próximas 12h</option>
+                <option value="Hoje">Hoje</option>
+                <option value="Amanha">Amanhã</option>
+                <option value="Semana">Esta Semana</option>
+                <option value="Mes">Este Mês</option>
+              </select>
+            </div>
+
+            {/* Status Filter */}
+            <div className="flex items-center gap-2">
+              <label className="text-xs font-bold text-gray-600 uppercase hidden md:block">Status:</label>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="bg-white dark:bg-[#2d181e] border border-gray-300 dark:border-gray-700 rounded-md text-sm font-medium text-gray-700 dark:text-gray-200 py-1 pl-2 pr-8 focus:ring-primary focus:border-primary"
+              >
+                <option value="Todos">Todos</option>
+                <option value={PatientStatus.DUE_TODAY}>Atenção</option>
+                <option value={PatientStatus.LATE}>Atrasado</option>
+                <option value={PatientStatus.ON_TIME}>No Prazo</option>
+              </select>
+            </div>
           </div>
         </div>
 

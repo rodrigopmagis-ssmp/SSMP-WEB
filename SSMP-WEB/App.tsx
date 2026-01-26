@@ -30,6 +30,7 @@ const App: React.FC = () => {
   const [view, setView] = useState<'dashboard' | 'patients' | 'profile' | 'details' | 'procedures' | 'register' | 'procedure_register' | 'protocol_register'>('dashboard');
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [selectedProcedureId, setSelectedProcedureId] = useState<string | null>(null);
+  const [selectedTreatmentId, setSelectedTreatmentId] = useState<string | undefined>(undefined);
   const [editingPatient, setEditingPatient] = useState<Patient | null>(null);
 
   useEffect(() => {
@@ -147,9 +148,10 @@ const App: React.FC = () => {
       const savedProcedure = await supabaseService.createProcedure(newProcedure);
       setProcedures([...procedures, savedProcedure]);
       setView('procedures');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving procedure:', error);
-      alert('Erro ao salvar procedimento.');
+      // Show specific error message if available, otherwise generic
+      alert(error.message || 'Erro ao salvar procedimento.');
     }
   };
 
@@ -170,7 +172,10 @@ const App: React.FC = () => {
           patient={selectedPatient}
           onBack={() => setView('patients')}
           onEdit={handleEditPatient}
-          onOpenProtocol={() => setView('details')}
+          onOpenProtocol={(treatmentId) => {
+            setSelectedTreatmentId(treatmentId);
+            setView('details');
+          }}
           onNewProtocol={() => {
             setEditingPatient(selectedPatient);
             setView('protocol_register');
@@ -180,12 +185,17 @@ const App: React.FC = () => {
         return <PatientDetails
           patient={selectedPatient}
           procedures={procedures}
-          onBack={() => setView('profile')} // Back goes to profile now
+          selectedTreatmentId={selectedTreatmentId}
+          onBack={() => {
+            setSelectedTreatmentId(undefined); // Clear selection when going back
+            setView('profile');
+          }}
           onEdit={handleEditPatient}
           onNewProtocol={() => {
             setEditingPatient(selectedPatient);
             setView('protocol_register');
           }}
+          onUpdate={loadData}
         />;
       case 'procedures':
         return (
@@ -203,6 +213,17 @@ const App: React.FC = () => {
               } catch (error) {
                 console.error('Error updating procedure:', error);
                 alert('Erro ao atualizar procedimento no banco de dados.');
+              }
+            }}
+            onDeleteProcedure={(id) => {
+              const updatedProcedures = procedures.filter(p => p.id !== id);
+              setProcedures(updatedProcedures);
+
+              // If deleted procedure was selected, select first remaining
+              if (selectedProcedureId === id && updatedProcedures.length > 0) {
+                setSelectedProcedureId(updatedProcedures[0].id);
+              } else if (updatedProcedures.length === 0) {
+                setSelectedProcedureId(null);
               }
             }}
           />

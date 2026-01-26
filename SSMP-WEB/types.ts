@@ -65,6 +65,9 @@ export interface Procedure {
   description: string;
   scripts: ScriptStage[];
   hasSurvey?: boolean;
+  is_active?: boolean;
+  created_at?: string;
+  updated_at?: string;
 }
 
 // Novos tipos para timing estruturado
@@ -132,4 +135,16 @@ export interface ClinicalNote {
   content: string;
   created_at: string;
   created_by?: string;
+}
+
+export interface TreatmentLog {
+  id: string;
+  treatment_id: string;
+  action: string;
+  description: string;
+  user_id?: string;
+  created_at: string;
+  metadata?: any;
+  // Optional: extended info if join is made
+  user_email?: string;
 }

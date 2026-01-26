@@ -7,7 +7,7 @@ interface PatientProfileProps {
     patient: Patient;
     onBack: () => void;
     onEdit: () => void;
-    onOpenProtocol: (procedureName: string) => void;
+    onOpenProtocol: (treatmentId: string) => void;
     onNewProtocol: () => void;
 }
 
@@ -156,7 +156,7 @@ const PatientProfile: React.FC<PatientProfileProps> = ({ patient, onBack, onEdit
                             </div>
                         ) : (
                             treatments.map((treatment) => (
-                                <div key={treatment.id} className={`bg-white dark:bg-gray-900 rounded-xl border-l-4 ${treatment.status === 'completed' ? 'border-l-green-500 opacity-75 hover:opacity-100' : 'border-l-primary'} border-y border-r border-gray-100 dark:border-gray-800 shadow-sm p-5 hover:shadow-md transition-all cursor-pointer group`} onClick={() => onOpenProtocol(treatment.procedureName)}>
+                                <div key={treatment.id} className={`bg-white dark:bg-gray-900 rounded-xl border-l-4 ${treatment.status === 'completed' ? 'border-l-green-500 opacity-75 hover:opacity-100' : 'border-l-primary'} border-y border-r border-gray-100 dark:border-gray-800 shadow-sm p-5 hover:shadow-md transition-all cursor-pointer group`} onClick={() => onOpenProtocol(treatment.id)}>
                                     <div className="flex justify-between items-start">
                                         <div>
                                             <div className="flex items-center gap-2 mb-1">

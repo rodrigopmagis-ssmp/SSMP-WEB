@@ -28,7 +28,7 @@ const ProtocolRegistration: React.FC<ProtocolRegistrationProps> = ({ patient, on
         const loadInitData = async () => {
             try {
                 const [proceduresData, treatmentsData] = await Promise.all([
-                    supabaseService.getProcedures(),
+                    supabaseService.getProcedures(true), // Load only ACTIVE procedures
                     supabaseService.getPatientTreatments(patient.id)
                 ]);
                 setProceduresList(proceduresData);

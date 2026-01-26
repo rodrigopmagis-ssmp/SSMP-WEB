@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase';
-import { Patient, Procedure, PatientTreatment, SurveyStatus } from '../../types';
+import { Patient, Procedure, PatientTreatment, SurveyStatus, TreatmentLog } from '../../types';
 import { PROCEDURES as INITIAL_PROCEDURES } from '../../constants';
 
 export const supabaseService = {
@@ -91,11 +91,17 @@ export const supabaseService = {
 
     // --- Procedures ---
 
-    async getProcedures() {
-        const { data, error } = await supabase
+    async getProcedures(activeOnly: boolean = false) {
+        let query = supabase
             .from('procedures')
-            .select('*');
+            .select('*')
+            .order('name', { ascending: true });
 
+        if (activeOnly) {
+            query = query.eq('is_active', true);
+        }
+
+        const { data, error } = await query;
         if (error) throw error;
         return data as Procedure[];
     },
@@ -125,12 +131,24 @@ export const supabaseService = {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error('User not authenticated');
 
+        // Check if procedure with same name already exists
+        const { data: existingProcedure } = await supabase
+            .from('procedures')
+            .select('id, name')
+            .ilike('name', procedure.name)
+            .single();
+
+        if (existingProcedure) {
+            throw new Error(`Já existe um procedimento cadastrado com o nome "${procedure.name}". Por favor, escolha outro nome.`);
+        }
+
         const dbProcedure = {
             name: procedure.name,
             icon: procedure.icon,
             description: procedure.description,
             scripts: procedure.scripts || [],
-            user_id: user.id
+            user_id: user.id,
+            is_active: true
         };
 
         const { data, error } = await supabase
@@ -139,7 +157,13 @@ export const supabaseService = {
             .select()
             .single();
 
-        if (error) throw error;
+        if (error) {
+            // Handle unique constraint violation from database
+            if (error.code === '23505') {
+                throw new Error(`Já existe um procedimento cadastrado com o nome "${procedure.name}". Por favor, escolha outro nome.`);
+            }
+            throw error;
+        }
         return data as Procedure;
     },
 
@@ -155,6 +179,66 @@ export const supabaseService = {
             .from('procedures')
             .update(dbProcedure)
             .eq('id', procedure.id)
+            .select()
+            .single();
+
+        if (error) throw error;
+        return data as Procedure;
+    },
+
+
+    async checkProcedureUsage(procedureId: string) {
+        // Check ALL treatments (both active and completed) to prevent history loss
+        const { data, error } = await supabase
+            .from('patient_treatments')
+            .select('status')
+            .eq('procedure_id', procedureId);
+
+        if (error) throw error;
+
+        if (!data || data.length === 0) {
+            return { total: 0, active: 0, completed: 0 };
+        }
+
+        const active = data.filter(t => t.status === 'active').length;
+        const completed = data.filter(t => t.status === 'completed').length;
+
+        return {
+            total: data.length,
+            active,
+            completed
+        };
+    },
+
+    async deleteProcedure(id: string) {
+        // Check if procedure is being used in ANY treatments (active or completed)
+        const usage = await this.checkProcedureUsage(id);
+
+        if (usage.total > 0) {
+            const parts = [];
+            if (usage.active > 0) parts.push(`${usage.active} ativo(s)`);
+            if (usage.completed > 0) parts.push(`${usage.completed} concluído(s)`);
+
+            throw new Error(
+                `Não é possível excluir. Este procedimento possui ${usage.total} protocolo(s) registrado(s) [${parts.join(', ')}]. ` +
+                `Excluir o procedimento apagaria permanentemente o histórico desses pacientes.`
+            );
+        }
+
+        const { error } = await supabase
+            .from('procedures')
+            .delete()
+            .eq('id', id);
+
+        if (error) throw error;
+        return true;
+    },
+
+    async inactivateProcedure(id: string, isActive: boolean) {
+        const { data, error } = await supabase
+            .from('procedures')
+            .update({ is_active: isActive })
+            .eq('id', id)
             .select()
             .single();
 
@@ -292,6 +376,44 @@ export const supabaseService = {
             .getPublicUrl(filePath);
 
         return publicUrl;
+    },
+
+    // --- Logs ---
+
+    async createLog(log: Omit<TreatmentLog, 'id' | 'created_at' | 'user_email'>) {
+        const { data: { user } } = await supabase.auth.getUser();
+
+        const dbLog = {
+            treatment_id: log.treatment_id,
+            action: log.action,
+            description: log.description,
+            user_id: user?.id,
+            metadata: { ...log.metadata, user_email: user?.email }
+        };
+
+        const { data, error } = await supabase
+            .from('treatment_logs')
+            .insert([dbLog])
+            .select()
+            .single();
+
+        if (error) throw error;
+        return data;
+    },
+
+    async getTreatmentLogs(treatmentId: string) {
+        const { data, error } = await supabase
+            .from('treatment_logs')
+            .select('*') // We can join with auth.users if we have access, otherwise we rely on user_id
+            .eq('treatment_id', treatmentId)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        // Se pudéssemos fazer join com users seria melhor, mas policies de auth.users costumam ser restritas.
+        // O ideal seria ter uma tabela public.profiles.
+        // Por enquanto, retornamos os logs como estão.
+        return data as TreatmentLog[];
     }
 };
 

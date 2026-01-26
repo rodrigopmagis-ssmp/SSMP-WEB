@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Procedure, ScriptStage, TimingUnit } from '../types';
 import { updateProcedure } from '../lib/procedures';
+import { supabaseService } from '../src/services/supabaseService';
 import Button from './ui/Button';
 import StageEditor from './StageEditor';
 
@@ -9,13 +10,15 @@ interface ProceduresAdminProps {
   onSelectProcedure?: (id: string) => void;
   procedures: Procedure[];
   onUpdateProcedure?: (procedure: Procedure) => void;
+  onDeleteProcedure?: (id: string) => void;
 }
 
 const ProceduresAdmin: React.FC<ProceduresAdminProps> = ({
   selectedProcedureId,
   onSelectProcedure,
   procedures,
-  onUpdateProcedure
+  onUpdateProcedure,
+  onDeleteProcedure
 }) => {
   console.log('ProceduresAdmin rendering', { procedures, selectedProcedureId });
 
@@ -23,6 +26,52 @@ const ProceduresAdmin: React.FC<ProceduresAdminProps> = ({
   const [isAddingStage, setIsAddingStage] = useState(false);
   const [editingStageId, setEditingStageId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  // Delete Modal State
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [mathChallenge, setMathChallenge] = useState({ n1: 0, n2: 0 });
+  const [deleteAnswer, setDeleteAnswer] = useState('');
+
+  // Filter State
+  const [showInactive, setShowInactive] = useState(false);
+
+  // Header Edit State
+  const [isEditingHeader, setIsEditingHeader] = useState(false);
+  const [headerForm, setHeaderForm] = useState({ name: '', icon: '', description: '' });
+
+  const startEditingHeader = () => {
+    if (!selectedProc) return;
+    setHeaderForm({
+      name: selectedProc.name,
+      icon: selectedProc.icon,
+      description: selectedProc.description
+    });
+    setIsEditingHeader(true);
+  };
+
+  const handleSaveHeader = async () => {
+    if (!selectedProc) return;
+
+    // Optimistic update
+    const updatedProc = {
+      ...selectedProc,
+      name: headerForm.name,
+      icon: headerForm.icon,
+      description: headerForm.description
+    };
+
+    setSelectedProc(updatedProc);
+    setIsEditingHeader(false);
+
+    // Persist
+    try {
+      await supabaseService.updateProcedure(updatedProc);
+      if (onUpdateProcedure) onUpdateProcedure(updatedProc);
+    } catch (err) {
+      console.error("Failed to update procedure details", err);
+      alert("Erro ao salvar detalhes do procedimento.");
+    }
+  };
 
   // Select procedure when component mounts or procedures change
   useEffect(() => {
@@ -115,6 +164,66 @@ const ProceduresAdmin: React.FC<ProceduresAdminProps> = ({
     }
   };
 
+  const handleRequestDelete = () => {
+    setMathChallenge({
+      n1: Math.floor(Math.random() * 9) + 1,
+      n2: Math.floor(Math.random() * 9) + 1
+    });
+    setDeleteAnswer('');
+    setIsDeleteModalOpen(true);
+  };
+
+  const handleDeleteProcedure = async () => {
+    if (!selectedProc) return;
+
+    // Validate Math Challenge
+    const sum = mathChallenge.n1 + mathChallenge.n2;
+    if (parseInt(deleteAnswer) !== sum) {
+      alert('Resposta incorreta. O procedimento não foi excluído.');
+      return;
+    }
+
+    try {
+      await supabaseService.deleteProcedure(selectedProc.id);
+      setIsDeleteModalOpen(false);
+      alert('Procedimento excluído com sucesso.');
+
+      // Call parent callback to refresh list
+      if (onDeleteProcedure) {
+        onDeleteProcedure(selectedProc.id);
+      }
+    } catch (error: any) {
+      console.error('Error deleting procedure:', error);
+      alert(error.message || 'Erro ao excluir procedimento.');
+    }
+  };
+
+  const handleToggleActive = async () => {
+    if (!selectedProc) return;
+
+    const newStatus = !selectedProc.is_active;
+    const action = newStatus ? 'reativar' : 'inativar';
+
+    if (!confirm(`Tem certeza que deseja ${action} o procedimento "${selectedProc.name}"?`)) return;
+
+    try {
+      const updated = await supabaseService.inactivateProcedure(selectedProc.id, newStatus);
+
+      // Update local state
+      setSelectedProc(updated);
+
+      // Notify parent to update list
+      if (onUpdateProcedure) {
+        onUpdateProcedure(updated);
+      }
+
+      alert(`Procedimento ${newStatus ? 'reativado' : 'inativado'} com sucesso.`);
+    } catch (error: any) {
+      console.error('Error toggling procedure status:', error);
+      alert(error.message || 'Erro ao alterar status do procedimento.');
+    }
+  };
+
   const handleTemplateChange = (stageId: string, newTemplate: string) => {
     if (!selectedProc) return;
 
@@ -128,8 +237,13 @@ const ProceduresAdmin: React.FC<ProceduresAdminProps> = ({
 
   const isEditing = isAddingStage || !!editingStageId;
 
+  // Filter procedures based on showInactive
+  const filteredProcedures = showInactive
+    ? procedures
+    : procedures.filter(p => p.is_active !== false);
+
   // Debug: mostrar se não há procedimentos
-  if (procedures.length === 0) {
+  if (filteredProcedures.length === 0) {
     return (
       <div className="max-w-4xl mx-auto py-4">
         <div className="bg-white dark:bg-gray-900 rounded-xl border border-dashed border-gray-300 dark:border-gray-700 p-12 text-center">
@@ -155,12 +269,126 @@ const ProceduresAdmin: React.FC<ProceduresAdminProps> = ({
   return (
     <div className="max-w-4xl mx-auto py-4">
       <div className="flex flex-wrap justify-between items-end gap-3 mb-8">
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-4 w-full md:w-2/3">
+          {isEditingHeader ? (
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl border border-primary/20 shadow-lg animate-in fade-in zoom-in-95 duration-200">
+              <div className="flex flex-col gap-4">
+                <div className="flex gap-4">
+                  <div className="flex-1">
+                    <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Nome do Procedimento (Bloqueado)</label>
+                    <input
+                      value={headerForm.name}
+                      disabled
+                      readOnly
+                      className="w-full px-3 py-2 border border-gray-200 dark:border-gray-800 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 cursor-not-allowed select-none"
+                      title="O nome do procedimento não pode ser alterado"
+                    />
+                  </div>
+                  <div className="w-1/3">
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
+                      <a href="https://fonts.google.com/icons" target="_blank" rel="noreferrer" className="flex items-center gap-1 hover:text-primary hover:underline">
+                        Ícone (Google Fonts) <span className="material-symbols-outlined text-xs">open_in_new</span>
+                      </a>
+                    </label>
+                    <div className="relative">
+                      <input
+                        value={headerForm.icon}
+                        onChange={e => setHeaderForm({ ...headerForm, icon: e.target.value })}
+                        className="w-full px-3 py-2 pl-10 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-primary outline-none bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                        placeholder="Ex: face"
+                      />
+                      <div className="absolute left-3 top-1/2 -translate-y-1/2 text-primary">
+                        <span className="material-symbols-outlined text-xl">{headerForm.icon || 'help'}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Descrição</label>
+                  <textarea
+                    value={headerForm.description}
+                    onChange={e => setHeaderForm({ ...headerForm, description: e.target.value })}
+                    rows={2}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-primary outline-none bg-white dark:bg-gray-900 text-gray-900 dark:text-white resize-none"
+                    placeholder="Descrição curta do procedimento..."
+                  />
+                </div>
+                <div className="flex justify-end gap-3 pt-2">
+                  <button
+                    onClick={() => setIsEditingHeader(false)}
+                    className="px-4 py-2 text-sm font-bold text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={handleSaveHeader}
+                    className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-bold shadow-md hover:bg-primary/90 transition-all"
+                  >
+                    Salvar Detalhes
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2 group">
+              <div className="flex items-start gap-4">
+                <div className="size-14 rounded-2xl bg-white dark:bg-gray-800 border items-center justify-center flex shadow-sm text-primary shrink-0">
+                  <span className="material-symbols-outlined text-3xl">{selectedProc.icon}</span>
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <h1 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight leading-none">
+                      {selectedProc.name}
+                    </h1>
+                    <button
+                      onClick={startEditingHeader}
+                      className="size-8 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center text-gray-400 hover:text-primary transition-colors opacity-0 group-hover:opacity-100"
+                      title="Editar nome e ícone"
+                    >
+                      <span className="material-symbols-outlined text-lg">edit</span>
+                    </button>
+                  </div>
+                  <p className="text-gray-600 dark:text-gray-400 text-sm leading-relaxed max-w-xl">
+                    {selectedProc.description || 'Sem descrição definida.'}
+                  </p>
 
-          {/* ... (header code) ... */}
-
+                  <div className="flex items-center gap-4 mt-3 text-xs font-medium text-gray-500 dark:text-gray-500">
+                    {selectedProc.created_at && (
+                      <div className="flex items-center gap-1.5 bg-gray-100 dark:bg-gray-800/50 px-2 py-1 rounded-md">
+                        <span className="material-symbols-outlined text-[14px]">calendar_today</span>
+                        Criado em: {new Date(selectedProc.created_at).toLocaleDateString()}
+                      </div>
+                    )}
+                    {selectedProc.updated_at && (
+                      <div className="flex items-center gap-1.5 bg-gray-100 dark:bg-gray-800/50 px-2 py-1 rounded-md">
+                        <span className="material-symbols-outlined text-[14px]">update</span>
+                        Modificado: {new Date(selectedProc.updated_at).toLocaleDateString()}
+                      </div>
+                    )}
+                    <div className="flex items-center gap-1.5 bg-gray-100 dark:bg-gray-800/50 px-2 py-1 rounded-md">
+                      <span className="material-symbols-outlined text-[14px]">layers</span>
+                      {selectedProc.scripts.length} etapas
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
         <div className="flex gap-3">
+          <button
+            onClick={handleToggleActive}
+            className={`flex items-center gap-1 px-3 py-2 text-xs font-bold rounded-lg border transition-colors ${selectedProc.is_active === false
+              ? 'text-green-600 border-green-200 bg-green-50 hover:bg-green-100'
+              : 'text-orange-600 border-orange-200 bg-orange-50 hover:bg-orange-100'
+              }`}
+            title={selectedProc.is_active === false ? 'Reativar este procedimento' : 'Inativar este procedimento'}
+          >
+            <span className="material-symbols-outlined text-base">
+              {selectedProc.is_active === false ? 'check_circle' : 'block'}
+            </span>
+            {selectedProc.is_active === false ? 'Reativar' : 'Inativar'}
+          </button>
           <button
             onClick={handleSaveChanges}
             disabled={saving || isEditing}
@@ -330,6 +558,58 @@ const ProceduresAdmin: React.FC<ProceduresAdminProps> = ({
           </div>
         )}
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {isDeleteModalOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl max-w-md w-full p-6 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="size-12 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                <span className="material-symbols-outlined text-red-600 dark:text-red-400 text-3xl">warning</span>
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-gray-900 dark:text-white">Excluir Procedimento?</h3>
+                <p className="text-sm text-gray-500">Esta ação não pode ser desfeita</p>
+              </div>
+            </div>
+
+            <div className="bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800 rounded-lg p-4 mb-4">
+              <p className="text-sm text-red-800 dark:text-red-300 font-medium">
+                ⚠️ Você está prestes a excluir permanentemente o procedimento <strong>"{selectedProc?.name}"</strong>.
+              </p>
+            </div>
+
+            <div className="mb-6">
+              <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
+                Para confirmar, resolva: {mathChallenge.n1} + {mathChallenge.n2} = ?
+              </label>
+              <input
+                type="number"
+                value={deleteAnswer}
+                onChange={(e) => setDeleteAnswer(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 dark:bg-gray-800 dark:text-white"
+                placeholder="Digite a resposta"
+                autoFocus
+              />
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setIsDeleteModalOpen(false)}
+                className="flex-1 px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg font-bold hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleDeleteProcedure}
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700 transition-colors shadow-lg shadow-red-600/20"
+              >
+                Confirmar Exclusão
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
