@@ -378,6 +378,46 @@ export const supabaseService = {
         return publicUrl;
     },
 
+    async uploadPatientPhoto(patientId: string, file: File) {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${patientId}/${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
+        const filePath = `patient-photos/${fileName}`;
+
+        // Ensure we try to upload. If the bucket doesn't exist, this might fail, 
+        // but typically one should set up 'patient-photos' bucket in Supabase dashboard.
+        // Falls back to 'avatars' if strict separation isn't enforced, but better to use specific bucket.
+        // For now, let's assume 'patient-photos' exists or use 'public' if generic.
+        // Let's stick to 'patient-photos' as a dedicated bucket pattern.
+
+        const { error: uploadError } = await supabase.storage
+            .from('patient-photos')
+            .upload(filePath, file);
+
+        if (uploadError) {
+            // Fallback to 'avatars' if 'patient-photos' not found/configured (common in dev)
+            if (uploadError.message.includes('Bucket not found')) {
+                const backupPath = `patient_uploads/${patientId}_${fileName}`;
+                const { error: backupError } = await supabase.storage
+                    .from('avatars') // reusing existing bucket
+                    .upload(backupPath, file);
+
+                if (backupError) throw backupError;
+
+                const { data: { publicUrl } } = supabase.storage
+                    .from('avatars')
+                    .getPublicUrl(backupPath);
+                return publicUrl;
+            }
+            throw uploadError;
+        }
+
+        const { data: { publicUrl } } = supabase.storage
+            .from('patient-photos')
+            .getPublicUrl(filePath);
+
+        return publicUrl;
+    },
+
     // --- Logs ---
 
     async createLog(log: Omit<TreatmentLog, 'id' | 'created_at' | 'user_email'>) {

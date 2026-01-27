@@ -56,6 +56,11 @@ export interface StageData {
   responseContent?: string;
   checklist?: Record<string, boolean>;
   hasResponded?: boolean;
+  // Photo Workflow
+  photoRequestSentAt?: string;
+  photoReceivedAt?: string;
+  photoStatus?: 'pending' | 'sent' | 'received' | 'refused';
+  photoUrl?: string;
 }
 
 export interface Procedure {

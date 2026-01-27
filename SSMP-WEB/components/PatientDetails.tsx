@@ -27,7 +27,7 @@ const PatientDetails: React.FC<PatientDetailsProps> = ({ patient, procedures = [
 
   const [tasksCompleted, setTasksCompleted] = useState(0);
   const [isTaskOpen, setIsTaskOpen] = useState(true);
-  const [copyFeedback, setCopyFeedback] = useState(false);
+  const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
 
   const [expandedStage, setExpandedStage] = useState<string | null>('stage1');
   const [stageData, setStageData] = useState<Record<string, StageData>>({});
@@ -192,7 +192,7 @@ const PatientDetails: React.FC<PatientDetailsProps> = ({ patient, procedures = [
 
   const scriptText = `Olá ${patient.name.split(' ')[0]}, espero que esteja tendo um ótimo dia! ✨ Como está a região da aplicação hoje ? Notou algum roxinho ou inchaço ?\n\nLembre - se de evitar exposição solar e usar o protetor conforme conversamos.Poderia nos enviar uma foto rápida de como está a recuperação agora ? `;
 
-  const handleCopyScript = () => {
+  const handleCopyScript = (text: string, stageId: string) => {
     console.log('Tentando copiar script...');
 
     const fallbackCopyTextToClipboard = (text: string) => {
@@ -207,8 +207,8 @@ const PatientDetails: React.FC<PatientDetailsProps> = ({ patient, procedures = [
       try {
         var successful = document.execCommand('copy');
         if (successful) {
-          setCopyFeedback(true);
-          setTimeout(() => setCopyFeedback(false), 2000);
+          setCopyFeedback(stageId);
+          setTimeout(() => setCopyFeedback(null), 2000);
         } else {
           alert('Não foi possível copiar. Por favor, selecione e copie manualmente.');
         }
@@ -219,22 +219,22 @@ const PatientDetails: React.FC<PatientDetailsProps> = ({ patient, procedures = [
     }
 
     if (!navigator.clipboard) {
-      fallbackCopyTextToClipboard(scriptText);
+      fallbackCopyTextToClipboard(text);
       return;
     }
 
-    navigator.clipboard.writeText(scriptText)
+    navigator.clipboard.writeText(text)
       .then(() => {
-        setCopyFeedback(true);
-        setTimeout(() => setCopyFeedback(false), 2000);
+        setCopyFeedback(stageId);
+        setTimeout(() => setCopyFeedback(null), 2000);
       })
       .catch((err) => {
-        fallbackCopyTextToClipboard(scriptText);
+        fallbackCopyTextToClipboard(text);
       });
   };
 
-  const handleSendWhatsapp = () => {
-    const encodedText = encodeURIComponent(scriptText);
+  const handleSendWhatsapp = (text: string) => {
+    const encodedText = encodeURIComponent(text);
     const phone = patient.phone.replace(/\D/g, '');
     window.open(`https://wa.me/${phone}?text=${encodedText}`, '_blank');
   };
@@ -334,6 +334,12 @@ const PatientDetails: React.FC<PatientDetailsProps> = ({ patient, procedures = [
   const currentStageIndex = expandedStage ? parseInt(expandedStage.replace('stage', '')) - 1 : -1;
   const currentScript = (currentStageIndex >= 0 && currentStageIndex < scripts.length) ? scripts[currentStageIndex] : null;
 
+  // Photo State
+  // State
+
+  const [isRegisteringPhotoResponse, setIsRegisteringPhotoResponse] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+
   // Derived state from current stage data
   const currentStageData = (expandedStage && stageData[expandedStage]) || {};
   const currentChecklist = currentStageData.checklist || {};
@@ -342,13 +348,73 @@ const PatientDetails: React.FC<PatientDetailsProps> = ({ patient, procedures = [
   const hasResponded = currentStageData.hasResponded;
   const responseContent = currentStageData.responseContent;
 
-  // Logic to check if all necessary actions are done
-  // If actions exist, check if all are true in currentChecklist
-  const isChecklistComplete = currentScript?.actions
-    ? currentScript.actions.filter(a => a.type !== 'message').every(a => currentChecklist[a.id])
-    : true;
+  // Photo Derived State
+  const photoRequestSentAt = currentStageData.photoRequestSentAt;
+  const photoReceivedAt = currentStageData.photoReceivedAt;
+  const photoStatus = currentStageData.photoStatus;
+  const photoUrl = currentStageData.photoUrl;
 
+  const handleRegisterPhotoRequest = async () => {
+    const now = new Date();
+    const formattedTime = `${now.toLocaleDateString()} · ${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`;
+    await updateStage({ photoRequestSentAt: formattedTime, photoStatus: 'pending' });
 
+    if (activeTreatment) {
+      await supabaseService.createLog({
+        treatment_id: activeTreatment.id,
+        action: 'photo_request_registered',
+        description: `Registrou solicitação de foto na etapa ${expandedStage?.replace('stage', '')}`,
+        metadata: { stage: expandedStage }
+      });
+    }
+  };
+
+  const handleRegisterPhotoResponse = () => setIsRegisteringPhotoResponse(true);
+
+  const handleConfirmPhotoResponse = async (received: boolean) => {
+    const now = new Date();
+    const formattedTime = `${now.toLocaleDateString()} · ${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`;
+
+    if (received) {
+      // We keep isRegisteringPhotoResponse = true to show the upload UI
+    } else {
+      await updateStage({
+        photoStatus: 'refused',
+        photoReceivedAt: formattedTime
+      });
+      setIsRegisteringPhotoResponse(false);
+    }
+  };
+
+  const handlePhotoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!event.target.files || event.target.files.length === 0) return;
+    const file = event.target.files[0];
+    setUploadingPhoto(true);
+
+    try {
+      const url = await supabaseService.uploadPatientPhoto(patient.id, file);
+
+      const now = new Date();
+      const formattedTime = `${now.toLocaleDateString()} · ${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`;
+
+      await updateStage({
+        photoStatus: 'received',
+        photoReceivedAt: formattedTime,
+        photoUrl: url
+      });
+
+      // Update patient photos list in DB
+      const newPhotos = [url, ...patient.photos];
+      await supabaseService.updatePatient(patient.id, { photos: newPhotos });
+
+      setIsRegisteringPhotoResponse(false);
+    } catch (error) {
+      console.error("Error uploading photo", error);
+      alert('Erro ao enviar foto. Tente novamente.');
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
 
   const handleSendSurvey = async () => {
     const now = new Date();
@@ -376,7 +442,6 @@ const PatientDetails: React.FC<PatientDetailsProps> = ({ patient, procedures = [
   const handleRegisterSent = async () => {
     const now = new Date();
     const formattedTime = `${now.toLocaleDateString()} · ${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`;
-    // setMessageSentAt(formattedTime) -> replaced by updateStage
     await updateStage({ messageSentAt: formattedTime });
 
     if (activeTreatment) {
@@ -398,18 +463,8 @@ const PatientDetails: React.FC<PatientDetailsProps> = ({ patient, procedures = [
     const formattedTime = `${now.toLocaleDateString()} · ${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`;
 
     if (responded) {
-      // setHasResponded(true) -> local only transition for UI
-      // We essentially just update state to show the text area, 
-      // but we don't persist "hasResponded=true" until they save the content?
-      // Or we can persist it now.
-      // For the UI logic, we probably just want to update local "isRegistering" state?
-      // Actually, relying on stageData means we need to update stageData
       await updateStage({ hasResponded: true });
     } else {
-      // setHasResponded(false);
-      // setMessageRespondedAt(formattedTime);
-      // setResponseContent...
-
       await updateStage({
         hasResponded: false,
         messageRespondedAt: formattedTime,
@@ -448,8 +503,17 @@ const PatientDetails: React.FC<PatientDetailsProps> = ({ patient, procedures = [
     }
   };
 
+  // Logic to check if all necessary actions are done
+  // If actions exist, check if all are true in currentChecklist
+  // Also check if photo request is completed if applicable
+  const needsPhoto = currentScript?.requestMedia || currentScript?.actions?.some(a => a.type === 'photo_request');
+  const isPhotoComplete = !needsPhoto || (photoStatus === 'received' || photoStatus === 'refused');
 
-  const isAllTasksCompleted = tasksCompleted === patient.totalTasks;
+  const isChecklistComplete = (currentScript?.actions
+    ? currentScript.actions.filter(a => a.type !== 'message' && a.type !== 'photo_request').every(a => currentChecklist[a.id])
+    : true) && isPhotoComplete;
+
+  const isAllTasksCompleted = tasksCompleted === (activeTreatment?.totalTasks || patient.totalTasks);
 
   return (
     <div className="animate-in slide-in-from-right duration-500">
@@ -761,15 +825,25 @@ const PatientDetails: React.FC<PatientDetailsProps> = ({ patient, procedures = [
                                 {isActive && (
                                   <div className="flex gap-2">
                                     <button
-                                      onClick={handleCopyScript}
+                                      onClick={() => {
+                                        const textToCopy = scriptInfo?.template
+                                          ? scriptInfo.template.replace('#NomePaciente', patient.name.split(' ')[0]).replace('#NomeClinica', 'Aesthetic Clinic')
+                                          : scriptText;
+                                        handleCopyScript(textToCopy, stageId);
+                                      }}
                                       className="flex items-center gap-1.5 text-gray-700 hover:text-primary hover:bg-white px-3 py-1.5 rounded-lg text-xs font-bold transition-all border border-transparent hover:border-gray-300 hover:shadow-sm"
                                       title="Copiar texto"
                                     >
-                                      <span className="material-symbols-outlined text-sm">{copyFeedback ? 'check' : 'content_copy'}</span>
-                                      <span>{copyFeedback ? 'Copiado' : 'Copiar'}</span>
+                                      <span className="material-symbols-outlined text-sm">{copyFeedback === stageId ? 'check' : 'content_copy'}</span>
+                                      <span>{copyFeedback === stageId ? 'Copiado' : 'Copiar'}</span>
                                     </button>
                                     <button
-                                      onClick={handleSendWhatsapp}
+                                      onClick={() => {
+                                        const textToSend = scriptInfo?.template
+                                          ? scriptInfo.template.replace('#NomePaciente', patient.name.split(' ')[0]).replace('#NomeClinica', 'Aesthetic Clinic')
+                                          : scriptText;
+                                        handleSendWhatsapp(textToSend);
+                                      }}
                                       className="flex items-center gap-1.5 bg-[#25D366] hover:bg-[#20bd5c] text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm transform hover:-translate-y-0.5"
                                     >
                                       <span className="material-symbols-outlined text-white text-sm">chat</span>
@@ -895,6 +969,134 @@ const PatientDetails: React.FC<PatientDetailsProps> = ({ patient, procedures = [
                               </div>
                             </div>
 
+                            {/* Photo Control Section */}
+                            {
+                              (currentScript?.requestMedia || currentScript?.actions?.some(a => a.type === 'photo_request')) && (
+                                <div className={`mb-6 p-4 rounded-xl border ${photoStatus === 'received' || photoStatus === 'refused' ? 'bg-gray-50 border-gray-200 opacity-75' : 'bg-orange-50 dark:bg-orange-900/10 border-orange-100 dark:border-orange-900/30'}`}>
+                                  <div className="space-y-2">
+                                    <h5 className="text-[10px] font-bold uppercase tracking-widest text-orange-700 dark:text-orange-300 flex items-center gap-1.5">
+                                      <span className="material-symbols-outlined text-sm">photo_camera</span>
+                                      Solicitação de Fotos
+                                    </h5>
+
+                                    {!photoRequestSentAt ? (
+                                      <div className="flex items-center justify-between bg-white dark:bg-gray-800 p-3 rounded-lg border border-orange-200/50 shadow-sm">
+                                        <p className="text-sm font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2">
+                                          <span className="size-2 rounded-full bg-orange-500 animate-pulse"></span>
+                                          {isActive ? "Aguardando solicitação da foto..." : "Solicitação pendente."}
+                                        </p>
+                                        {isActive && (
+                                          <button
+                                            onClick={handleRegisterPhotoRequest}
+                                            className="text-orange-700 hover:text-orange-900 text-xs font-bold flex items-center gap-1 hover:underline bg-orange-50 hover:bg-orange-100 px-3 py-1.5 rounded-lg transition-colors"
+                                          >
+                                            Registrar Solicitação
+                                          </button>
+                                        )}
+                                      </div>
+                                    ) : (
+                                      <div className="space-y-3">
+                                        {/* Sent Status */}
+                                        <div className="bg-white dark:bg-gray-800 p-3 rounded-lg border border-orange-200 dark:border-orange-900/30 shadow-sm flex items-center gap-3">
+                                          <div className="size-8 rounded-full bg-orange-100 dark:bg-orange-900/50 flex items-center justify-center text-orange-700">
+                                            <span className="material-symbols-outlined text-lg">check</span>
+                                          </div>
+                                          <div>
+                                            <p className="text-xs font-bold text-gray-500 uppercase">Solicitação Enviada</p>
+                                            <p className="text-sm font-bold text-gray-900 dark:text-white">
+                                              Solicitado em {photoRequestSentAt}
+                                            </p>
+                                          </div>
+                                        </div>
+
+                                        {/* Response Status */}
+                                        {!photoStatus || photoStatus === 'pending' ? (
+                                          !isRegisteringPhotoResponse ? (
+                                            <div className="flex items-center justify-between pl-2 border-l-2 border-dashed border-gray-300 ml-4 py-2">
+                                              <p className="text-xs font-bold text-gray-600 italic pl-2">Aguardando envio das fotos...</p>
+                                              {isActive && (
+                                                <button
+                                                  onClick={handleRegisterPhotoResponse}
+                                                  className="text-primary hover:text-primary-dark text-xs font-bold hover:underline flex items-center gap-1"
+                                                >
+                                                  <span className="material-symbols-outlined text-sm">add_a_photo</span>
+                                                  Registrar Resposta
+                                                </button>
+                                              )}
+                                            </div>
+                                          ) : (
+                                            <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-orange-200 dark:border-orange-900/30 shadow-md animate-in fade-in zoom-in duration-300">
+                                              <p className="text-sm font-bold text-gray-900 dark:text-gray-100 mb-4 text-center">As fotos foram enviadas?</p>
+                                              <div className="flex gap-3 mb-4">
+                                                <button onClick={() => { }} className="flex-1 group bg-green-50 hover:bg-green-100 border border-green-200 text-green-800 py-3 rounded-xl text-xs font-bold flex flex-col items-center gap-1 transition-all ring-2 ring-primary ring-offset-2">
+                                                  <span className="material-symbols-outlined text-xl">check_circle</span>
+                                                  Sim
+                                                </button>
+                                                <button onClick={() => handleConfirmPhotoResponse(false)} className="flex-1 group bg-red-50 hover:bg-red-100 border border-red-200 text-red-800 py-3 rounded-xl text-xs font-bold flex flex-col items-center gap-1 transition-all opacity-50 hover:opacity-100">
+                                                  <span className="material-symbols-outlined text-xl">cancel</span>
+                                                  Não
+                                                </button>
+                                              </div>
+
+                                              {/* Upload Area for YES */}
+                                              <div className="mt-4 border-t border-gray-100 pt-4">
+                                                <label className="block w-full cursor-pointer group">
+                                                  <div className="border-2 border-dashed border-gray-300 group-hover:border-primary rounded-xl p-6 text-center transition-colors bg-gray-50 group-hover:bg-primary/5">
+                                                    {uploadingPhoto ? (
+                                                      <div className="flex flex-col items-center gap-2">
+                                                        <span className="material-symbols-outlined animate-spin text-primary text-3xl">sync</span>
+                                                        <span className="text-xs font-bold text-gray-500">Enviando foto...</span>
+                                                      </div>
+                                                    ) : (
+                                                      <>
+                                                        <span className="material-symbols-outlined text-gray-400 group-hover:text-primary text-3xl mb-2">cloud_upload</span>
+                                                        <p className="text-xs font-bold text-gray-600 group-hover:text-primary mb-1">Clique para fazer upload (JPEG)</p>
+                                                        <p className="text-[10px] text-gray-400">Máximo 5MB</p>
+                                                      </>
+                                                    )}
+                                                  </div>
+                                                  <input
+                                                    type="file"
+                                                    className="hidden"
+                                                    accept="image/jpeg,image/png,image/jpg"
+                                                    onChange={handlePhotoUpload}
+                                                    disabled={uploadingPhoto}
+                                                  />
+                                                </label>
+                                                <button onClick={() => setIsRegisteringPhotoResponse(false)} className="w-full mt-3 text-xs text-gray-500 hover:text-gray-700 font-bold">Cancelar</button>
+                                              </div>
+                                            </div>
+                                          )
+                                        ) : (
+                                          <div className={`p-4 rounded-xl border flex items-start gap-3 ${photoStatus === 'received' ? 'bg-green-50/50 border-green-200' : 'bg-red-50/50 border-red-200'}`}>
+                                            <div className={`size-8 rounded-full flex items-center justify-center shrink-0 ${photoStatus === 'received' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                              <span className="material-symbols-outlined text-lg">{photoStatus === 'received' ? 'collections' : 'broken_image'}</span>
+                                            </div>
+                                            <div className="w-full">
+                                              <p className={`text-xs font-bold uppercase tracking-wider mb-1 ${photoStatus === 'received' ? 'text-green-800' : 'text-red-800'}`}>
+                                                {photoStatus === 'received' ? 'Fotos Recebidas' : 'Paciente não enviou'}
+                                              </p>
+
+                                              {photoUrl && (
+                                                <div className="mt-2 relative group w-fit">
+                                                  <div className="h-24 w-24 bg-cover bg-center rounded-lg border border-gray-200 shadow-sm" style={{ backgroundImage: `url(${photoUrl})` }}></div>
+                                                  <a href={photoUrl} target="_blank" rel="noreferrer" className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white rounded-lg transition-opacity">
+                                                    <span className="material-symbols-outlined">visibility</span>
+                                                  </a>
+                                                </div>
+                                              )}
+
+                                              <p className="text-[10px] text-gray-500 mt-2 font-bold">{photoReceivedAt}</p>
+                                            </div>
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              )
+                            }
+
                             <div className="grid md:grid-cols-2 gap-6 border-t border-gray-200 dark:border-gray-700 pt-5 mt-2">
                               {scriptInfo?.actions && scriptInfo.actions.length > 0 && (
                                 <div className="space-y-3">
@@ -902,7 +1104,7 @@ const PatientDetails: React.FC<PatientDetailsProps> = ({ patient, procedures = [
                                     <span className="material-symbols-outlined text-sm">checklist</span>
                                     Checklist
                                   </h4>
-                                  {scriptInfo.actions.filter(a => a.type !== 'message').map(action => (
+                                  {scriptInfo.actions.filter(a => a.type !== 'message' && a.type !== 'photo_request').map(action => (
                                     <div key={action.id} onClick={() => isActive && handleToggleAction(action.id, !currentChecklist[action.id])} className={`flex items-center gap-3 p-2 rounded-lg transition-colors border border-transparent ${isActive ? 'cursor-pointer hover:bg-gray-50 hover:border-gray-200' : 'cursor-default'}`}>
                                       <div className={`size-5 rounded border flex items-center justify-center transition-all ${currentChecklist[action.id] ? 'bg-primary border-primary text-white' : 'border-gray-400 bg-white'}`}>
                                         {currentChecklist[action.id] && <span className="material-symbols-outlined text-sm font-bold">check</span>}
@@ -937,98 +1139,100 @@ const PatientDetails: React.FC<PatientDetailsProps> = ({ patient, procedures = [
                                 </div>
                               )}
                             </div>
-                          </div>
+                          </div >
                         )}
-                      </div>
-                    </div>
+                      </div >
+                    </div >
                   );
                 })}
 
 
                 {/* Pesquisa de Satisfação (Módulo Separado) */}
-                {currentProcedureDef?.hasSurvey && ((activeTreatment?.totalTasks || 0) >= scripts.length) && (
-                  <div className={`relative pl-12 transition-all duration-500 ${isAllTasksCompleted ? 'opacity-100' : 'opacity-50 grayscale'}`}>
-                    <div className={`absolute left-0 top-1 w-10 h-10 rounded-full flex items-center justify-center text-white border-4 border-background-light dark:border-background-dark z-10 shadow-lg ${surveyStatus === SurveyStatus.RESPONDED ? 'bg-green-500' : 'bg-purple-600'}`}>
-                      <span className="material-symbols-outlined text-lg">star</span>
-                    </div>
-
-                    <div className={`rounded-xl border-2 shadow-md overflow-hidden ${surveyStatus === SurveyStatus.RESPONDED ? 'bg-white dark:bg-gray-900 border-green-200' : 'bg-white dark:bg-gray-900 border-purple-100'}`}>
-                      <div className={`px-5 py-4 flex justify-between items-center border-b ${surveyStatus === SurveyStatus.RESPONDED ? 'bg-green-50/50 border-green-100' : 'bg-purple-50/50 border-purple-100'}`}>
-                        <div>
-                          <h3 className={`${surveyStatus === SurveyStatus.RESPONDED ? 'text-green-700' : 'text-purple-700'} font-bold text-base leading-none mb-1`}>Pesquisa de Satisfação</h3>
-                          <p className={`${surveyStatus === SurveyStatus.RESPONDED ? 'text-green-600' : 'text-purple-600'} text-xs font-semibold uppercase tracking-wider`}>
-                            {surveyStatus === SurveyStatus.PENDING && 'Aguardando Finalização do Tratamento'}
-                            {surveyStatus === SurveyStatus.SENT && `Enviado em ${surveySentAt}`}
-                            {surveyStatus === SurveyStatus.RESPONDED && `Respondido em ${surveyRespondedAt}`}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className={`text-[10px] font-bold px-2 py-1 rounded ${surveyStatus === SurveyStatus.PENDING ? 'bg-gray-100 text-gray-500' :
-                            surveyStatus === SurveyStatus.SENT ? 'bg-purple-100 text-purple-700' :
-                              'bg-green-100 text-green-700'
-                            }`}>
-                            {surveyStatus === SurveyStatus.PENDING ? 'BLOQUEADO' :
-                              surveyStatus === SurveyStatus.SENT ? 'AGUARDANDO' : 'CONCLUÍDO'}
-                          </span>
-                        </div>
+                {
+                  currentProcedureDef?.hasSurvey && ((activeTreatment?.totalTasks || 0) >= scripts.length) && (
+                    <div className={`relative pl-12 transition-all duration-500 ${isAllTasksCompleted ? 'opacity-100' : 'opacity-50 grayscale'}`}>
+                      <div className={`absolute left-0 top-1 w-10 h-10 rounded-full flex items-center justify-center text-white border-4 border-background-light dark:border-background-dark z-10 shadow-lg ${surveyStatus === SurveyStatus.RESPONDED ? 'bg-green-500' : 'bg-purple-600'}`}>
+                        <span className="material-symbols-outlined text-lg">star</span>
                       </div>
 
-                      {isAllTasksCompleted && (
-                        <div className="p-5">
-                          {surveyStatus === SurveyStatus.PENDING && (
-                            <div className="flex flex-col gap-4">
-                              <p className="text-sm text-gray-600 dark:text-gray-300">
-                                Todos os acompanhamentos foram concluídos! Agora é hora de enviar a pesquisa de satisfação para o paciente avaliar o tratamento.
-                              </p>
-                              <button
-                                onClick={handleSendSurvey}
-                                className="flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-3 rounded-xl font-bold text-sm transition-all shadow-lg shadow-purple-600/20"
-                              >
-                                <span className="material-symbols-outlined">send</span>
-                                <span>Enviar Pesquisa via WhatsApp</span>
-                              </button>
-                            </div>
-                          )}
+                      <div className={`rounded-xl border-2 shadow-md overflow-hidden ${surveyStatus === SurveyStatus.RESPONDED ? 'bg-white dark:bg-gray-900 border-green-200' : 'bg-white dark:bg-gray-900 border-purple-100'}`}>
+                        <div className={`px-5 py-4 flex justify-between items-center border-b ${surveyStatus === SurveyStatus.RESPONDED ? 'bg-green-50/50 border-green-100' : 'bg-purple-50/50 border-purple-100'}`}>
+                          <div>
+                            <h3 className={`${surveyStatus === SurveyStatus.RESPONDED ? 'text-green-700' : 'text-purple-700'} font-bold text-base leading-none mb-1`}>Pesquisa de Satisfação</h3>
+                            <p className={`${surveyStatus === SurveyStatus.RESPONDED ? 'text-green-600' : 'text-purple-600'} text-xs font-semibold uppercase tracking-wider`}>
+                              {surveyStatus === SurveyStatus.PENDING && 'Aguardando Finalização do Tratamento'}
+                              {surveyStatus === SurveyStatus.SENT && `Enviado em ${surveySentAt}`}
+                              {surveyStatus === SurveyStatus.RESPONDED && `Respondido em ${surveyRespondedAt}`}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className={`text-[10px] font-bold px-2 py-1 rounded ${surveyStatus === SurveyStatus.PENDING ? 'bg-gray-100 text-gray-500' :
+                              surveyStatus === SurveyStatus.SENT ? 'bg-purple-100 text-purple-700' :
+                                'bg-green-100 text-green-700'
+                              }`}>
+                              {surveyStatus === SurveyStatus.PENDING ? 'BLOQUEADO' :
+                                surveyStatus === SurveyStatus.SENT ? 'AGUARDANDO' : 'CONCLUÍDO'}
+                            </span>
+                          </div>
+                        </div>
 
-                          {surveyStatus === SurveyStatus.SENT && (
-                            <div className="flex flex-col gap-4">
-                              <div className="bg-purple-50 dark:bg-purple-900/10 rounded-lg p-4 border border-purple-100 dark:border-purple-900/30">
-                                <p className="text-sm text-purple-800 dark:text-purple-200 flex items-center gap-2">
-                                  <span className="material-symbols-outlined animate-pulse">mark_email_unread</span>
-                                  Link da pesquisa enviado. Aguardando resposta do paciente...
+                        {isAllTasksCompleted && (
+                          <div className="p-5">
+                            {surveyStatus === SurveyStatus.PENDING && (
+                              <div className="flex flex-col gap-4">
+                                <p className="text-sm text-gray-600 dark:text-gray-300">
+                                  Todos os acompanhamentos foram concluídos! Agora é hora de enviar a pesquisa de satisfação para o paciente avaliar o tratamento.
+                                </p>
+                                <button
+                                  onClick={handleSendSurvey}
+                                  className="flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-3 rounded-xl font-bold text-sm transition-all shadow-lg shadow-purple-600/20"
+                                >
+                                  <span className="material-symbols-outlined">send</span>
+                                  <span>Enviar Pesquisa via WhatsApp</span>
+                                </button>
+                              </div>
+                            )}
+
+                            {surveyStatus === SurveyStatus.SENT && (
+                              <div className="flex flex-col gap-4">
+                                <div className="bg-purple-50 dark:bg-purple-900/10 rounded-lg p-4 border border-purple-100 dark:border-purple-900/30">
+                                  <p className="text-sm text-purple-800 dark:text-purple-200 flex items-center gap-2">
+                                    <span className="material-symbols-outlined animate-pulse">mark_email_unread</span>
+                                    Link da pesquisa enviado. Aguardando resposta do paciente...
+                                  </p>
+                                </div>
+                                <button
+                                  onClick={handleRegisterResponse}
+                                  className="self-end text-purple-600 hover:text-purple-800 text-xs font-bold underline cursor-pointer"
+                                >
+                                  Simular: Registrar Resposta Agora
+                                </button>
+                              </div>
+                            )}
+
+                            {surveyStatus === SurveyStatus.RESPONDED && (
+                              <div className="flex flex-col gap-3">
+                                <div className="flex items-center justify-between bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
+                                  <span className="text-sm font-bold text-gray-700 dark:text-gray-300">Nota Geral</span>
+                                  <div className="flex gap-1 text-amber-400">
+                                    {[1, 2, 3, 4, 5].map(star => (
+                                      <span key={star} className="material-symbols-outlined text-xl fill-current">star</span>
+                                    ))}
+                                  </div>
+                                </div>
+                                <p className="text-sm text-gray-600 dark:text-gray-400 italic bg-white dark:bg-gray-900 p-3 rounded border border-gray-100 dark:border-gray-800">
+                                  "O atendimento foi excelente! Adorei o resultado e a atenção da equipe durante todo o processo."
                                 </p>
                               </div>
-                              <button
-                                onClick={handleRegisterResponse}
-                                className="self-end text-purple-600 hover:text-purple-800 text-xs font-bold underline cursor-pointer"
-                              >
-                                Simular: Registrar Resposta Agora
-                              </button>
-                            </div>
-                          )}
-
-                          {surveyStatus === SurveyStatus.RESPONDED && (
-                            <div className="flex flex-col gap-3">
-                              <div className="flex items-center justify-between bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
-                                <span className="text-sm font-bold text-gray-700 dark:text-gray-300">Nota Geral</span>
-                                <div className="flex gap-1 text-amber-400">
-                                  {[1, 2, 3, 4, 5].map(star => (
-                                    <span key={star} className="material-symbols-outlined text-xl fill-current">star</span>
-                                  ))}
-                                </div>
-                              </div>
-                              <p className="text-sm text-gray-600 dark:text-gray-400 italic bg-white dark:bg-gray-900 p-3 rounded border border-gray-100 dark:border-gray-800">
-                                "O atendimento foi excelente! Adorei o resultado e a atenção da equipe durante todo o processo."
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      )}
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                )}
-              </div>
-            </div>
+                  )
+                }
+              </div >
+            </div >
 
             <div className="lg:col-span-4 space-y-6">
               <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 shadow-sm p-6">
@@ -1138,7 +1342,7 @@ const PatientDetails: React.FC<PatientDetailsProps> = ({ patient, procedures = [
                 )}
               </div>
             </div>
-          </div>
+          </div >
         )
       }
       {/* Delete Confirmation Modal */}

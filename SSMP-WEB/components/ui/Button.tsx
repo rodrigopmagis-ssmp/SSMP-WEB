@@ -2,6 +2,7 @@ import React from 'react';
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
     variant?: 'primary' | 'secondary' | 'outline' | 'ghost';
+    isLoading?: boolean;
     children: React.ReactNode;
 }
 
@@ -9,6 +10,8 @@ const Button: React.FC<ButtonProps> = ({
     variant = 'primary',
     className = '',
     children,
+    isLoading,
+    disabled,
     ...props
 }) => {
     const baseStyles = "flex items-center justify-center gap-2 rounded-lg font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed";
@@ -24,10 +27,16 @@ const Button: React.FC<ButtonProps> = ({
 
     return (
         <button
-            className={`${baseStyles} ${variants[variant]} ${sizes} ${className}`}
+            className={`${baseStyles} ${variants[variant]} ${sizes} ${className} `}
+            disabled={disabled || isLoading}
             {...props}
         >
-            {children}
+            {isLoading ? (
+                <>
+                    <span className="material-symbols-outlined animate-spin text-sm">progress_activity</span>
+                    Please wait...
+                </>
+            ) : children}
         </button>
     );
 };
