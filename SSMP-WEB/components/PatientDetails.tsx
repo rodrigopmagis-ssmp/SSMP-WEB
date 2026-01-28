@@ -86,6 +86,8 @@ const PatientDetails: React.FC<PatientDetailsProps> = ({ patient, procedures = [
     fetchLogs();
   };
   const [deleteAnswer, setDeleteAnswer] = useState('');
+  const [isSkipping, setIsSkipping] = useState(false);
+  const [skipJustification, setSkipJustification] = useState('');
 
   // Clinical Notes State
   const [notes, setNotes] = useState<ClinicalNote[]>([]);
@@ -188,12 +190,21 @@ const PatientDetails: React.FC<PatientDetailsProps> = ({ patient, procedures = [
   }, [patient.id, selectedTreatmentId]);
 
   // Effect to update local state when active treatment changes
+  // Effect to handle treatment switching (reset state)
+  useEffect(() => {
+    if (activeTreatment?.id) {
+      setExpandedStage(null); // Force collapse ONLY when switching treatments
+    }
+  }, [activeTreatment?.id, activeTreatment?.procedureId]);
+
+  // Effect to update local state when active treatment content updates
   useEffect(() => {
     if (activeTreatment) {
       const safeTasksCompleted = activeTreatment.tasksCompleted || 0;
       setTasksCompleted(safeTasksCompleted);
       setStageData(activeTreatment.stageData || {});
-      setExpandedStage('stage' + (safeTasksCompleted + 1));
+      // Do NOT reset expandedStage here, allowing user to keep it open while working
+
       setSurveyStatus(activeTreatment.surveyStatus || SurveyStatus.PENDING);
 
       // Update survey dates if available
@@ -304,6 +315,78 @@ const PatientDetails: React.FC<PatientDetailsProps> = ({ patient, procedures = [
     }
   };
 
+  const handleSkipTask = async () => {
+    if (!activeTreatment || !skipJustification || skipJustification.length < 10) {
+      alert("Por favor, informe uma justificativa com pelo menos 10 caracteres.");
+      return;
+    }
+
+    if (tasksCompleted < activeTreatment.totalTasks) {
+      try {
+        const safeTasksCompleted = (tasksCompleted || 0) + 1;
+        const totalTasks = activeTreatment.totalTasks || 1;
+        const newProgress = Math.round((safeTasksCompleted / totalTasks) * 100);
+
+        // Optimistic update
+        setTasksCompleted(safeTasksCompleted);
+        setIsTaskOpen(false);
+        setExpandedStage(null);
+        setIsTaskOpen(true);
+        setIsSkipping(false);
+        setSkipJustification('');
+
+        const currentStageId = `stage${safeTasksCompleted}`;
+
+        // Prepare new stage data with skipped status
+        const newStageData = {
+          ...activeTreatment.stageData,
+          [currentStageId]: {
+            ...(activeTreatment.stageData?.[currentStageId] || {}),
+            skipped: true,
+            skippedAt: new Date().toISOString(),
+            skipJustification: skipJustification
+          }
+        };
+
+        const updatedTreatment = {
+          ...activeTreatment,
+          tasksCompleted: safeTasksCompleted,
+          progress: newProgress,
+          status: safeTasksCompleted === activeTreatment.totalTasks ? 'completed' : 'active',
+          stageData: newStageData
+        };
+        setActiveTreatment(updatedTreatment);
+
+        // Persist to DB
+        await supabaseService.updateTreatment(activeTreatment.id, {
+          tasksCompleted: safeTasksCompleted,
+          progress: newProgress,
+          status: safeTasksCompleted === activeTreatment.totalTasks ? 'completed' : 'active',
+          stageData: newStageData
+        });
+
+        // Log action
+        await supabaseService.createLog({
+          treatment_id: activeTreatment.id,
+          action: 'task_skipped',
+          description: `Pulou a etapa ${safeTasksCompleted}: ${activeTreatment.scripts?.[tasksCompleted]?.title || `Etapa ${safeTasksCompleted}`}`,
+          metadata: {
+            stage: safeTasksCompleted,
+            task_index: tasksCompleted,
+            justification: skipJustification
+          }
+        });
+
+        if (onUpdate) {
+          onUpdate();
+        }
+      } catch (error) {
+        console.error("Failed to skip task", error);
+        alert("Erro ao pular etapa.");
+      }
+    }
+  };
+
   const handleCompleteTask = async () => {
     if (!activeTreatment) return;
 
@@ -316,7 +399,7 @@ const PatientDetails: React.FC<PatientDetailsProps> = ({ patient, procedures = [
         // Optimistic update
         setTasksCompleted(safeTasksCompleted);
         setIsTaskOpen(false);
-        setExpandedStage(`stage${safeTasksCompleted + 1}`);
+        setExpandedStage(null); // Keep collapsed after completion
         setIsTaskOpen(true);
 
         const updatedTreatment = {
@@ -329,17 +412,17 @@ const PatientDetails: React.FC<PatientDetailsProps> = ({ patient, procedures = [
 
         // Persist to DB (Treatment)
         await supabaseService.updateTreatment(activeTreatment.id, {
-          tasksCompleted: newTasksCompleted,
+          tasksCompleted: safeTasksCompleted,
           progress: newProgress,
-          status: newTasksCompleted === activeTreatment.totalTasks ? 'completed' : 'active'
+          status: safeTasksCompleted === activeTreatment.totalTasks ? 'completed' : 'active'
         });
 
         // Log action
         await supabaseService.createLog({
           treatment_id: activeTreatment.id,
           action: 'task_completed',
-          description: `Concluiu a etapa ${newTasksCompleted}: ${activeTreatment.scripts?.[tasksCompleted]?.title || `Etapa ${newTasksCompleted}`}`,
-          metadata: { stage: newTasksCompleted, task_index: tasksCompleted }
+          description: `Concluiu a etapa ${safeTasksCompleted}: ${activeTreatment.scripts?.[tasksCompleted]?.title || `Etapa ${safeTasksCompleted}`}`,
+          metadata: { stage: safeTasksCompleted, task_index: tasksCompleted }
         });
 
         if (onUpdate) {
@@ -735,6 +818,9 @@ const PatientDetails: React.FC<PatientDetailsProps> = ({ patient, procedures = [
                   const isActive = stageNum === tasksCompleted + 1;
                   const stageId = `stage${stageNum}`;
 
+                  // Check if stage was skipped
+                  const isSkipped = activeTreatment?.stageData?.[stageId]?.skipped;
+
                   // Get script info for this stage if available
                   const scriptInfo = scripts[idx];
 
@@ -745,8 +831,6 @@ const PatientDetails: React.FC<PatientDetailsProps> = ({ patient, procedures = [
                   if (patient.procedureDate && scriptInfo?.timing) {
                     try {
                       // Assuming procedureDate is YYYY-MM-DD HH:MM
-                      // We might need to handle the format carefully
-                      // In supabaseService we just saved it directly
                       const dueDate = calculateDueDate(patient.procedureDate, scriptInfo.timing);
                       slaStatus = getSLAStatus(dueDate);
                       dueDateFormatted = formatDueDate(dueDate);
@@ -759,13 +843,17 @@ const PatientDetails: React.FC<PatientDetailsProps> = ({ patient, procedures = [
                   return (
                     <div key={stageId} className="relative pl-12">
                       {/* Stage Icon */}
-                      <div className={`absolute left-0 top-1 w-10 h-10 rounded-full flex items-center justify-center text-white border-4 border-background-light dark:border-background-dark z-10 ${isCompleted
-                        ? 'bg-green-500 shadow-sm'
-                        : isActive
-                          ? 'bg-primary shadow-lg shadow-primary/30 ring-4 ring-primary/10'
-                          : 'bg-gray-300 dark:bg-gray-700'
+                      <div className={`absolute left-0 top-1 w-10 h-10 rounded-full flex items-center justify-center text-white border-4 border-background-light dark:border-background-dark z-10 ${isSkipped
+                          ? 'bg-amber-500 shadow-sm'
+                          : isCompleted
+                            ? 'bg-green-500 shadow-sm'
+                            : isActive
+                              ? 'bg-primary shadow-lg shadow-primary/30 ring-4 ring-primary/10'
+                              : 'bg-gray-300 dark:bg-gray-700'
                         }`}>
-                        {isCompleted ? (
+                        {isSkipped ? (
+                          <span className="material-symbols-outlined text-lg font-bold">fast_forward</span>
+                        ) : isCompleted ? (
                           <span className="material-symbols-outlined text-lg font-bold">check</span>
                         ) : (
                           <span className="text-sm font-bold">{stageNum}</span>
@@ -773,30 +861,44 @@ const PatientDetails: React.FC<PatientDetailsProps> = ({ patient, procedures = [
                       </div>
 
                       {/* Unified Stage Card */}
-                      <div className={`bg-white dark:bg-gray-900 rounded-xl border-2 shadow-md overflow-hidden transition-all duration-300 ${isActive
-                        ? (slaStatus === 'late' ? 'border-red-400' : slaStatus === 'warning' ? 'border-orange-400' : 'border-primary/30')
-                        : isCompleted
-                          ? 'border-green-100 dark:border-green-900/30 opacity-75 hover:opacity-100'
-                          : 'border-gray-100 dark:border-gray-700 opacity-60 hover:opacity-100'
+                      <div className={`bg-white dark:bg-gray-900 rounded-xl border-2 shadow-md overflow-hidden transition-all duration-300 ${isSkipped
+                          ? 'border-amber-200 dark:border-amber-900/30 opacity-75 hover:opacity-100'
+                          : isActive
+                            ? (slaStatus === 'late' ? 'border-red-400' : slaStatus === 'warning' ? 'border-orange-400' : 'border-primary/30')
+                            : isCompleted
+                              ? 'border-green-100 dark:border-green-900/30 opacity-75 hover:opacity-100'
+                              : 'border-gray-100 dark:border-gray-700 opacity-60 hover:opacity-100'
                         }`}>
                         <div
-                          className={`px-5 py-4 flex justify-between items-center border-b cursor-pointer transition-colors ${isActive
-                            ? 'bg-primary/5 dark:bg-primary/10 border-primary/10 hover:bg-primary/10'
-                            : isCompleted
-                              ? 'bg-green-50/50 dark:bg-green-900/10 border-green-100 dark:border-green-800 hover:bg-green-50 dark:hover:bg-green-900/20'
-                              : 'bg-gray-50/50 dark:bg-gray-800 border-gray-100 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700'
+                          className={`px-5 py-4 flex justify-between items-center border-b cursor-pointer transition-colors ${isSkipped
+                              ? 'bg-amber-50/50 dark:bg-amber-900/10 border-amber-100 dark:border-amber-800 hover:bg-amber-50 dark:hover:bg-amber-900/20'
+                              : isActive
+                                ? 'bg-primary/5 dark:bg-primary/10 border-primary/10 hover:bg-primary/10'
+                                : isCompleted
+                                  ? 'bg-green-50/50 dark:bg-green-900/10 border-green-100 dark:border-green-800 hover:bg-green-50 dark:hover:bg-green-900/20'
+                                  : 'bg-gray-50/50 dark:bg-gray-800 border-gray-100 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700'
                             }`}
                           onClick={() => setExpandedStage(expandedStage === stageId ? null : stageId)}
                         >
                           <div>
                             <div className="flex items-center gap-2 mb-1">
-                              <h3 className={`font-bold text-base leading-none ${isActive ? 'text-primary' : isCompleted ? 'text-green-700 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'
+                              <h3 className={`font-bold text-base leading-none ${isSkipped
+                                  ? 'text-amber-700 dark:text-amber-400'
+                                  : isActive
+                                    ? 'text-primary'
+                                    : isCompleted
+                                      ? 'text-green-700 dark:text-green-400'
+                                      : 'text-gray-500 dark:text-gray-400'
                                 }`}>
                                 {scriptInfo ? scriptInfo.title : `Acompanhamento ${stageNum}`}
                               </h3>
 
                               {/* SLA/Status Badge */}
-                              {isCompleted ? (
+                              {isSkipped ? (
+                                <span className="text-[10px] px-2 py-0.5 rounded font-bold uppercase bg-amber-100 text-amber-600">
+                                  ETAPA PULADA
+                                </span>
+                              ) : isCompleted ? (
                                 <span className="text-[10px] px-2 py-0.5 rounded font-bold uppercase bg-green-100 text-green-600">
                                   CONCLUÍDO
                                 </span>
@@ -817,7 +919,9 @@ const PatientDetails: React.FC<PatientDetailsProps> = ({ patient, procedures = [
                             </div>
 
                             <div className="flex gap-2 text-xs">
-                              {isCompleted ? (
+                              {isSkipped ? (
+                                <p className="text-amber-600/70 font-semibold uppercase tracking-wider">Ignorado</p>
+                              ) : isCompleted ? (
                                 <p className="text-green-600/70 font-semibold uppercase tracking-wider">Finalizado</p>
                               ) : isActive ? (
                                 <p className="text-primary/70 font-semibold uppercase tracking-wider">Em Andamento</p>
@@ -1151,19 +1255,67 @@ const PatientDetails: React.FC<PatientDetailsProps> = ({ patient, procedures = [
 
                               {/* Action Buttons - Only for Active Stage */}
                               {isActive && (
-                                <div className="flex items-end justify-end">
+                                <div className="flex items-end justify-end gap-2">
                                   {!isAllTasksCompleted && (
-                                    <button
-                                      onClick={handleCompleteTask}
-                                      disabled={!isTaskOpen || !isChecklistComplete || !messageRespondedAt}
-                                      className={`px-6 py-3 rounded-xl text-xs font-bold shadow-md transition-all flex items-center gap-2 transform active:scale-95 ${isTaskOpen && isChecklistComplete && messageRespondedAt
-                                        ? 'bg-gradient-to-r from-green-600 to-green-700 text-white hover:from-green-700 hover:to-green-800 hover:shadow-green-600/30'
-                                        : 'bg-gray-100 text-gray-400 cursor-not-allowed shadow-none'
-                                        }`}
-                                    >
-                                      <span className="material-symbols-outlined text-lg">check_circle</span>
-                                      {isTaskOpen ? 'Concluir Etapa' : 'Concluído'}
-                                    </button>
+                                    isSkipping ? (
+                                      <div className="flex-1 bg-red-50 p-4 rounded-lg border border-red-100 animate-in fade-in slide-in-from-bottom-2 w-full">
+                                        <h5 className="text-sm font-bold text-red-700 mb-2 flex items-center gap-2">
+                                          <span className="material-symbols-outlined">warning</span>
+                                          Pular Etapa?
+                                        </h5>
+                                        <p className="text-xs text-red-600 mb-3">
+                                          Deseja realmente pular esta etapa? Isso ficará registrado no histórico.
+                                        </p>
+                                        <textarea
+                                          value={skipJustification}
+                                          onChange={(e) => setSkipJustification(e.target.value)}
+                                          placeholder="Justificativa (mínimo 10 caracteres)..."
+                                          className="w-full text-sm p-3 border border-red-200 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 mb-3 bg-white text-gray-800"
+                                          rows={2}
+                                          autoFocus
+                                        />
+                                        <div className="flex justify-end gap-2">
+                                          <button
+                                            onClick={() => {
+                                              setIsSkipping(false);
+                                              setSkipJustification('');
+                                            }}
+                                            className="px-3 py-1.5 text-xs text-gray-600 hover:bg-white rounded border border-transparent hover:border-gray-200 transition-colors"
+                                          >
+                                            Cancelar
+                                          </button>
+                                          <button
+                                            onClick={handleSkipTask}
+                                            disabled={skipJustification.length < 10}
+                                            className="px-3 py-1.5 text-xs bg-red-600 text-white rounded hover:bg-red-700 transition-colors font-medium flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                                          >
+                                            <span className="material-symbols-outlined text-sm">skip_next</span>
+                                            Confirmar Pulo
+                                          </button>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <>
+                                        <button
+                                          onClick={() => setIsSkipping(true)}
+                                          className="px-4 py-3 text-sm text-red-600 hover:bg-red-50 rounded-xl border border-red-200 transition-colors flex items-center gap-2 font-medium"
+                                        >
+                                          <span className="material-symbols-outlined">skip_next</span>
+                                          Pular Etapa
+                                        </button>
+                                        <button
+                                          onClick={handleCompleteTask}
+                                          disabled={!isTaskOpen || !isChecklistComplete || !messageRespondedAt}
+                                          className={`px-6 py-3 rounded-xl text-xs font-bold shadow-md transition-all flex items-center gap-2 transform active:scale-95 ${isTaskOpen && isChecklistComplete && messageRespondedAt
+                                            ? 'bg-gradient-to-r from-green-600 to-green-700 text-white hover:from-green-700 hover:to-green-800 hover:shadow-green-600/30'
+                                            : 'bg-gray-100 text-gray-400 cursor-not-allowed shadow-none'
+                                            }`}
+                                        >
+                                          <span className="material-symbols-outlined text-lg">check_circle</span>
+                                          {isTaskOpen ? 'Concluir Etapa' : 'Concluído'}
+                                        </button>
+                                      </>
+                                    )
                                   )}
                                 </div>
                               )}
