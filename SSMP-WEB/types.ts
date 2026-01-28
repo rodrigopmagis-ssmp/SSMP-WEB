@@ -153,3 +153,74 @@ export interface TreatmentLog {
   // Optional: extended info if join is made
   user_email?: string;
 }
+
+export interface Clinic {
+  id: string;
+  user_id: string;
+  type: 'fisica' | 'juridica';
+
+  // Identification
+  cpf_cnpj: string;
+  fantasy_name: string;
+  owner_name: string;
+
+  // Contact
+  phone: string;
+  email: string;
+
+  // Address
+  has_address: boolean;
+  zip_code?: string;
+  street?: string;
+  number?: string;
+  complement?: string;
+  neighborhood?: string;
+  city?: string;
+  state?: string;
+
+  country?: string;
+
+  // Billing Address
+  same_address_for_billing?: boolean;
+  billing_zip_code?: string;
+  billing_street?: string;
+  billing_number?: string;
+  billing_complement?: string;
+  billing_neighborhood?: string;
+  billing_city?: string;
+  billing_state?: string;
+  billing_country?: string;
+
+  // Branding
+  logo_url?: string;
+}
+
+export interface UserProfile {
+  id: string;
+  email: string;
+  full_name?: string;
+  role: 'master' | 'admin' | 'doctor' | 'receptionist';
+  status: 'pending' | 'approved' | 'rejected';
+  clinic_id?: string;
+  created_at: string;
+}
+
+export interface Lead {
+  id: string;
+  name: string;
+  whatsapp: string;
+  concerns: string[];
+  procedure_awareness: string;
+  previous_experience: string;
+  budget_range: string;
+  timeline: string;
+  availability: string[];
+  commitment_level: string;
+  observations?: string;
+  ai_tags?: string[];
+  ai_score?: number;
+  ai_urgency?: 'baixa' | 'média' | 'alta';
+  ai_summary?: string;
+  kanban_status: 'Frio' | 'Morno' | 'Quente' | 'Ultra Quente';
+  created_at: string;
+}

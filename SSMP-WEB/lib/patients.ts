@@ -62,7 +62,7 @@ export async function fetchPatients(): Promise<Patient[]> {
     const { data, error } = await supabase
         .from('patients')
         .select('*')
-        .eq('user_id', user.id)
+        // RLS handles the filtering by clinic_id
         .order('created_at', { ascending: false });
 
     if (error) {
@@ -81,9 +81,6 @@ export async function fetchPatients(): Promise<Patient[]> {
         if (t.status === 'active') acc[t.patient_id].active++;
         if (t.status === 'completed') acc[t.patient_id].completed++;
 
-        // Sum up tasks for progress calculation (active treatments only for "current work" or all? Using all gives better history context)
-        // User asked "how many follow-ups need to be done", so maybe focus on active?
-        // Let's sum ALL for now to match the "Progress" concept of the patient's journey.
         acc[t.patient_id].tasksCompleted += (t.tasks_completed || 0);
         acc[t.patient_id].totalTasks += (t.total_tasks || 0);
 
@@ -111,11 +108,26 @@ export async function createPatient(patient: Omit<Patient, 'id'>): Promise<Patie
         throw new Error('User not authenticated');
     }
 
+    // Fetch clinic_id
+    const { data: profile } = await supabase
+        .from('profiles')
+        .select('clinic_id')
+        .eq('id', user.id)
+        .single();
+
+    if (!profile?.clinic_id) {
+        throw new Error('User is not linked to any clinic');
+    }
+
     const dbPatient = patientToDbPatient(patient);
 
     const { data, error } = await supabase
         .from('patients')
-        .insert([{ ...dbPatient, user_id: user.id }])
+        .insert([{
+            ...dbPatient,
+            user_id: user.id,
+            clinic_id: profile.clinic_id
+        }])
         .select()
         .single();
 
@@ -154,7 +166,7 @@ export async function updatePatient(id: string, updates: Partial<Patient>): Prom
         .from('patients')
         .update(dbUpdates)
         .eq('id', id)
-        .eq('user_id', user.id)
+        // RLS handles permission checks
         .select()
         .single();
 
@@ -176,8 +188,8 @@ export async function deletePatient(id: string): Promise<void> {
     const { error } = await supabase
         .from('patients')
         .delete()
-        .eq('id', id)
-        .eq('user_id', user.id);
+        .eq('id', id);
+    // RLS handles permission checks
 
     if (error) {
         console.error('Error deleting patient:', error);

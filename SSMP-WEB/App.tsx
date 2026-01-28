@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from './lib/supabase';
 import { Auth } from './components/Auth';
 import { Session } from '@supabase/supabase-js';
-import { Patient, Procedure, PatientTreatment } from './types';
+import { Patient, Procedure, PatientTreatment, Lead } from './types';
 import { supabaseService } from './src/services/supabaseService';
 import { fetchPatients, createPatient, updatePatient } from './lib/patients';
 import Dashboard from './components/Dashboard';
@@ -14,8 +14,15 @@ import ProcedureRegistration from './components/ProcedureRegistration';
 import PatientRegistration from './components/PatientRegistration';
 import ProtocolRegistration from './components/ProtocolRegistration';
 import PatientProfile from './components/PatientProfile';
+import LeadQuiz from './components/LeadQuiz';
+import CRMKanban from './components/CRMKanban';
+import CRMContainer from './components/CRMContainer';
+import LeadDetails from './components/LeadDetails';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
+import ClinicSettings from './components/ClinicSettings';
+import UserManagement from './components/UserManagement';
+import { ThemeProvider } from './lib/theme';
 
 const App: React.FC = () => {
   const [session, setSession] = useState<Session | null>(null);
@@ -27,11 +34,16 @@ const App: React.FC = () => {
   const [activeTreatments, setActiveTreatments] = useState<PatientTreatment[]>([]);
 
   // View State
-  const [view, setView] = useState<'dashboard' | 'patients' | 'profile' | 'details' | 'procedures' | 'register' | 'procedure_register' | 'protocol_register'>('dashboard');
+  const [currentView, setCurrentView] = useState<'dashboard' | 'patients' | 'financial' | 'reports' | 'settings' | 'users' | 'quiz' | 'crm_kanban' | 'lead_details'>('dashboard');
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [selectedProcedureId, setSelectedProcedureId] = useState<string | null>(null);
   const [selectedTreatmentId, setSelectedTreatmentId] = useState<string | undefined>(undefined);
   const [editingPatient, setEditingPatient] = useState<Patient | null>(null);
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+
+  const [buildingAccess, setBuildingAccess] = useState<'checking' | 'allowed' | 'pending' | 'rejected'>('checking');
+
+
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -39,14 +51,75 @@ const App: React.FC = () => {
       setLoading(false);
     });
 
+    // Check URL URLSearchParams for view=quiz
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('view') === 'quiz') {
+      setCurrentView('quiz');
+    }
+
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('DEBUG: Auth Event:', event);
       setSession(session);
+      if (event === 'SIGNED_OUT') {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('view') !== 'quiz') {
+          setBuildingAccess('checking'); // Reset state on logout
+        }
+      }
     });
 
     return () => subscription.unsubscribe();
   }, []);
+
+  // Check Profile Status on Session Change
+  useEffect(() => {
+    const checkProfile = async () => {
+      if (!session?.user) return;
+
+      console.log('DEBUG: Checking profile for user:', session.user.id);
+
+      try {
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('status, role')
+          .eq('id', session.user.id)
+          .single();
+
+        if (error) {
+          console.error('DEBUG: Error fetching profile:', error);
+          // If error (e.g. no connection), defaulting to pending to be safe
+          setBuildingAccess('pending');
+          return;
+        }
+
+        if (profile) {
+          console.log('DEBUG: Profile found:', profile);
+          if (profile.status === 'pending') {
+            setBuildingAccess('pending');
+          } else if (profile.status === 'rejected') {
+            setBuildingAccess('rejected');
+          } else {
+            console.log('DEBUG: Access Allowed');
+            setBuildingAccess('allowed');
+          }
+        } else {
+          console.log('DEBUG: No profile found, falling back to pending');
+          setBuildingAccess('pending');
+        }
+      } catch (err) {
+        console.error('DEBUG: Exception checking profile:', err);
+        setBuildingAccess('pending');
+      }
+    };
+
+    if (session) {
+      checkProfile();
+    }
+  }, [session]);
+
+
 
   // Load Initial Data (Patients & Procedures)
   useEffect(() => {
@@ -83,24 +156,68 @@ const App: React.FC = () => {
     }
   };
 
+
+
+
+
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900"><span className="material-symbols-outlined animate-spin text-primary text-4xl">progress_activity</span></div>;
   }
 
-  if (!session) {
+  if (!session && currentView !== 'quiz') {
     return <Auth />;
+  }
+
+
+
+  // Blocking UI for Pending/Rejected Users
+  if (buildingAccess === 'pending' || buildingAccess === 'rejected') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-4">
+        <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-2xl shadow-xl overflow-hidden border border-gray-100 dark:border-gray-700 text-center p-8">
+          <div className={`mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-4 ${buildingAccess === 'pending' ? 'bg-orange-100 text-orange-500' : 'bg-red-100 text-red-500'}`}>
+            <span className="material-symbols-outlined text-3xl">
+              {buildingAccess === 'pending' ? 'hourglass_empty' : 'block'}
+            </span>
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+            {buildingAccess === 'pending' ? 'Aprovação Pendente' : 'Acesso Negado'}
+          </h2>
+          <p className="text-gray-500 dark:text-gray-400 mb-6">
+            {buildingAccess === 'pending'
+              ? 'Seu cadastro foi realizado com sucesso e está aguardando aprovação de um administrador. Por favor, aguarde.'
+              : 'Seu acesso ao sistema foi suspenso ou recusado pelo administrador.'}
+          </p>
+
+
+
+          <button
+            onClick={() => supabase.auth.signOut()}
+            className="w-full bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 font-bold py-3 rounded-xl transition-all flex items-center justify-center gap-2"
+          >
+            <span className="material-symbols-outlined">logout</span>
+            Sair Agora
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Wait for profile check before showing dashboard (prevents flash of content)
+  if (buildingAccess === 'checking') {
+    return <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900"><span className="material-symbols-outlined animate-spin text-primary text-4xl">verified_user</span></div>;
   }
 
   const selectedPatient = patients.find(p => p.id === selectedPatientId) || patients[0];
 
   const navigateToProfile = (id: string) => {
     setSelectedPatientId(id);
-    setView('profile');
+    setCurrentView('profile');
   };
 
   const navigateToDetails = (id: string) => {
     setSelectedPatientId(id);
-    setView('details');
+    setCurrentView('details');
   };
 
   const handleSavePatient = async (patient: Patient) => {
@@ -118,7 +235,7 @@ const App: React.FC = () => {
         setPatients([newPatient, ...patients]);
         setSelectedPatientId(newPatient.id);
       }
-      setView('profile'); // Go to profile after save
+      setCurrentView('profile'); // Go to profile after save
     } catch (error) {
       console.error('Error saving patient:', error);
       alert('Erro ao salvar paciente. Por favor, tente novamente.');
@@ -130,7 +247,7 @@ const App: React.FC = () => {
       setPatients(patients.map(p => p.id === updatedPatient.id ? updatedPatient : p));
       setEditingPatient(null);
       setSelectedPatientId(updatedPatient.id);
-      setView('details'); // Go to timeline after creating protocol
+      setCurrentView('details'); // Go to timeline after creating protocol
     } catch (error) {
       console.error('Error saving protocol:', error);
       alert('Erro ao salvar protocolo.');
@@ -139,7 +256,7 @@ const App: React.FC = () => {
 
   const handleEditPatient = () => {
     setEditingPatient(selectedPatient);
-    setView('register');
+    setCurrentView('register');
   };
 
   const handleAddProcedure = async (newProcedure: Procedure) => {
@@ -147,7 +264,7 @@ const App: React.FC = () => {
       // Persist to Supabase
       const savedProcedure = await supabaseService.createProcedure(newProcedure);
       setProcedures([...procedures, savedProcedure]);
-      setView('procedures');
+      setCurrentView('procedures');
     } catch (error: any) {
       console.error('Error saving procedure:', error);
       // Show specific error message if available, otherwise generic
@@ -155,30 +272,43 @@ const App: React.FC = () => {
     }
   };
 
+  const navigateToLead = async (leadId: string) => {
+    // Optionally fetch specific lead details if not fully loaded, 
+    // but for now relying on getting it fresh or passed.
+    // Ideally we fetch to ensure latest data including AI analysis updates.
+    try {
+      const lead = await supabaseService.getLeadById(leadId);
+      setSelectedLead(lead);
+      setCurrentView('lead_details');
+    } catch (e) {
+      console.error("Error fetching lead", e);
+    }
+  };
+
   const renderView = () => {
-    switch (view) {
+    switch (currentView) {
       case 'dashboard':
         return <Dashboard
           patients={patients}
           procedures={procedures}
           activeTreatments={activeTreatments}
           onPatientSelect={navigateToDetails}
-          onNewRegistration={() => setView('register')}
+          onNewRegistration={() => setCurrentView('register')}
         />;
       case 'patients':
-        return <PatientsList patients={patients} onPatientSelect={navigateToProfile} onNewRegistration={() => setView('register')} />;
+        return <PatientsList patients={patients} onPatientSelect={navigateToProfile} onNewRegistration={() => setCurrentView('register')} />;
       case 'profile':
         return <PatientProfile
           patient={selectedPatient}
-          onBack={() => setView('patients')}
+          onBack={() => setCurrentView('patients')}
           onEdit={handleEditPatient}
           onOpenProtocol={(treatmentId) => {
             setSelectedTreatmentId(treatmentId);
-            setView('details');
+            setCurrentView('details');
           }}
           onNewProtocol={() => {
             setEditingPatient(selectedPatient);
-            setView('protocol_register');
+            setCurrentView('protocol_register');
           }}
         />;
       case 'details':
@@ -188,12 +318,12 @@ const App: React.FC = () => {
           selectedTreatmentId={selectedTreatmentId}
           onBack={() => {
             setSelectedTreatmentId(undefined); // Clear selection when going back
-            setView('profile');
+            setCurrentView('profile');
           }}
           onEdit={handleEditPatient}
           onNewProtocol={() => {
             setEditingPatient(selectedPatient);
-            setView('protocol_register');
+            setCurrentView('protocol_register');
           }}
           onUpdate={loadData}
         />;
@@ -229,13 +359,13 @@ const App: React.FC = () => {
           />
         );
       case 'procedure_register':
-        return <ProcedureRegistration onSave={handleAddProcedure} onCancel={() => setView('procedures')} />;
+        return <ProcedureRegistration onSave={handleAddProcedure} onCancel={() => setCurrentView('procedures')} />;
       case 'protocol_register':
         return editingPatient ? (
           <ProtocolRegistration
             patient={editingPatient}
             onSave={handleSaveProtocol}
-            onCancel={() => setView('profile')}
+            onCancel={() => setCurrentView('profile')}
           />
         ) : null;
       case 'register':
@@ -243,38 +373,75 @@ const App: React.FC = () => {
           onSave={handleSavePatient}
           onCancel={() => {
             setEditingPatient(null);
-            setView(selectedPatientId ? 'profile' : 'dashboard');
+            setCurrentView(selectedPatientId ? 'profile' : 'dashboard');
           }}
           initialData={editingPatient || undefined}
         />;
+      case 'settings':
+        return <ClinicSettings onBack={() => setCurrentView('dashboard')} />;
+      case 'users':
+        return <UserManagement onBack={() => setCurrentView('dashboard')} />;
+      case 'quiz':
+        return <LeadQuiz />;
+      case 'crm_kanban':
+        return <CRMContainer onNavigateToLead={navigateToLead} />;
+      case 'lead_details':
+        return selectedLead ? (
+          <LeadDetails
+            lead={selectedLead}
+            onBack={() => setCurrentView('crm_kanban')}
+            onReanalyze={async () => {
+              // Placeholder for re-analyze
+              await supabaseService.reanalyzeLead(selectedLead.id);
+              alert("Reanálise solicitada (Simulação)");
+            }}
+          />
+        ) : <CRMKanban onSelectLead={navigateToLead} />;
+      // return <UserManagement onBack={() => setCurrentView('dashboard')} />;
       default:
-        return <Dashboard patients={patients} onPatientSelect={navigateToProfile} onNewRegistration={() => { setEditingPatient(null); setView('register'); }} />;
+        return <Dashboard patients={patients} onPatientSelect={navigateToProfile} onNewRegistration={() => { setEditingPatient(null); setCurrentView('register'); }} />;
     }
   };
 
+  // Special render for Quiz (Full Screen, no Sidebar/Header)
+  if (currentView === 'quiz') {
+    return (
+      <ThemeProvider>
+        {renderView()}
+      </ThemeProvider>
+    );
+  }
+
   return (
-    <div className="flex flex-col min-h-screen">
-      <Header currentView={view} setView={setView} onNewRegistration={() => { setEditingPatient(null); setView('register'); }} />
-      <div className="flex flex-1 overflow-hidden">
-        {(view === 'procedures' || view === 'procedure_register') && (
-          <Sidebar
-            setView={setView}
-            procedures={procedures}
-            onNewProcedure={() => setView('procedure_register')}
-            selectedProcedureId={selectedProcedureId}
-            onSelectProcedure={(id) => setSelectedProcedureId(id)}
-          />
-        )}
-        <main className="flex-1 overflow-y-auto custom-scrollbar bg-background-light dark:bg-background-dark">
-          <div className="max-w-7xl mx-auto w-full px-4 md:px-10 py-8">
-            {renderView()}
-          </div>
-        </main>
+    <ThemeProvider>
+      <div className="flex flex-col min-h-screen">
+        <Header currentView={currentView} onViewChange={setCurrentView} onNewRegistration={() => { setEditingPatient(null); setCurrentView('register'); }} />
+        <div className="flex flex-1 overflow-hidden">
+          {(currentView === 'procedures' || currentView === 'procedure_register') && (
+            <Sidebar
+              currentView={currentView}
+              onViewChange={setCurrentView}
+              procedures={procedures}
+              onNewProcedure={() => setCurrentView('procedure_register')}
+              selectedProcedureId={selectedProcedureId}
+              onSelectProcedure={(id) => setSelectedProcedureId(id)}
+            />
+          )}
+          <main className={`flex-1 bg-background-light dark:bg-background-dark ${currentView === 'crm_kanban' ? 'overflow-hidden flex flex-col' : 'overflow-y-auto custom-scrollbar'}`}>
+            {currentView === 'crm_kanban' ? (
+              renderView()
+            ) : (
+              <div className="max-w-7xl mx-auto w-full px-4 md:px-10 py-8">
+                {renderView()}
+              </div>
+            )}
+          </main>
+        </div>
+        <footer className="px-10 py-6 border-t border-[#DBDBDB] dark:border-[#262626] text-center bg-white dark:bg-background-dark">
+          <p className="text-xs text-[#8E8E8E] dark:text-[#A8A8A8]">© 2023 AestheticClinic Patient Follow-up System. Professional recovery tracking made simple.</p>
+        </footer>
       </div>
-      <footer className="px-10 py-6 border-t border-[#DBDBDB] dark:border-[#262626] text-center bg-white dark:bg-background-dark">
-        <p className="text-xs text-[#8E8E8E] dark:text-[#A8A8A8]">© 2023 AestheticClinic Patient Follow-up System. Professional recovery tracking made simple.</p>
-      </footer>
-    </div>
+    </ThemeProvider>
   );
 };
 

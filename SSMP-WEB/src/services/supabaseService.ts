@@ -1,8 +1,22 @@
 import { supabase } from '../lib/supabase';
-import { Patient, Procedure, PatientTreatment, SurveyStatus, TreatmentLog } from '../../types';
+import { Patient, Procedure, PatientTreatment, SurveyStatus, TreatmentLog, UserProfile, Lead } from '../../types';
 import { PROCEDURES as INITIAL_PROCEDURES } from '../../constants';
 
 export const supabaseService = {
+    // --- Helper ---
+    async _getClinicId() {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return null;
+
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('clinic_id')
+            .eq('id', user.id)
+            .single();
+
+        return profile?.clinic_id;
+    },
+
     // --- Patients ---
 
     async getPatients() {
@@ -34,7 +48,8 @@ export const supabaseService = {
             total_tasks: patient.totalTasks,
             photos: patient.photos,
             avatar: patient.avatar,
-            user_id: user.id
+            user_id: user.id,
+            clinic_id: await this._getClinicId()
         };
 
         const { data, error } = await supabase
@@ -110,12 +125,15 @@ export const supabaseService = {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error('User not authenticated');
 
+        const clinicId = await this._getClinicId();
+
         const proceduresToInsert = INITIAL_PROCEDURES.map(p => ({
             name: p.name,
             icon: p.icon,
             description: p.description,
             scripts: p.scripts,
-            user_id: user.id
+            user_id: user.id,
+            clinic_id: clinicId
         }));
 
         // Upsert allows us to ignore duplicates if they exist (based on the unique constraint we just added)
@@ -148,6 +166,7 @@ export const supabaseService = {
             description: procedure.description,
             scripts: procedure.scripts || [],
             user_id: user.id,
+            clinic_id: await this._getClinicId(),
             is_active: true
         };
 
@@ -277,10 +296,13 @@ export const supabaseService = {
             _scriptsSnapshot: treatment.scripts
         };
 
+        const clinicId = await this._getClinicId();
+
         const dbTreatment = {
             patient_id: treatment.patientId,
             procedure_id: treatment.procedureId,
             procedure_name: treatment.procedureName,
+            clinic_id: clinicId,
             started_at: treatment.startedAt,
             status: treatment.status,
             tasks_completed: treatment.tasksCompleted,
@@ -454,7 +476,269 @@ export const supabaseService = {
         // O ideal seria ter uma tabela public.profiles.
         // Por enquanto, retornamos os logs como estão.
         return data as TreatmentLog[];
-    }
+    },
+
+    // --- Clinic ---
+
+    async getClinic(userId: string) {
+        const { data, error } = await supabase
+            .from('clinics')
+            .select('*')
+            .eq('user_id', userId)
+            .single();
+
+        if (error && error.code !== 'PGRST116') {
+            throw error;
+        }
+
+        return data || null;
+    },
+
+    async upsertClinic(clinicData: any) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('User not authenticated');
+
+        const { data, error } = await supabase
+            .from('clinics')
+            .upsert({
+                ...clinicData,
+                user_id: user.id,
+                updated_at: new Date().toISOString()
+            }, { onConflict: 'user_id' })
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        // Sync clinic_id to profile
+        if (data?.id) {
+            await supabase
+                .from('profiles')
+                .update({ clinic_id: data.id })
+                .eq('id', user.id);
+        }
+
+        return data;
+    },
+
+    async uploadClinicLogo(userId: string, file: File) {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${userId}/logo.${fileExt}`;
+        const filePath = `${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+            .from('clinic-logos')
+            .upload(filePath, file, { upsert: true });
+
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage
+            .from('clinic-logos')
+            .getPublicUrl(filePath);
+
+        return publicUrl;
+    },
+
+    async getAllClinics() {
+        const { data, error } = await supabase
+            .from('clinics')
+            .select('id, fantasy_name, business_name')
+            .order('fantasy_name', { ascending: true });
+
+        if (error) throw error;
+        return data.map((c: any) => ({
+            id: c.id,
+            name: c.fantasy_name || c.business_name || 'Clínica sem nome'
+        }));
+    },
+
+    // --- User Profiles ---
+
+    async getUserProfile(userId: string) {
+        const { data, error } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', userId)
+            .single();
+
+        if (error) {
+            // If profile doesn't exist yet (race condition), return pending mock or null
+            if (error.code === 'PGRST116') return null;
+            throw error;
+        }
+        return data;
+    },
+
+    async getAllProfiles() {
+        const { data, error } = await supabase
+            .from('profiles')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        return data;
+    },
+
+    async updateProfileStatus(userId: string, status: 'approved' | 'rejected', role?: string, clinicId?: string) {
+        const updates: any = { status };
+        if (role) updates.role = role;
+        if (clinicId) updates.clinic_id = clinicId;
+
+        const { data, error } = await supabase
+            .from('profiles')
+            .update(updates)
+            .eq('id', userId)
+            .select()
+            .single();
+
+        if (error) throw error;
+        return data;
+    },
+
+    async updateUserProfile(userId: string, updates: Partial<UserProfile>) {
+        const { data, error } = await supabase
+            .from('profiles')
+            .update(updates)
+            .eq('id', userId)
+            .select()
+            .single();
+
+        if (error) throw error;
+        return data;
+    },
+
+    // --- Leads ---
+
+    async getCRMSettings(key: string = 'lead_scoring') {
+        const { data, error } = await supabase
+            .from('crm_settings')
+            .select('value')
+            .eq('setting_key', key)
+            .single();
+
+        if (error && error.code !== 'PGRST116') {
+            console.error('Error fetching CRM settings:', error);
+            return null;
+        }
+        return data?.value || { frio_max: 50, morno_max: 75, quente_max: 90 }; // Default fallback
+    },
+
+    async updateCRMSettings(key: string, value: any) {
+        const { data, error } = await supabase
+            .from('crm_settings')
+            .upsert({ setting_key: key, value, updated_at: new Date().toISOString() }, { onConflict: 'setting_key' })
+            .select()
+            .single();
+
+        if (error) {
+            console.error('Error updating CRM settings:', error);
+            throw error;
+        }
+        return data;
+    },
+
+    async getQuizConfig() {
+        // Try to fetch quiz config from DB
+        const { data, error } = await supabase
+            .from('quiz_config')
+            .select('*')
+            .single();
+
+        if (error) {
+            console.error('Error fetching quiz config:', error);
+            // If profile doesn't exist yet (race condition), return pending mock or null
+            if (error.code === 'PGRST116') return null;
+            throw error;
+        }
+        console.log('Fetched Quiz Config:', data);
+        return data;
+    },
+
+    async saveQuizConfig(questions: any[], finalScreen?: any) {
+        // Fetch existing config to determine if we update or insert
+        const current = await this.getQuizConfig();
+
+        const payload: any = {
+            questions: questions,
+            final_screen: finalScreen,
+            updated_at: new Date().toISOString()
+        };
+
+        let result;
+        let error;
+
+        if (current && current.id) {
+            // Update existing
+            const response = await supabase
+                .from('quiz_config')
+                .update(payload)
+                .eq('id', current.id)
+                .select()
+                .single();
+            result = response.data;
+            error = response.error;
+        } else {
+            // Insert new (let DB generate UUID)
+            const response = await supabase
+                .from('quiz_config')
+                .insert([payload])
+                .select()
+                .single();
+            result = response.data;
+            error = response.error;
+        }
+
+        if (error) {
+            console.error('Error saving quiz config:', error);
+            throw error;
+        }
+        return result;
+    },
+
+    async getLeads() {
+        const { data, error } = await supabase
+            .from('leads')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        // Fetch settings for calibration
+        const settings = await this.getCRMSettings();
+
+        return (data || []).map(lead => mapDbToLead(lead, settings));
+    },
+
+    async getLeadById(id: string) {
+        // Fetch specific lead
+        const { data, error } = await supabase
+            .from('leads')
+            .select('*')
+            .eq('id', id)
+            .single();
+
+        if (error) throw error;
+
+        // Fetch calibration settings to map status correctly
+        const settings = await this.getCRMSettings();
+
+        return mapDbToLead(data, settings);
+    },
+
+    async updateLead(id: string, updates: Partial<Lead>) {
+        // If sorting status, map 'Frio' back to 'Cold' if necessary, or just save as is.
+        // Assuming DB accepts the PT values since mapDbToLead handles fallback.
+
+        const { data, error } = await supabase
+            .from('leads')
+            .update(updates)
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) throw error;
+        return data;
+    },
 };
 
 // Helper to map DB treatment to Frontend type
@@ -499,3 +783,15 @@ const mapDbToPatient = (dbPatient: any): Patient => ({
     photos: dbPatient.photos || [],
     avatar: dbPatient.avatar,
 });
+
+const mapDbToLead = (dbLead: any, settings?: any): Lead => {
+    let status = dbLead.kanban_status === 'Cold' ? 'Frio' : (dbLead.kanban_status || 'Frio');
+
+    return {
+        ...dbLead,
+        concerns: typeof dbLead.concerns === 'string' ? JSON.parse(dbLead.concerns) : (dbLead.concerns || []),
+        availability: typeof dbLead.availability === 'string' ? JSON.parse(dbLead.availability) : (dbLead.availability || []),
+        ai_tags: typeof dbLead.ai_tags === 'string' ? JSON.parse(dbLead.ai_tags) : (dbLead.ai_tags || []),
+        kanban_status: status
+    };
+};

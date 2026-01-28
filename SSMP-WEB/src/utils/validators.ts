@@ -3,7 +3,7 @@ export const normalize = (value: string) => value.replace(/\D/g, '');
 
 export const validateCPF = (cpf: string): boolean => {
   const cleanCPF = normalize(cpf);
-  
+
   if (cleanCPF.length !== 11) return false;
   if (/^(\d)\1+$/.test(cleanCPF)) return false; // Check for all same digits (111.111.111-11)
 
@@ -57,4 +57,55 @@ export const formatPhone = (value: string): string => {
       .replace(/(\d{2})(\d)/, '($1) $2')
       .replace(/(\d{5})(\d)/, '$1-$2');
   }
+};
+
+export const validateCNPJ = (cnpj: string): boolean => {
+  const cleanCNPJ = normalize(cnpj);
+
+  if (cleanCNPJ.length !== 14) return false;
+
+  // Validate Check Digits
+  let size = cleanCNPJ.length - 2;
+  let numbers = cleanCNPJ.substring(0, size);
+  const digits = cleanCNPJ.substring(size);
+  let sum = 0;
+  let pos = size - 7;
+
+  for (let i = size; i >= 1; i--) {
+    sum += parseInt(numbers.charAt(size - i)) * pos--;
+    if (pos < 2) pos = 9;
+  }
+
+  let result = sum % 11 < 2 ? 0 : 11 - sum % 11;
+  if (result !== parseInt(digits.charAt(0))) return false;
+
+  size = size + 1;
+  numbers = cleanCNPJ.substring(0, size);
+  sum = 0;
+  pos = size - 7;
+
+  for (let i = size; i >= 1; i--) {
+    sum += parseInt(numbers.charAt(size - i)) * pos--;
+    if (pos < 2) pos = 9;
+  }
+
+  result = sum % 11 < 2 ? 0 : 11 - sum % 11;
+  if (result !== parseInt(digits.charAt(1))) return false;
+
+  return true;
+};
+
+export const formatCNPJ = (value: string): string => {
+  const cleanValue = normalize(value).slice(0, 14);
+  return cleanValue
+    .replace(/^(\d{2})(\d)/, '$1.$2')
+    .replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3')
+    .replace(/\.(\d{3})(\d)/, '.$1/$2')
+    .replace(/(\d{4})(\d)/, '$1-$2');
+};
+
+export const formatZipCode = (value: string): string => {
+  const cleanValue = normalize(value).slice(0, 8);
+  return cleanValue
+    .replace(/^(\d{5})(\d)/, '$1-$2');
 };

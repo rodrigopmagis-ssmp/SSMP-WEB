@@ -192,51 +192,62 @@ const PatientDetails: React.FC<PatientDetailsProps> = ({ patient, procedures = [
 
   const scriptText = `Olá ${patient.name.split(' ')[0]}, espero que esteja tendo um ótimo dia! ✨ Como está a região da aplicação hoje ? Notou algum roxinho ou inchaço ?\n\nLembre - se de evitar exposição solar e usar o protetor conforme conversamos.Poderia nos enviar uma foto rápida de como está a recuperação agora ? `;
 
-  const handleCopyScript = (text: string, stageId: string) => {
-    console.log('Tentando copiar script...');
+  const cleanAndFormatScript = (template: string, patientName: string) => {
+    if (!template) return '';
 
-    const fallbackCopyTextToClipboard = (text: string) => {
-      var textArea = document.createElement("textarea");
-      textArea.value = text;
-      textArea.style.top = "0";
-      textArea.style.left = "0";
+    let text = template;
+
+    // Replace placeholders - Support both formats
+    text = text.replace(/#NomePaciente/g, patientName)
+      .replace(/\[Nome\]/g, patientName)
+      .replace(/#NomeClinica/g, 'Aesthetic Clinic')
+      .replace(/\[NomeClinica\]/g, 'Aesthetic Clinic');
+
+    // Fix formatting for WhatsApp 
+    // Markdown uses **bold**, WhatsApp uses *bold*
+    text = text.replace(/\*\*/g, '*');
+
+    // Remove specific garbage characters (Replacement Character)
+    // eslint-disable-next-line
+    text = text.replace(/\uFFFD/g, '');
+
+    return text;
+  };
+
+  const handleCopyScript = async (text: string, stageId: string) => {
+    // Normalize newlines to ensure consistency across platforms
+    const cleanText = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+    try {
+      await navigator.clipboard.writeText(cleanText);
+      setCopyFeedback(stageId);
+      setTimeout(() => setCopyFeedback(null), 2000);
+    } catch (err) {
+      console.error('Clipboard API failed', err);
+      // Fallback
+      const textArea = document.createElement("textarea");
+      textArea.value = cleanText;
       textArea.style.position = "fixed";
+      textArea.style.left = "-9999px";
       document.body.appendChild(textArea);
       textArea.focus();
       textArea.select();
       try {
-        var successful = document.execCommand('copy');
-        if (successful) {
-          setCopyFeedback(stageId);
-          setTimeout(() => setCopyFeedback(null), 2000);
-        } else {
-          alert('Não foi possível copiar. Por favor, selecione e copie manualmente.');
-        }
-      } catch (err) {
-        alert('Não foi possível copiar. Por favor, selecione e copie manualmente.');
+        document.execCommand('copy');
+        setCopyFeedback(stageId);
+        setTimeout(() => setCopyFeedback(null), 2000);
+      } catch (e) {
+        alert('Não foi possível copiar automaticamente.');
       }
       document.body.removeChild(textArea);
     }
-
-    if (!navigator.clipboard) {
-      fallbackCopyTextToClipboard(text);
-      return;
-    }
-
-    navigator.clipboard.writeText(text)
-      .then(() => {
-        setCopyFeedback(stageId);
-        setTimeout(() => setCopyFeedback(null), 2000);
-      })
-      .catch((err) => {
-        fallbackCopyTextToClipboard(text);
-      });
   };
 
   const handleSendWhatsapp = (text: string) => {
     const encodedText = encodeURIComponent(text);
     const phone = patient.phone.replace(/\D/g, '');
-    window.open(`https://wa.me/${phone}?text=${encodedText}`, '_blank');
+    // Using api.whatsapp.com is often more reliable for pre-filled text with special chars than wa.me
+    window.open(`https://api.whatsapp.com/send?phone=${phone}&text=${encodedText}`, '_blank');
   };
 
 
@@ -826,10 +837,9 @@ const PatientDetails: React.FC<PatientDetailsProps> = ({ patient, procedures = [
                                   <div className="flex gap-2">
                                     <button
                                       onClick={() => {
-                                        const textToCopy = scriptInfo?.template
-                                          ? scriptInfo.template.replace('#NomePaciente', patient.name.split(' ')[0]).replace('#NomeClinica', 'Aesthetic Clinic')
-                                          : scriptText;
-                                        handleCopyScript(textToCopy, stageId);
+                                        const rawText = scriptInfo?.template || scriptText;
+                                        const cleanText = cleanAndFormatScript(rawText, patient.name.split(' ')[0]);
+                                        handleCopyScript(cleanText, stageId);
                                       }}
                                       className="flex items-center gap-1.5 text-gray-700 hover:text-primary hover:bg-white px-3 py-1.5 rounded-lg text-xs font-bold transition-all border border-transparent hover:border-gray-300 hover:shadow-sm"
                                       title="Copiar texto"
@@ -839,10 +849,9 @@ const PatientDetails: React.FC<PatientDetailsProps> = ({ patient, procedures = [
                                     </button>
                                     <button
                                       onClick={() => {
-                                        const textToSend = scriptInfo?.template
-                                          ? scriptInfo.template.replace('#NomePaciente', patient.name.split(' ')[0]).replace('#NomeClinica', 'Aesthetic Clinic')
-                                          : scriptText;
-                                        handleSendWhatsapp(textToSend);
+                                        const rawText = scriptInfo?.template || scriptText;
+                                        const cleanText = cleanAndFormatScript(rawText, patient.name.split(' ')[0]);
+                                        handleSendWhatsapp(cleanText);
                                       }}
                                       className="flex items-center gap-1.5 bg-[#25D366] hover:bg-[#20bd5c] text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm transform hover:-translate-y-0.5"
                                     >
@@ -855,9 +864,7 @@ const PatientDetails: React.FC<PatientDetailsProps> = ({ patient, procedures = [
 
                               <div className="p-5 bg-white dark:bg-gray-900/50">
                                 <p className="text-base text-gray-900 dark:text-gray-100 leading-relaxed font-medium whitespace-pre-line select-text">
-                                  {scriptInfo?.template
-                                    ? scriptInfo.template.replace('#NomePaciente', patient.name.split(' ')[0]).replace('#NomeClinica', 'Aesthetic Clinic')
-                                    : scriptText}
+                                  {cleanAndFormatScript(scriptInfo?.template || scriptText, patient.name.split(' ')[0])}
                                 </p>
                               </div>
                             </div>

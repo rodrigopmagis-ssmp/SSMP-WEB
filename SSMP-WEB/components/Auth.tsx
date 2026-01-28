@@ -5,6 +5,7 @@ export const Auth: React.FC = () => {
     const [loading, setLoading] = useState(false);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [fullName, setFullName] = useState('');
     const [isSignUp, setIsSignUp] = useState(false);
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
@@ -15,20 +16,28 @@ export const Auth: React.FC = () => {
 
         try {
             if (isSignUp) {
-                const { error } = await supabase.auth.signUp({
+                const { error, data } = await supabase.auth.signUp({
                     email,
                     password,
+                    options: {
+                        data: {
+                            full_name: fullName,
+                        }
+                    }
                 });
                 if (error) throw error;
-                setMessage({ type: 'success', text: 'Verifique seu email para confirmar o cadastro!' });
+                setMessage({ type: 'success', text: 'Cadastro realizado! Aguarde a aprovação do administrador.' });
             } else {
-                const { error } = await supabase.auth.signInWithPassword({
+                const { data: { user }, error } = await supabase.auth.signInWithPassword({
                     email,
                     password,
                 });
                 if (error) throw error;
+
+
             }
         } catch (error: any) {
+            console.error(error);
             setMessage({ type: 'error', text: error.message || 'Ocorreu um erro.' });
         } finally {
             setLoading(false);
@@ -58,6 +67,23 @@ export const Auth: React.FC = () => {
                     )}
 
                     <form onSubmit={handleAuth} className="space-y-5">
+                        {isSignUp && (
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Nome Completo</label>
+                                <div className="relative">
+                                    <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">person</span>
+                                    <input
+                                        type="text"
+                                        className="w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm"
+                                        placeholder="Seu Nome"
+                                        value={fullName}
+                                        onChange={(e) => setFullName(e.target.value)}
+                                        required={isSignUp}
+                                    />
+                                </div>
+                            </div>
+                        )}
+
                         <div>
                             <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Email</label>
                             <div className="relative">
@@ -106,7 +132,7 @@ export const Auth: React.FC = () => {
 
                     <div className="mt-6 text-center">
                         <button
-                            onClick={() => { setIsSignUp(!isSignUp); setMessage(null); }}
+                            onClick={() => { setIsSignUp(!isSignUp); setMessage(null); setFullName(''); }}
                             className="text-sm text-primary font-bold hover:underline"
                         >
                             {isSignUp ? 'Já tem uma conta? Entre' : 'Não tem conta? Cadastre-se'}
