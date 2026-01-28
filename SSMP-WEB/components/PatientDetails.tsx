@@ -1,3 +1,4 @@
+import React, { useState, useEffect } from 'react';
 import { Patient, SurveyStatus, Procedure, ScriptStage, StageData, ClinicalNote, TreatmentLog, PatientPhoto } from '../types';
 import { calculateDueDate, getSLAStatus, formatDueDate } from '../src/utils/sla';
 import { supabaseService } from '../src/services/supabaseService';
@@ -189,9 +190,10 @@ const PatientDetails: React.FC<PatientDetailsProps> = ({ patient, procedures = [
   // Effect to update local state when active treatment changes
   useEffect(() => {
     if (activeTreatment) {
-      setTasksCompleted(activeTreatment.tasksCompleted);
+      const safeTasksCompleted = activeTreatment.tasksCompleted || 0;
+      setTasksCompleted(safeTasksCompleted);
       setStageData(activeTreatment.stageData || {});
-      setExpandedStage('stage' + (activeTreatment.tasksCompleted + 1));
+      setExpandedStage('stage' + (safeTasksCompleted + 1));
       setSurveyStatus(activeTreatment.surveyStatus || SurveyStatus.PENDING);
 
       // Update survey dates if available
@@ -203,11 +205,11 @@ const PatientDetails: React.FC<PatientDetailsProps> = ({ patient, procedures = [
   }, [activeTreatment]);
 
   // Find procedure definition for the ACTIVE treatment
-  const currentProcedureDef = activeTreatment
-    ? procedures.find(p => p.id === activeTreatment.procedureId || p.name === activeTreatment.procedureName)
+  const currentProcedureDef = activeTreatment && Array.isArray(procedures)
+    ? procedures.find(p => p && (p.id === activeTreatment.procedureId || p.name === activeTreatment.procedureName))
     : null;
 
-  const scripts: ScriptStage[] = activeTreatment?.scripts || currentProcedureDef?.scripts || [];
+  const scripts: ScriptStage[] = Array.isArray(activeTreatment?.scripts) ? activeTreatment.scripts : (Array.isArray(currentProcedureDef?.scripts) ? currentProcedureDef!.scripts : []);
 
   const scriptText = `Olá ${patient.name.split(' ')[0]}, espero que esteja tendo um ótimo dia! ✨ Como está a região da aplicação hoje ? Notou algum roxinho ou inchaço ?\n\nLembre - se de evitar exposição solar e usar o protetor conforme conversamos.Poderia nos enviar uma foto rápida de como está a recuperação agora ? `;
 
@@ -307,20 +309,21 @@ const PatientDetails: React.FC<PatientDetailsProps> = ({ patient, procedures = [
 
     if (tasksCompleted < activeTreatment.totalTasks) {
       try {
-        const newTasksCompleted = tasksCompleted + 1;
-        const newProgress = Math.round((newTasksCompleted / activeTreatment.totalTasks) * 100);
+        const safeTasksCompleted = (tasksCompleted || 0) + 1;
+        const totalTasks = activeTreatment.totalTasks || 1; // Prevent division by zero
+        const newProgress = Math.round((safeTasksCompleted / totalTasks) * 100);
 
         // Optimistic update
-        setTasksCompleted(newTasksCompleted);
+        setTasksCompleted(safeTasksCompleted);
         setIsTaskOpen(false);
-        setExpandedStage(`stage${newTasksCompleted + 1}`);
+        setExpandedStage(`stage${safeTasksCompleted + 1}`);
         setIsTaskOpen(true);
 
         const updatedTreatment = {
           ...activeTreatment,
-          tasksCompleted: newTasksCompleted,
+          tasksCompleted: safeTasksCompleted,
           progress: newProgress,
-          status: newTasksCompleted === activeTreatment.totalTasks ? 'completed' : 'active'
+          status: safeTasksCompleted === activeTreatment.totalTasks ? 'completed' : 'active'
         };
         setActiveTreatment(updatedTreatment);
 
@@ -579,7 +582,7 @@ const PatientDetails: React.FC<PatientDetailsProps> = ({ patient, procedures = [
               </div>
 
               <div className="flex gap-2 mt-3 flex-wrap">
-                {patient.procedures.map((procedureName, index) => {
+                {patient.procedures?.map((procedureName, index) => {
                   const isActive = activeTreatment?.procedureName === procedureName;
 
                   if (isActive) {
@@ -726,7 +729,7 @@ const PatientDetails: React.FC<PatientDetailsProps> = ({ patient, procedures = [
 
               <div className="space-y-6 relative before:content-[''] before:absolute before:left-[19px] before:top-4 before:bottom-4 before:w-[2px] before:bg-gray-200 dark:before:bg-gray-800">
                 {/* Render stages dynamically based on available scripts or totalTasks */}
-                {Array.from({ length: (activeTreatment?.totalTasks || patient.totalTasks) }, (_, idx) => {
+                {Array.from({ length: Math.max(0, activeTreatment?.totalTasks || patient.totalTasks || 0) }, (_, idx) => {
                   const stageNum = idx + 1;
                   const isCompleted = stageNum <= tasksCompleted;
                   const isActive = stageNum === tasksCompleted + 1;
@@ -1124,7 +1127,7 @@ const PatientDetails: React.FC<PatientDetailsProps> = ({ patient, procedures = [
                             }
 
                             <div className="grid md:grid-cols-2 gap-6 border-t border-gray-200 dark:border-gray-700 pt-5 mt-2">
-                              {scriptInfo?.actions && scriptInfo.actions.length > 0 && (
+                              {scriptInfo?.actions && Array.isArray(scriptInfo.actions) && scriptInfo.actions.length > 0 && (
                                 <div className="space-y-3">
                                   <h4 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-1.5">
                                     <span className="material-symbols-outlined text-sm">checklist</span>
@@ -1295,7 +1298,7 @@ const PatientDetails: React.FC<PatientDetailsProps> = ({ patient, procedures = [
                 <div className="mt-6 pt-6 border-t border-gray-100 dark:border-gray-800">
                   <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Fotos Recentes</h4>
                   <div className="grid grid-cols-3 gap-2">
-                    {patient.photos.map((photo, i) => (
+                    {patient.photos?.map((photo, i) => (
                       <div
                         key={i}
                         className="aspect-square rounded-lg bg-center bg-cover border border-gray-100 cursor-pointer hover:opacity-80 transition-opacity"
@@ -1316,10 +1319,10 @@ const PatientDetails: React.FC<PatientDetailsProps> = ({ patient, procedures = [
                 </div>
 
                 <div className="space-y-3 mb-4">
-                  {notes.length === 0 ? (
+                  {(!notes || notes.length === 0) ? (
                     <p className="text-sm text-gray-500 italic text-center py-4">Nenhuma nota registrada.</p>
                   ) : (
-                    notes.map((note) => (
+                    notes?.map((note) => (
                       <div key={note.id} className="bg-white dark:bg-gray-800 p-3 rounded-lg border border-primary/10 shadow-sm">
                         <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed mb-2">
                           "{note.content}"
@@ -1438,19 +1441,19 @@ const PatientDetails: React.FC<PatientDetailsProps> = ({ patient, procedures = [
               </div>
 
               <div className="flex-1 overflow-y-auto p-0">
-                {loadingLogs ? (
+                {(loadingLogs) ? (
                   <div className="p-8 text-center text-gray-500 flex flex-col items-center gap-2">
                     <span className="material-symbols-outlined animate-spin text-2xl">sync</span>
                     Carregando histórico...
                   </div>
-                ) : treatmentLogs.length === 0 ? (
+                ) : (!treatmentLogs || treatmentLogs.length === 0) ? (
                   <div className="p-12 text-center text-gray-400 flex flex-col items-center gap-3">
                     <span className="material-symbols-outlined text-4xl opacity-50">history_toggle_off</span>
                     <p>Nenhuma ação registrada neste tratamento.</p>
                   </div>
                 ) : (
                   <div className="divide-y divide-gray-100 dark:divide-gray-700">
-                    {treatmentLogs.map((log) => (
+                    {treatmentLogs?.map((log) => (
                       <div key={log.id} className="p-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors flex gap-3 items-start">
                         <div className={`mt-0.5 size-8 rounded-full flex items-center justify-center shrink-0 ${log.action.includes('completed') ? 'bg-green-100 text-green-600' :
                           log.action.includes('message') ? 'bg-blue-100 text-blue-600' :
