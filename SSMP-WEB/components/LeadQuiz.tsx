@@ -388,8 +388,8 @@ const LeadQuiz: React.FC<LeadQuizProps> = ({ onBackendComplete }) => {
 
     if (finished) {
         return (
-            <div className="min-h-screen bg-gradient-to-br from-primary-dark to-purple flex items-center justify-center p-6 text-white text-center animate-fade-in">
-                <div className="max-w-md w-full bg-white text-gray-800 rounded-3xl p-10 shadow-2xl">
+            <div className="min-h-screen bg-gradient-to-br from-primary-dark to-purple flex items-center justify-center p-4 text-white text-center animate-fade-in">
+                <div className="max-w-lg w-full bg-white text-gray-800 rounded-3xl p-6 md:p-10 shadow-2xl">
                     <div className="w-20 h-20 bg-green-100 text-green-500 rounded-full flex items-center justify-center mx-auto mb-6">
                         <Icon name="check_circle" className="text-5xl" />
                     </div>
@@ -426,8 +426,8 @@ const LeadQuiz: React.FC<LeadQuizProps> = ({ onBackendComplete }) => {
                 />
             </div>
 
-            <div className="flex-1 flex flex-col items-center justify-center p-6 sm:p-12 relative max-w-2xl mx-auto w-full z-10">
-                <div className="bg-white/70 backdrop-blur-xl rounded-3xl shadow-xl w-full p-8 sm:p-12 animate-slide-up border border-white/60">
+            <div className="flex-1 flex flex-col items-center justify-center p-4 sm:p-12 relative max-w-3xl mx-auto w-full z-10">
+                <div className="bg-white/70 backdrop-blur-xl rounded-3xl shadow-xl w-full p-6 sm:p-12 animate-slide-up border border-white/60">
                     {step > 0 && (
                         <button
                             onClick={handleBack}
