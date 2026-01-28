@@ -386,25 +386,27 @@ const LeadQuiz: React.FC<LeadQuizProps> = ({ onBackendComplete }) => {
         );
     }
 
-    return (
-        <div className="min-h-screen bg-gradient-to-br from-primary-dark to-purple flex items-center justify-center p-0 sm:p-4 text-white text-center animate-fade-in">
-            <div className="w-full h-screen sm:h-auto max-w-2xl bg-white text-gray-800 sm:rounded-3xl p-8 sm:p-12 shadow-none sm:shadow-2xl flex flex-col justify-center items-center">
-                <div className="w-24 h-24 bg-green-100 text-green-500 rounded-full flex items-center justify-center mb-8 transform scale-110">
-                    <Icon name="check_circle" className="text-6xl" />
+    if (finished) {
+        return (
+            <div className="min-h-screen bg-gradient-to-br from-primary-dark to-purple flex items-center justify-center p-0 sm:p-4 text-white text-center animate-fade-in">
+                <div className="w-full h-screen sm:h-auto max-w-2xl bg-white text-gray-800 sm:rounded-3xl p-8 sm:p-12 shadow-none sm:shadow-2xl flex flex-col justify-center items-center">
+                    <div className="w-24 h-24 bg-green-100 text-green-500 rounded-full flex items-center justify-center mb-8 transform scale-110">
+                        <Icon name="check_circle" className="text-6xl" />
+                    </div>
+                    <h2 className="text-4xl font-bold mb-6 text-primary">{finalScreenConfig.title}</h2>
+                    <p className="text-gray-600 mb-10 text-xl leading-relaxed max-w-lg">
+                        {finalScreenConfig.message.replace('{phone}', data.whatsapp ? `${data.whatsapp}` : '')}
+                    </p>
+                    <button
+                        onClick={handleFinalAction}
+                        className={`w-full max-w-md py-5 bg-gray-100 text-gray-700 text-xl font-bold rounded-2xl hover:bg-gray-200 transition-colors ${(!finalScreenConfig.buttonAction || finalScreenConfig.buttonAction === 'none') ? 'cursor-default hover:bg-gray-100' : ''}`}
+                    >
+                        {finalScreenConfig.buttonText}
+                    </button>
                 </div>
-                <h2 className="text-4xl font-bold mb-6 text-primary">{finalScreenConfig.title}</h2>
-                <p className="text-gray-600 mb-10 text-xl leading-relaxed max-w-lg">
-                    {finalScreenConfig.message.replace('{phone}', data.whatsapp ? `${data.whatsapp}` : '')}
-                </p>
-                <button
-                    onClick={handleFinalAction}
-                    className={`w-full max-w-md py-5 bg-gray-100 text-gray-700 text-xl font-bold rounded-2xl hover:bg-gray-200 transition-colors ${(!finalScreenConfig.buttonAction || finalScreenConfig.buttonAction === 'none') ? 'cursor-default hover:bg-gray-100' : ''}`}
-                >
-                    {finalScreenConfig.buttonText}
-                </button>
             </div>
-        </div>
-    );
+        );
+    }
 
     return (
         <div className="min-h-screen bg-[#fff0f5] flex flex-col font-display overflow-hidden relative">
