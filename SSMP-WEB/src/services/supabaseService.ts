@@ -22,11 +22,32 @@ export const supabaseService = {
     async getPatients() {
         const { data, error } = await supabase
             .from('patients')
-            .select('*')
+            .select(`
+                *,
+                patient_treatments (
+                    procedure_name,
+                    status
+                )
+            `)
             .order('created_at', { ascending: false });
 
         if (error) throw error;
-        return (data || []).map(mapDbToPatient);
+
+        // Fetch calibration settings
+        const settings = await this.getCRMSettings();
+
+        return (data || []).map(p => {
+            const treatments = p.patient_treatments || [];
+            // Get unique procedure names from active/all treatments
+            const procedureNames = Array.from(new Set(treatments.map((t: any) => t.procedure_name).filter(Boolean)));
+
+            const patientWithProcedures = {
+                ...p,
+                procedures: procedureNames
+            };
+
+            return mapDbToPatient(patientWithProcedures);
+        });
     },
 
     async createPatient(patient: Partial<Patient>) {
@@ -39,17 +60,20 @@ export const supabaseService = {
             email: patient.email,
             dob: patient.dob,
             cpf: patient.cpf,
-            procedures: patient.procedures,
+            // procedures: patient.procedures, // Deprecated - derived from treatments
             procedure_date: patient.procedureDate,
             last_visit: patient.lastVisit,
             status: patient.status,
             progress: patient.progress,
             tasks_completed: patient.tasksCompleted,
             total_tasks: patient.totalTasks,
-            photos: patient.photos,
+            // photos: patient.photos, // Deprecated - stored in patient_photos
             avatar: patient.avatar,
             user_id: user.id,
-            clinic_id: await this._getClinicId()
+            clinic_id: await this._getClinicId(),
+            gender: patient.gender,
+            marital_status: patient.maritalStatus,
+            profession: patient.profession
         };
 
         const { data, error } = await supabase
@@ -69,17 +93,33 @@ export const supabaseService = {
         if (updates.email !== undefined) dbUpdates.email = updates.email;
         if (updates.dob !== undefined) dbUpdates.dob = updates.dob;
         if (updates.cpf !== undefined) dbUpdates.cpf = updates.cpf;
-        if (updates.procedures !== undefined) dbUpdates.procedures = updates.procedures;
+        // if (updates.procedures !== undefined) dbUpdates.procedures = updates.procedures; // Deprecated
         if (updates.procedureDate !== undefined) dbUpdates.procedure_date = updates.procedureDate;
         if (updates.lastVisit !== undefined) dbUpdates.last_visit = updates.lastVisit;
         if (updates.status !== undefined) dbUpdates.status = updates.status;
         if (updates.progress !== undefined) dbUpdates.progress = updates.progress;
         if (updates.tasksCompleted !== undefined) dbUpdates.tasks_completed = updates.tasksCompleted;
         if (updates.totalTasks !== undefined) dbUpdates.total_tasks = updates.totalTasks;
-        if (updates.photos !== undefined) dbUpdates.photos = updates.photos;
+        // if (updates.photos !== undefined) dbUpdates.photos = updates.photos; // Deprecated
         if (updates.avatar !== undefined) dbUpdates.avatar = updates.avatar;
         if (updates.survey !== undefined) dbUpdates.survey = updates.survey;
         if (updates.stageData !== undefined) dbUpdates.stage_data = updates.stageData;
+
+        if (updates.stageData !== undefined) dbUpdates.stage_data = updates.stageData;
+
+        if (updates.gender !== undefined) dbUpdates.gender = updates.gender;
+        if (updates.maritalStatus !== undefined) dbUpdates.marital_status = updates.maritalStatus;
+        if (updates.gender !== undefined) dbUpdates.gender = updates.gender;
+        if (updates.maritalStatus !== undefined) dbUpdates.marital_status = updates.maritalStatus;
+        if (updates.maritalStatus !== undefined) dbUpdates.marital_status = updates.maritalStatus;
+        if (updates.profession !== undefined) dbUpdates.profession = updates.profession;
+        if (updates.address !== undefined) dbUpdates.address = updates.address;
+
+        if (updates.rg !== undefined) dbUpdates.rg = updates.rg;
+        if (updates.cnpj !== undefined) dbUpdates.cnpj = updates.cnpj;
+        if (updates.race !== undefined) dbUpdates.race = updates.race;
+        if (updates.origin !== undefined) dbUpdates.origin = updates.origin;
+        if (updates.healthInsurance !== undefined) dbUpdates.health_insurance = updates.healthInsurance;
 
         const { data, error } = await supabase
             .from('patients')
@@ -440,6 +480,52 @@ export const supabaseService = {
         return publicUrl;
     },
 
+    // --- Patient Photos (New Table) ---
+
+    async getPatientPhotos(patientId: string) {
+        const { data, error } = await supabase
+            .from('patient_photos')
+            .select('*')
+            .eq('patient_id', patientId)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        return data.map((p: any) => ({
+            id: p.id,
+            patientId: p.patient_id,
+            treatmentId: p.treatment_id,
+            stageId: p.stage_id,
+            photoUrl: p.photo_url,
+            createdAt: p.created_at,
+            metadata: p.metadata
+        }));
+    },
+
+    async addPatientPhoto(patientId: string, url: string, treatmentId?: string, stageId?: string) {
+        const { data, error } = await supabase
+            .from('patient_photos')
+            .insert([{
+                patient_id: patientId,
+                photo_url: url,
+                treatment_id: treatmentId,
+                stage_id: stageId
+            }])
+            .select()
+            .single();
+
+        if (error) throw error;
+        return data;
+    },
+
+    async deletePatientPhoto(photoId: string) {
+        const { error } = await supabase
+            .from('patient_photos')
+            .delete()
+            .eq('id', photoId);
+        if (error) throw error;
+        return true;
+    },
+
     // --- Logs ---
 
     async createLog(log: Omit<TreatmentLog, 'id' | 'created_at' | 'user_email'>) {
@@ -780,7 +866,7 @@ const mapDbToPatient = (dbPatient: any): Patient => ({
     progress: dbPatient.progress || 0,
     tasksCompleted: dbPatient.tasks_completed || 0,
     totalTasks: dbPatient.total_tasks || 0,
-    photos: dbPatient.photos || [],
+    // photos: dbPatient.photos || [], // Deprecated
     avatar: dbPatient.avatar,
 });
 

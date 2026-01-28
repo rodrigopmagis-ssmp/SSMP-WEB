@@ -9,7 +9,7 @@ export interface DatabasePatient {
     email: string | null;
     dob: string | null;
     cpf: string | null;
-    procedures: string[];
+    procedures?: string[]; // Made optional as column is dropped
     procedure_date: string | null;
     last_visit: string;
     status: string;
@@ -17,6 +17,9 @@ export interface DatabasePatient {
     avatar: string | null;
     created_at: string;
     updated_at: string;
+    gender: 'male' | 'female' | 'other' | null;
+    marital_status: string | null;
+    profession: string | null;
 }
 
 function dbPatientToPatient(dbPatient: DatabasePatient): Patient {
@@ -27,12 +30,15 @@ function dbPatientToPatient(dbPatient: DatabasePatient): Patient {
         email: dbPatient.email || '',
         dob: dbPatient.dob || '',
         cpf: dbPatient.cpf,
-        procedures: dbPatient.procedures,
+        procedures: dbPatient.procedures || [], // Handle missing column
         procedureDate: dbPatient.procedure_date || '',
         lastVisit: dbPatient.last_visit,
         status: dbPatient.status as PatientStatus,
-        photos: dbPatient.photos,
+        // photos: dbPatient.photos || [], // Deprecated
         avatar: dbPatient.avatar || undefined,
+        gender: dbPatient.gender || undefined,
+        maritalStatus: dbPatient.marital_status || undefined,
+        profession: dbPatient.profession || undefined,
     };
 }
 
@@ -43,13 +49,16 @@ function patientToDbPatient(patient: Omit<Patient, 'id'>): Omit<DatabasePatient,
         email: patient.email || null,
         dob: patient.dob || null,
         cpf: patient.cpf || null,
-        procedures: patient.procedures,
+        // procedures: patient.procedures, // Deprecated
         procedure_date: patient.procedureDate || null,
         last_visit: patient.lastVisit,
         status: patient.status,
-        photos: patient.photos,
+        // photos: patient.photos, // Deprecated
         avatar: patient.avatar || null,
-    };
+        gender: patient.gender || null,
+        marital_status: patient.maritalStatus || null,
+        profession: patient.profession || null,
+    } as any;
 }
 
 export async function fetchPatients(): Promise<Patient[]> {
@@ -72,11 +81,18 @@ export async function fetchPatients(): Promise<Patient[]> {
 
     const { data: treatments } = await supabase
         .from('patient_treatments')
-        .select('patient_id, status, tasks_completed, total_tasks');
+        .select('patient_id, status, tasks_completed, total_tasks, procedure_name');
 
-    const treatmentStats = (treatments || []).reduce((acc, t) => {
+    // Aggregate stats AND procedure names
+    const patientData = (treatments || []).reduce((acc, t) => {
         if (!acc[t.patient_id]) {
-            acc[t.patient_id] = { active: 0, completed: 0, tasksCompleted: 0, totalTasks: 0 };
+            acc[t.patient_id] = {
+                active: 0,
+                completed: 0,
+                tasksCompleted: 0,
+                totalTasks: 0,
+                procedures: new Set<string>()
+            };
         }
         if (t.status === 'active') acc[t.patient_id].active++;
         if (t.status === 'completed') acc[t.patient_id].completed++;
@@ -84,12 +100,28 @@ export async function fetchPatients(): Promise<Patient[]> {
         acc[t.patient_id].tasksCompleted += (t.tasks_completed || 0);
         acc[t.patient_id].totalTasks += (t.total_tasks || 0);
 
+        if (t.procedure_name) {
+            acc[t.patient_id].procedures.add(t.procedure_name);
+        }
+
         return acc;
-    }, {} as Record<string, { active: number, completed: number, tasksCompleted: number, totalTasks: number }>);
+    }, {} as Record<string, { active: number, completed: number, tasksCompleted: number, totalTasks: number, procedures: Set<string> }>);
 
     return (data as DatabasePatient[]).map(dbP => {
-        const p = dbPatientToPatient(dbP);
-        const stats = treatmentStats[p.id] || { active: 0, completed: 0, tasksCompleted: 0, totalTasks: 0 };
+        const stats = patientData[dbP.id] || {
+            active: 0,
+            completed: 0,
+            tasksCompleted: 0,
+            totalTasks: 0,
+            procedures: new Set()
+        };
+
+        // Inject aggregated procedures
+        const p = dbPatientToPatient({
+            ...dbP,
+            procedures: Array.from(stats.procedures)
+        });
+
         return {
             ...p,
             activeTreatmentsCount: stats.active,

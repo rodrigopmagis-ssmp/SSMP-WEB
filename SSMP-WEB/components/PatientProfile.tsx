@@ -122,12 +122,47 @@ const PatientProfile: React.FC<PatientProfileProps> = ({ patient, onBack, onEdit
                             </div>
                             <div>
                                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none mb-1">Data de Nascimento</p>
-                                <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{patient.dob || 'Não informada'}</p>
+                                <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{patient.dob ? new Date(patient.dob).toLocaleDateString('pt-BR') : 'Não informada'}</p>
+                            </div>
+                            <div>
+                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none mb-1">Gênero</p>
+                                <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    {patient.gender === 'male' ? 'Masculino' :
+                                        patient.gender === 'female' ? 'Feminino' :
+                                            patient.gender === 'other' ? 'Outro' : 'Não informado'}
+                                </p>
+                            </div>
+                            <div>
+                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none mb-1">Estado Civil</p>
+                                <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{patient.maritalStatus || 'Não informado'}</p>
+                            </div>
+                            <div>
+                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none mb-1">Profissão</p>
+                                <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{patient.profession || 'Não informado'}</p>
+                            </div>
+                            <div>
+                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none mb-1">RG</p>
+                                <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{patient.rg || 'Não informado'}</p>
+                            </div>
+                            <div>
+                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none mb-1">CNPJ</p>
+                                <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{patient.cnpj || 'Não informado'}</p>
+                            </div>
+                            <div>
+                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none mb-1">Cor / Raça</p>
+                                <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{patient.race || 'Não informado'}</p>
+                            </div>
+                            <div>
+                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none mb-1">Origem</p>
+                                <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{patient.origin || 'Não informado'}</p>
+                            </div>
+                            <div>
+                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none mb-1">Convênio</p>
+                                <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{patient.healthInsurance || 'Não informado'}</p>
                             </div>
                             <div>
                                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none mb-1">Endereço</p>
-                                <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Rua Exemplo, 123 - São Paulo/SP</p>
-                                {/* Mock address since it's not in Patient interface yet, or we assume it's there/add it later */}
+                                <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{patient.address || 'Não informado'}</p>
                             </div>
                         </div>
                     </div>

@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from 'react';
-import { Patient, SurveyStatus, Procedure, ScriptStage, StageData, ClinicalNote, TreatmentLog } from '../types';
+import { Patient, SurveyStatus, Procedure, ScriptStage, StageData, ClinicalNote, TreatmentLog, PatientPhoto } from '../types';
 import { calculateDueDate, getSLAStatus, formatDueDate } from '../src/utils/sla';
 import { supabaseService } from '../src/services/supabaseService';
 
@@ -19,6 +18,26 @@ const PatientDetails: React.FC<PatientDetailsProps> = ({ patient, procedures = [
   const [treatments, setTreatments] = useState<any[]>([]);
   const [activeTreatment, setActiveTreatment] = useState<any>(null);
   const [loadingTreatments, setLoadingTreatments] = useState(true);
+
+  // Photos State
+  const [photos, setPhotos] = useState<PatientPhoto[]>([]);
+  const [loadingPhotos, setLoadingPhotos] = useState(false);
+
+  // Fetch Photos
+  useEffect(() => {
+    const loadPhotos = async () => {
+      setLoadingPhotos(true);
+      try {
+        const data = await supabaseService.getPatientPhotos(patient.id);
+        setPhotos(data);
+      } catch (error) {
+        console.error('Error loading photos:', error);
+      } finally {
+        setLoadingPhotos(false);
+      }
+    };
+    loadPhotos();
+  }, [patient.id]);
 
   // Re-introducing local state variables (synced with activeTreatment)
   const [surveyStatus, setSurveyStatus] = useState<SurveyStatus>(SurveyStatus.PENDING);
@@ -414,9 +433,9 @@ const PatientDetails: React.FC<PatientDetailsProps> = ({ patient, procedures = [
         photoUrl: url
       });
 
-      // Update patient photos list in DB
-      const newPhotos = [url, ...patient.photos];
-      await supabaseService.updatePatient(patient.id, { photos: newPhotos });
+      // Update patient photos list in DB (New Table)
+      const currentStageId = expandedStage || undefined;
+      await supabaseService.addPatientPhoto(patient.id, url, activeTreatment?.id, currentStageId);
 
       setIsRegisteringPhotoResponse(false);
     } catch (error) {

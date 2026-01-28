@@ -275,13 +275,12 @@ const ProceduresAdmin: React.FC<ProceduresAdminProps> = ({
               <div className="flex flex-col gap-4">
                 <div className="flex gap-4">
                   <div className="flex-1">
-                    <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Nome do Procedimento (Bloqueado)</label>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Nome do Procedimento</label>
                     <input
                       value={headerForm.name}
-                      disabled
-                      readOnly
-                      className="w-full px-3 py-2 border border-gray-200 dark:border-gray-800 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 cursor-not-allowed select-none"
-                      title="O nome do procedimento não pode ser alterado"
+                      onChange={e => setHeaderForm({ ...headerForm, name: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-primary outline-none bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                      placeholder="Nome do procedimento"
                     />
                   </div>
                   <div className="w-1/3">
@@ -308,7 +307,7 @@ const ProceduresAdmin: React.FC<ProceduresAdminProps> = ({
                   <textarea
                     value={headerForm.description}
                     onChange={e => setHeaderForm({ ...headerForm, description: e.target.value })}
-                    rows={2}
+                    rows={6}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-primary outline-none bg-white dark:bg-gray-900 text-gray-900 dark:text-white resize-none"
                     placeholder="Descrição curta do procedimento..."
                   />

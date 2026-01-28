@@ -244,9 +244,9 @@ const App: React.FC = () => {
         setSelectedPatientId(newPatient.id);
       }
       setCurrentView('profile'); // Go to profile after save
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving patient:', error);
-      alert('Erro ao salvar paciente. Por favor, tente novamente.');
+      alert(`Erro ao salvar paciente: ${error.message || 'Erro desconhecido'}`);
     }
   };
 

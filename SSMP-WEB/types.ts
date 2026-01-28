@@ -41,8 +41,18 @@ export interface Patient {
   avatar?: string;
   progress?: number;
   tasksCompleted?: number;
+
   totalTasks?: number;
-  photos: string[];
+  // photos: string[]; // Removed in favor of patient_photos table
+  gender?: 'male' | 'female' | 'other';
+  maritalStatus?: string;
+  profession?: string;
+  address?: string;
+  rg?: string;
+  cnpj?: string;
+  race?: string;
+  origin?: string;
+  healthInsurance?: string;
   survey?: Survey;
   cpf?: string;
   stageData?: Record<string, StageData>;
@@ -61,6 +71,16 @@ export interface StageData {
   photoReceivedAt?: string;
   photoStatus?: 'pending' | 'sent' | 'received' | 'refused';
   photoUrl?: string;
+}
+
+export interface PatientPhoto {
+  id: string;
+  patientId: string;
+  treatmentId?: string;
+  stageId?: string;
+  photoUrl: string;
+  createdAt: string;
+  metadata?: any;
 }
 
 export interface Procedure {
