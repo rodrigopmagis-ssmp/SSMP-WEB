@@ -49,9 +49,9 @@ export const Auth: React.FC = () => {
             <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-2xl shadow-xl overflow-hidden border border-gray-100 dark:border-gray-700">
                 <div className="bg-primary p-8 text-center">
                     <div className="mx-auto w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mb-4 backdrop-blur-sm">
-                        <span className="material-symbols-outlined text-white text-3xl">medical_services</span>
+                        <span className="material-symbols-outlined text-white text-3xl">360</span>
                     </div>
-                    <h2 className="text-2xl font-bold text-white">AestheticClinic OS</h2>
+                    <h2 className="text-2xl font-bold text-white">Jornada 360</h2>
                     <p className="text-white/80 text-sm mt-2">Sistema de Gestão de Pacientes</p>
                 </div>
 

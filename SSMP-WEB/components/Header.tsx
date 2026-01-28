@@ -36,10 +36,10 @@ const Header: React.FC<HeaderProps> = ({ currentView, onViewChange, onNewRegistr
     <header className="flex items-center justify-between border-b border-solid border-[#f3e7ea] dark:border-[#3d242a] bg-white dark:bg-[#2d181e] px-10 py-3 sticky top-0 z-50">
       <div className="flex items-center gap-4 text-primary cursor-pointer" onClick={() => onViewChange('dashboard')}>
         <div className="size-8 flex items-center justify-center">
-          <span className="material-symbols-outlined text-3xl">medical_services</span>
+          <span className="material-symbols-outlined text-3xl">360</span>
         </div>
         <h2 className="text-[#1b0d11] dark:text-[#fcf8f9] text-xl font-extrabold leading-tight tracking-[-0.015em]">
-          AestheticClinic <span className="font-light text-primary">Acompanhamento</span>
+          Jornada 360 <span className="font-light text-primary">Acompanhamento</span>
         </h2>
       </div>
 
