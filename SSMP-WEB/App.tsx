@@ -51,9 +51,9 @@ const App: React.FC = () => {
       setLoading(false);
     });
 
-    // Check URL URLSearchParams for view=quiz
+    // Check URL URLSearchParams for view=quiz OR pathname /quiz
     const params = new URLSearchParams(window.location.search);
-    if (params.get('view') === 'quiz') {
+    if (params.get('view') === 'quiz' || window.location.pathname === '/quiz') {
       setCurrentView('quiz');
     }
 
@@ -64,7 +64,7 @@ const App: React.FC = () => {
       setSession(session);
       if (event === 'SIGNED_OUT') {
         const params = new URLSearchParams(window.location.search);
-        if (params.get('view') !== 'quiz') {
+        if (params.get('view') !== 'quiz' && window.location.pathname !== '/quiz') {
           setBuildingAccess('checking'); // Reset state on logout
         }
       }
@@ -165,13 +165,21 @@ const App: React.FC = () => {
   }
 
   if (!session && currentView !== 'quiz') {
+    // Determine if we should be in quiz view based on URL even if not yet set in state (avoid flicker)
+    if (window.location.pathname === '/quiz') {
+      return (
+        <ThemeProvider>
+          <LeadQuiz />
+        </ThemeProvider>
+      );
+    }
     return <Auth />;
   }
 
 
 
   // Blocking UI for Pending/Rejected Users
-  if (buildingAccess === 'pending' || buildingAccess === 'rejected') {
+  if ((buildingAccess === 'pending' || buildingAccess === 'rejected') && currentView !== 'quiz') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-4">
         <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-2xl shadow-xl overflow-hidden border border-gray-100 dark:border-gray-700 text-center p-8">
@@ -204,7 +212,7 @@ const App: React.FC = () => {
   }
 
   // Wait for profile check before showing dashboard (prevents flash of content)
-  if (buildingAccess === 'checking') {
+  if (buildingAccess === 'checking' && currentView !== 'quiz') {
     return <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900"><span className="material-symbols-outlined animate-spin text-primary text-4xl">verified_user</span></div>;
   }
 
