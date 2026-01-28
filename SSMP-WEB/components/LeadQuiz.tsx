@@ -386,27 +386,25 @@ const LeadQuiz: React.FC<LeadQuizProps> = ({ onBackendComplete }) => {
         );
     }
 
-    if (finished) {
-        return (
-            <div className="min-h-screen bg-gradient-to-br from-primary-dark to-purple flex items-center justify-center p-4 text-white text-center animate-fade-in">
-                <div className="max-w-lg w-full bg-white text-gray-800 rounded-3xl p-6 md:p-10 shadow-2xl">
-                    <div className="w-20 h-20 bg-green-100 text-green-500 rounded-full flex items-center justify-center mx-auto mb-6">
-                        <Icon name="check_circle" className="text-5xl" />
-                    </div>
-                    <h2 className="text-3xl font-bold mb-4 text-primary">{finalScreenConfig.title}</h2>
-                    <p className="text-gray-600 mb-8 text-lg">
-                        {finalScreenConfig.message.replace('{phone}', data.whatsapp ? `${data.whatsapp}` : '')}
-                    </p>
-                    <button
-                        onClick={handleFinalAction}
-                        className={`w-full py-4 bg-gray-100 text-gray-700 font-bold rounded-xl hover:bg-gray-200 transition-colors ${(!finalScreenConfig.buttonAction || finalScreenConfig.buttonAction === 'none') ? 'cursor-default hover:bg-gray-100' : ''}`}
-                    >
-                        {finalScreenConfig.buttonText}
-                    </button>
+    return (
+        <div className="min-h-screen bg-gradient-to-br from-primary-dark to-purple flex items-center justify-center p-0 sm:p-4 text-white text-center animate-fade-in">
+            <div className="w-full h-screen sm:h-auto max-w-2xl bg-white text-gray-800 sm:rounded-3xl p-8 sm:p-12 shadow-none sm:shadow-2xl flex flex-col justify-center items-center">
+                <div className="w-24 h-24 bg-green-100 text-green-500 rounded-full flex items-center justify-center mb-8 transform scale-110">
+                    <Icon name="check_circle" className="text-6xl" />
                 </div>
+                <h2 className="text-4xl font-bold mb-6 text-primary">{finalScreenConfig.title}</h2>
+                <p className="text-gray-600 mb-10 text-xl leading-relaxed max-w-lg">
+                    {finalScreenConfig.message.replace('{phone}', data.whatsapp ? `${data.whatsapp}` : '')}
+                </p>
+                <button
+                    onClick={handleFinalAction}
+                    className={`w-full max-w-md py-5 bg-gray-100 text-gray-700 text-xl font-bold rounded-2xl hover:bg-gray-200 transition-colors ${(!finalScreenConfig.buttonAction || finalScreenConfig.buttonAction === 'none') ? 'cursor-default hover:bg-gray-100' : ''}`}
+                >
+                    {finalScreenConfig.buttonText}
+                </button>
             </div>
-        );
-    }
+        </div>
+    );
 
     return (
         <div className="min-h-screen bg-[#fff0f5] flex flex-col font-display overflow-hidden relative">
@@ -426,8 +424,8 @@ const LeadQuiz: React.FC<LeadQuizProps> = ({ onBackendComplete }) => {
                 />
             </div>
 
-            <div className="flex-1 flex flex-col items-center justify-center p-4 sm:p-12 relative max-w-3xl mx-auto w-full z-10">
-                <div className="bg-white/70 backdrop-blur-xl rounded-3xl shadow-xl w-full p-6 sm:p-12 animate-slide-up border border-white/60">
+            <div className="flex-1 flex flex-col items-center justify-center p-0 sm:p-12 relative max-w-4xl mx-auto w-full z-10">
+                <div className="bg-white/90 sm:bg-white/70 backdrop-blur-xl sm:rounded-3xl shadow-none sm:shadow-xl w-full h-full sm:h-auto min-h-screen sm:min-h-0 p-6 sm:p-12 animate-slide-up border-0 sm:border border-white/60 flex flex-col justify-center">
                     {step > 0 && (
                         <button
                             onClick={handleBack}
@@ -500,16 +498,16 @@ const LeadQuiz: React.FC<LeadQuizProps> = ({ onBackendComplete }) => {
                                                 onClick={() => {
                                                     updateData(currentQuestion.field!, opt);
                                                 }}
-                                                className={`text-left p-5 rounded-xl border-2 transition-all flex items-center justify-between group
+                                                className={`text-left p-6 rounded-xl border-2 transition-all flex items-center justify-between group
                         ${data[currentQuestion.field as keyof QuizData] === opt
                                                         ? 'border-primary bg-primary/5 text-primary shadow-lg ring-1 ring-primary'
                                                         : 'border-gray-200 hover:border-primary/50 hover:bg-gray-50'
                                                     }
                       `}
                                             >
-                                                <span className="text-xl font-medium text-gray-800">{opt}</span>
+                                                <span className="text-2xl font-medium text-gray-800 leading-snug">{opt}</span>
                                                 {data[currentQuestion.field as keyof QuizData] === opt && (
-                                                    <Icon name="check_circle" className="text-primary" />
+                                                    <Icon name="check_circle" className="text-3xl text-primary" />
                                                 )}
                                             </button>
                                         ))}
@@ -524,15 +522,15 @@ const LeadQuiz: React.FC<LeadQuizProps> = ({ onBackendComplete }) => {
                                                 <button
                                                     key={opt}
                                                     onClick={() => toggleSelection(currentQuestion.field!, opt)}
-                                                    className={`text-left p-4 rounded-xl border-2 transition-all flex items-center justify-between
+                                                    className={`text-left p-6 rounded-xl border-2 transition-all flex items-center justify-between
                           ${selected
                                                             ? 'border-primary bg-primary/5 text-primary shadow-md'
                                                             : 'border-gray-200 hover:border-primary/50 hover:bg-gray-50'
                                                         }
                         `}
                                                 >
-                                                    <span className="text-lg font-medium text-gray-800">{opt}</span>
-                                                    {selected && <Icon name="check" />}
+                                                    <span className="text-xl font-medium text-gray-800 leading-snug">{opt}</span>
+                                                    {selected && <Icon name="check" className="text-2xl" />}
                                                 </button>
                                             );
                                         })}
