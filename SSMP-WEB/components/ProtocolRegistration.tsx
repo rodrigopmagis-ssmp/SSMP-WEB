@@ -7,7 +7,7 @@ import Button from './ui/Button';
 
 interface ProtocolRegistrationProps {
     patient: Patient;
-    onSave: (updatedPatient: Patient) => void;
+    onSave: (updatedPatient: Patient, newTreatmentId?: string) => void;
     onCancel: () => void;
 }
 
@@ -31,7 +31,8 @@ const ProtocolRegistration: React.FC<ProtocolRegistrationProps> = ({ patient, on
                     supabaseService.getProcedures(true), // Load only ACTIVE procedures
                     supabaseService.getPatientTreatments(patient.id)
                 ]);
-                setProceduresList(proceduresData);
+                const validProcedures = proceduresData.filter(p => p.scripts && p.scripts.length > 0);
+                setProceduresList(validProcedures);
                 setExistingTreatments(treatmentsData);
             } catch (error) {
                 console.error('Error loading data:', error);
@@ -102,7 +103,7 @@ const ProtocolRegistration: React.FC<ProtocolRegistrationProps> = ({ patient, on
             await supabaseService.createTreatment({
                 patientId: patient.id,
                 procedureId: formData.selectedProtocolId,
-                procedureName: formData.procedures[0], // Assuming single selection for now or primary
+                procedureName: formData.procedures.join(' + '), // Join all selected procedures
                 startedAt: `${formData.procedureDate} ${formData.procedureTime}`,
                 status: 'active',
                 tasksCompleted: 0,

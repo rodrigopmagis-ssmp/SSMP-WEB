@@ -7,7 +7,7 @@ interface DashboardProps {
   patients: Patient[];
   procedures: Procedure[];
   activeTreatments?: PatientTreatment[];
-  onPatientSelect: (id: string) => void;
+  onPatientSelect: (id: string, treatmentId?: string) => void;
   onNewRegistration: () => void;
 }
 
@@ -115,8 +115,9 @@ const Dashboard: React.FC<DashboardProps> = ({ patients, procedures, activeTreat
 
   // Calcular estatísticas
   const stats = {
-    totalPatients: patients.length, // Total unique patients
+    totalPatients: new Set(activeTreatments.map(t => t.patientId)).size, // Unique patients with active protocols
     totalOpenProtocols: activeTreatments.length,
+    totalRemainingActions: treatmentRows.reduce((acc, row) => acc + (row.treatment.totalTasks - row.treatment.tasksCompleted), 0),
     dueToday: treatmentRows.filter(r => r.dynamicStatus === PatientStatus.DUE_TODAY).length,
     overdue: treatmentRows.filter(r => r.dynamicStatus === PatientStatus.LATE).length,
   };
@@ -129,31 +130,25 @@ const Dashboard: React.FC<DashboardProps> = ({ patients, procedures, activeTreat
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">Painel de Controle</h1>
           <p className="text-gray-600 dark:text-gray-400 mt-1">Visão geral da operação e protocolos ativos.</p>
         </div>
-        <button
-          onClick={onNewRegistration}
-          className="flex items-center justify-center gap-2 bg-primary hover:bg-primary-dark text-white px-6 py-2.5 rounded-lg font-bold text-sm transition-colors shadow-sm"
-        >
-          <span className="material-symbols-outlined text-xl">add_circle</span>
-          NOVO PACIENTE
-        </button>
+
       </div>
 
       {/* Stats Overview - Dense & Readable */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <div className="bg-pink-50/40 dark:bg-pink-900/10 rounded-2xl p-6 shadow-sm border border-pink-100/50 dark:border-pink-800/30 flex items-center justify-between hover:shadow-md transition-shadow">
           <div>
-            <p className="text-xs font-bold text-pink-900/60 dark:text-pink-400 uppercase tracking-wider mb-1">Total Pacientes</p>
-            <h3 className="text-3xl font-black text-gray-800 dark:text-white">{stats.totalPatients}</h3>
+            <p className="text-xs font-bold text-pink-900/60 dark:text-pink-400 uppercase tracking-wider mb-1">Protocolos Ativos</p>
+            <h3 className="text-3xl font-black text-gray-800 dark:text-white">{stats.totalOpenProtocols}</h3>
           </div>
           <div className="size-12 rounded-xl bg-pink-100 dark:bg-pink-900/50 flex items-center justify-center text-pink-600 dark:text-pink-400 shadow-inner">
-            <span className="material-symbols-outlined text-2xl">groups</span>
+            <span className="material-symbols-outlined text-2xl">medical_services</span>
           </div>
         </div>
 
         <div className="bg-blue-50/40 dark:bg-blue-900/10 rounded-2xl p-6 shadow-sm border border-blue-100/50 dark:border-blue-800/30 flex items-center justify-between hover:shadow-md transition-shadow">
           <div>
-            <p className="text-xs font-bold text-blue-900/60 dark:text-blue-400 uppercase tracking-wider mb-1">Em Tratamento</p>
-            <h3 className="text-3xl font-black text-gray-800 dark:text-white">{stats.totalOpenProtocols}</h3>
+            <p className="text-xs font-bold text-blue-900/60 dark:text-blue-400 uppercase tracking-wider mb-1">Ações Pendentes</p>
+            <h3 className="text-3xl font-black text-gray-800 dark:text-white">{stats.totalRemainingActions}</h3>
           </div>
           <div className="size-12 rounded-xl bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center text-blue-600 dark:text-blue-400 shadow-inner">
             <span className="material-symbols-outlined text-2xl">assignment</span>
@@ -262,7 +257,7 @@ const Dashboard: React.FC<DashboardProps> = ({ patients, procedures, activeTreat
                       key={treatment.id}
                       className={`transition-colors cursor-pointer group border-b border-gray-100 dark:border-white/5 last:border-0 ${index % 2 === 0 ? 'bg-white dark:bg-transparent' : 'bg-gray-50/50 dark:bg-white/5'
                         } hover:bg-gray-100 dark:hover:bg-primary/10`}
-                      onClick={() => onPatientSelect(patient.id)}
+                      onClick={() => onPatientSelect(patient.id, treatment.id)}
                     >
                       <td className="px-6 py-3 border-r border-gray-100 dark:border-white/5 last:border-0">
                         <div className="flex items-center gap-3">

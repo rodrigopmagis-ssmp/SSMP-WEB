@@ -9,14 +9,33 @@ interface PatientsListProps {
   onPatientSelect: (id: string) => void;
 }
 
+import { supabaseService } from '../src/services/supabaseService';
+
+interface PatientsListProps {
+  patients: Patient[];
+  onPatientSelect: (id: string) => void;
+}
+
 const PatientsList: React.FC<PatientsListProps> = ({ patients, onPatientSelect }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showFilters, setShowFilters] = useState(false);
+  const [tags, setTags] = useState<any[]>([]);
+  const [selectedTag, setSelectedTag] = useState('');
 
-  const filteredPatients = patients.filter(p =>
-    p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.procedures.some(proc => proc.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  React.useEffect(() => {
+    supabaseService.getTags().then(setTags).catch(console.error);
+  }, []);
+
+  const filteredPatients = patients.filter(p => {
+    const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p.procedures.some(proc => proc.toLowerCase().includes(searchTerm.toLowerCase()));
+
+    const matchesTag = selectedTag
+      ? p.tags?.some(t => t.id === selectedTag)
+      : true;
+
+    return matchesSearch && matchesTag;
+  });
 
   return (
     <div className="space-y-6">
@@ -35,15 +54,7 @@ const PatientsList: React.FC<PatientsListProps> = ({ patients, onPatientSelect }
             <span className="text-xs font-bold text-[#9a4c5f] uppercase tracking-wider">Data:</span>
             <input className="rounded-lg border-[#e7cfd5] dark:border-[#4d3239] bg-background-light dark:bg-[#3d242a] focus:ring-primary focus:border-primary text-sm py-2 px-3 h-10 outline-none" type="date" />
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-[#9a4c5f] uppercase tracking-wider">Status:</span>
-            <select className="rounded-lg border-[#e7cfd5] dark:border-[#4d3239] bg-background-light dark:bg-[#3d242a] focus:ring-primary focus:border-primary text-sm py-2 px-3 pr-8 h-10 outline-none">
-              <option>Todos os Status</option>
-              <option>Vence Hoje</option>
-              <option>Atrasado</option>
-              <option>No Prazo</option>
-            </select>
-          </div>
+
           <Button
             variant={showFilters ? 'secondary' : 'outline'}
             onClick={() => setShowFilters(!showFilters)}
@@ -59,21 +70,27 @@ const PatientsList: React.FC<PatientsListProps> = ({ patients, onPatientSelect }
           <div className="pt-4 border-t border-[#f3e7ea] dark:border-[#3d242a] animate-in slide-in-from-top-2 fade-in duration-200">
             <h3 className="text-xs font-bold text-[#9a4c5f] uppercase tracking-wider mb-3">Filtros Avançados</h3>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="md:col-span-2">
+              <div>
                 <Input label="Médico Responsável" placeholder="Ex: Dr. Silva" className="h-10" />
               </div>
+
               <div>
                 <label className="flex flex-col gap-2 w-full">
-                  <span className="text-sm font-bold text-[#1b0d11] dark:text-white">Unidade</span>
-                  <select className="rounded-xl border-[#e7cfd5] dark:border-[#4d3239] bg-background-light dark:bg-[#3d242a] focus:ring-primary focus:border-primary h-10 px-4 outline-none">
-                    <option>Todas as Unidades</option>
-                    <option>Unidade Jardins</option>
-                    <option>Unidade Moema</option>
+                  <span className="text-sm font-bold text-[#1b0d11] dark:text-white">Etiqueta</span>
+                  <select
+                    value={selectedTag}
+                    onChange={(e) => setSelectedTag(e.target.value)}
+                    className="rounded-xl border-[#e7cfd5] dark:border-[#4d3239] bg-background-light dark:bg-[#3d242a] focus:ring-primary focus:border-primary h-10 px-4 outline-none"
+                  >
+                    <option value="">Todas as Etiquetas</option>
+                    {tags.map(tag => (
+                      <option key={tag.id} value={tag.id}>{tag.name}</option>
+                    ))}
                   </select>
                 </label>
               </div>
               <div className="flex items-end">
-                <Button variant="ghost" className="w-full h-10 justify-start" onClick={() => { setSearchTerm(''); setShowFilters(false); }}>
+                <Button variant="ghost" className="w-full h-10 justify-start" onClick={() => { setSearchTerm(''); setSelectedTag(''); setShowFilters(false); }}>
                   <span className="material-symbols-outlined text-sm">close</span>
                   Limpar Filtros
                 </Button>
@@ -92,7 +109,7 @@ const PatientsList: React.FC<PatientsListProps> = ({ patients, onPatientSelect }
                 <th className="px-6 py-4 border-b border-[#f3e7ea] dark:border-[#3d242a]">Procedimento e Data</th>
                 <th className="px-6 py-4 border-b border-[#f3e7ea] dark:border-[#3d242a]">Em Aberto</th>
                 <th className="px-6 py-4 border-b border-[#f3e7ea] dark:border-[#3d242a]">Concluídos</th>
-                <th className="px-6 py-4 border-b border-[#f3e7ea] dark:border-[#3d242a]">Status</th>
+                <th className="px-6 py-4 border-b border-[#f3e7ea] dark:border-[#3d242a]">Etiquetas</th>
                 <th className="px-6 py-4 border-b border-[#f3e7ea] dark:border-[#3d242a] text-right">Ações</th>
               </tr>
             </thead>
@@ -133,16 +150,45 @@ const PatientsList: React.FC<PatientsListProps> = ({ patients, onPatientSelect }
                     </span>
                   </td>
                   <td className="px-6 py-4">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border ${patient.status === PatientStatus.DUE_TODAY ? 'bg-primary/20 text-primary border-primary/30' :
-                      patient.status === PatientStatus.LATE ? 'bg-red-100 text-red-600 border-red-200' :
-                        'bg-green-50 text-green-600 border-green-200 dark:bg-green-900/20 dark:border-green-800'
-                      }`}>
-                      {patient.status}
-                    </span>
+                    <div className="flex flex-wrap gap-1">
+                      {patient.tags && patient.tags.length > 0 ? (
+                        patient.tags.map(tag => (
+                          <div
+                            key={tag.id}
+                            title={tag.metadata?.complaint ? `Reclamação: ${tag.metadata.complaint}` : tag.name}
+                            className="size-4 rounded-md shadow-sm border border-black/5"
+                            style={{ backgroundColor: tag.color }}
+                          >
+                            {tag.metadata?.complaint && (
+                              <span className="flex items-center justify-center w-full h-full text-[10px] text-white">
+                                !
+                              </span>
+                            )}
+                          </div>
+                        ))
+                      ) : (
+                        <span className="text-xs text-gray-400">-</span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex justify-end gap-2">
-                      <button className="size-8 flex items-center justify-center rounded-lg bg-green-500 hover:bg-green-600 text-white transition-all transform group-hover:scale-110">
+                      {patient.phone ? (
+                        <a
+                          href={`https://wa.me/${patient.phone.replace(/\D/g, '')}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="size-8 flex items-center justify-center rounded-lg bg-[#25D366] hover:bg-[#20bd5a] text-white transition-all transform group-hover:scale-110"
+                          title="WhatsApp"
+                        >
+                          <span className="text-lg">
+                            <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+                              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" />
+                            </svg>
+                          </span>
+                        </a>
+                      ) : null}
+                      <button className="size-8 flex items-center justify-center rounded-lg bg-indigo-500 hover:bg-indigo-600 text-white transition-all transform group-hover:scale-110" title="Chat Interno">
                         <span className="material-symbols-outlined text-lg">chat</span>
                       </button>
                     </div>

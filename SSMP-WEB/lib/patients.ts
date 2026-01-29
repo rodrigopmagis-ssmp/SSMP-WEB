@@ -83,6 +83,12 @@ export async function fetchPatients(): Promise<Patient[]> {
         .from('patient_treatments')
         .select('patient_id, status, tasks_completed, total_tasks, procedure_name');
 
+
+
+    const { data: tagAssignments } = await supabase
+        .from('patient_tag_assignments')
+        .select('patient_id, metadata, patient_tags (id, name, color)');
+
     // Aggregate stats AND procedure names
     const patientData = (treatments || []).reduce((acc, t) => {
         if (!acc[t.patient_id]) {
@@ -91,7 +97,8 @@ export async function fetchPatients(): Promise<Patient[]> {
                 completed: 0,
                 tasksCompleted: 0,
                 totalTasks: 0,
-                procedures: new Set<string>()
+                procedures: new Set<string>(),
+                tags: []
             };
         }
         if (t.status === 'active') acc[t.patient_id].active++;
@@ -105,7 +112,29 @@ export async function fetchPatients(): Promise<Patient[]> {
         }
 
         return acc;
-    }, {} as Record<string, { active: number, completed: number, tasksCompleted: number, totalTasks: number, procedures: Set<string> }>);
+    }, {} as Record<string, { active: number, completed: number, tasksCompleted: number, totalTasks: number, procedures: Set<string>, tags: any[] }>);
+
+    // Populate tags
+    if (tagAssignments) {
+        tagAssignments.forEach((assignment: any) => {
+            if (!patientData[assignment.patient_id]) {
+                patientData[assignment.patient_id] = {
+                    active: 0,
+                    completed: 0,
+                    tasksCompleted: 0,
+                    totalTasks: 0,
+                    procedures: new Set<string>(),
+                    tags: []
+                };
+            }
+            if (assignment.patient_tags) {
+                patientData[assignment.patient_id].tags.push({
+                    ...assignment.patient_tags,
+                    metadata: assignment.metadata
+                });
+            }
+        });
+    }
 
     return (data as DatabasePatient[]).map(dbP => {
         const stats = patientData[dbP.id] || {
@@ -113,7 +142,8 @@ export async function fetchPatients(): Promise<Patient[]> {
             completed: 0,
             tasksCompleted: 0,
             totalTasks: 0,
-            procedures: new Set()
+            procedures: new Set(),
+            tags: []
         };
 
         // Inject aggregated procedures
@@ -128,7 +158,8 @@ export async function fetchPatients(): Promise<Patient[]> {
             completedTreatmentsCount: stats.completed,
             tasksCompleted: stats.tasksCompleted,
             totalTasks: stats.totalTasks,
-            progress: stats.totalTasks > 0 ? Math.round((stats.tasksCompleted / stats.totalTasks) * 100) : 0
+            progress: stats.totalTasks > 0 ? Math.round((stats.tasksCompleted / stats.totalTasks) * 100) : 0,
+            tags: stats.tags
         };
     });
 }
@@ -185,11 +216,11 @@ export async function updatePatient(id: string, updates: Partial<Patient>): Prom
     if (updates.email !== undefined) dbUpdates.email = updates.email || null;
     if (updates.dob !== undefined) dbUpdates.dob = updates.dob || null;
     if (updates.cpf !== undefined) dbUpdates.cpf = updates.cpf || null;
-    if (updates.procedures !== undefined) dbUpdates.procedures = updates.procedures;
+    // if (updates.procedures !== undefined) dbUpdates.procedures = updates.procedures; // Deprecated
     if (updates.procedureDate !== undefined) dbUpdates.procedure_date = updates.procedureDate || null;
     if (updates.lastVisit !== undefined) dbUpdates.last_visit = updates.lastVisit;
     if (updates.status !== undefined) dbUpdates.status = updates.status;
-    if (updates.photos !== undefined) dbUpdates.photos = updates.photos;
+    // if (updates.photos !== undefined) dbUpdates.photos = updates.photos; // Deprecated
     if (updates.avatar !== undefined) dbUpdates.avatar = updates.avatar || null;
 
     dbUpdates.updated_at = new Date().toISOString();

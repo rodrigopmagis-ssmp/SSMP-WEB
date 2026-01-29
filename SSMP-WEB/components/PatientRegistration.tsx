@@ -1,5 +1,6 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { supabaseService } from '../src/services/supabaseService';
 import { Patient, PatientStatus } from '../types';
 import Input from './ui/Input';
 import Button from './ui/Button';
@@ -41,6 +42,18 @@ const PatientRegistration: React.FC<PatientRegistrationProps> = ({ onSave, onCan
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [availableTags, setAvailableTags] = useState<any[]>([]);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+
+  useEffect(() => {
+    supabaseService.getTags().then(tags => setAvailableTags(tags || []));
+
+    if (initialData?.id) {
+      supabaseService.getPatientTags(initialData.id).then(tags => {
+        setSelectedTags(tags?.map((t: any) => t.id) || []);
+      });
+    }
+  }, [initialData]);
 
   // Apply visual formatting on load if editing
   React.useEffect(() => {
@@ -191,7 +204,9 @@ const PatientRegistration: React.FC<PatientRegistrationProps> = ({ onSave, onCan
         address: `${formData.addressStreet}, ${formData.addressNumber}, ${formData.addressComplement}, ${formData.addressNeighborhood}, ${formData.addressCity}/${formData.addressState}, ${formData.addressZip}`
       };
 
-      await onSave(newPatient);
+      const savedPatient = await onSave(newPatient); // Assume onSave returns the saved patient or we use ID if it's update
+
+
     } catch (error) {
       console.error("Error saving patient", error);
     } finally {
@@ -370,6 +385,8 @@ const PatientRegistration: React.FC<PatientRegistrationProps> = ({ onSave, onCan
           </div>
         </div>
 
+
+
         {/* Endereço */}
         <div className="bg-white dark:bg-[#2d181e] rounded-2xl shadow-sm border border-[#f3e7ea] dark:border-[#3d242a] p-8">
           <h2 className="text-lg font-bold mb-6 flex items-center gap-2">
@@ -459,7 +476,8 @@ const PatientRegistration: React.FC<PatientRegistrationProps> = ({ onSave, onCan
           </div>
         </div>
 
-        {/* Detalhes do Procedimento removidos para ProtocolRegistration */}
+
+
 
         <div className="flex justify-end gap-4 py-6">
           <Button
@@ -486,3 +504,4 @@ const PatientRegistration: React.FC<PatientRegistrationProps> = ({ onSave, onCan
 };
 
 export default PatientRegistration;
+

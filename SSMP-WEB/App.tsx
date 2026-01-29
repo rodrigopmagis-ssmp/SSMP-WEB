@@ -126,7 +126,7 @@ const App: React.FC = () => {
     if (session) {
       loadData();
     }
-  }, [session]);
+  }, [session, currentView]);
 
   const loadData = async () => {
     try {
@@ -223,8 +223,9 @@ const App: React.FC = () => {
     setCurrentView('profile');
   };
 
-  const navigateToDetails = (id: string) => {
+  const navigateToDetails = (id: string, treatmentId?: string) => {
     setSelectedPatientId(id);
+    setSelectedTreatmentId(treatmentId);
     setCurrentView('details');
   };
 
@@ -250,11 +251,12 @@ const App: React.FC = () => {
     }
   };
 
-  const handleSaveProtocol = async (updatedPatient: Patient) => {
+  const handleSaveProtocol = async (updatedPatient: Patient, newTreatmentId?: string) => {
     try {
       setPatients(patients.map(p => p.id === updatedPatient.id ? updatedPatient : p));
       setEditingPatient(null);
       setSelectedPatientId(updatedPatient.id);
+      setSelectedTreatmentId(newTreatmentId); // Set the newly created treatment ID
       setCurrentView('details'); // Go to timeline after creating protocol
     } catch (error) {
       console.error('Error saving protocol:', error);

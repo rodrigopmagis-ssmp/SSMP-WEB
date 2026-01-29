@@ -825,6 +825,113 @@ export const supabaseService = {
         if (error) throw error;
         return data;
     },
+
+    // --- Patient Tags ---
+
+    async getTags() {
+        // First try to select with clinic_id if we have one, otherwise fallback or just select all for now
+        // Assuming RLS handles visibility, but we can filter by clinic_id explicitly
+        const clinicId = await this._getClinicId();
+        let query = supabase
+            .from('patient_tags')
+            .select('*')
+            .order('name', { ascending: true });
+
+        if (clinicId) {
+            query = query.eq('clinic_id', clinicId);
+        }
+
+        const { data, error } = await query;
+        if (error) throw error;
+        return data;
+    },
+
+    async createTag(name: string, color: string) {
+        const clinicId = await this._getClinicId();
+        const { data, error } = await supabase
+            .from('patient_tags')
+            .insert([{ name, color, clinic_id: clinicId }])
+            .select()
+            .single();
+
+        if (error) throw error;
+        return data;
+    },
+
+    async deleteTag(id: string) {
+        const { error } = await supabase
+            .from('patient_tags')
+            .delete()
+            .eq('id', id);
+
+        if (error) throw error;
+        return true;
+    },
+
+    async assignTag(patientId: string, tagId: string, metadata: any = {}) {
+        const { data, error } = await supabase
+            .from('patient_tag_assignments')
+            .insert([{ patient_id: patientId, tag_id: tagId, metadata }])
+            .select()
+            .single();
+
+        if (error) {
+            if (error.code === '23505') return null; // Already assigned
+            throw error;
+        }
+        return data;
+    },
+
+    async removeTag(patientId: string, tagId: string) {
+        const { error } = await supabase
+            .from('patient_tag_assignments')
+            .delete()
+            .match({ patient_id: patientId, tag_id: tagId });
+
+        if (error) throw error;
+        return true;
+    },
+
+    async getPatientTags(patientId: string) {
+        const { data, error } = await supabase
+            .from('patient_tag_assignments')
+            .select(`
+                id,
+                tag_id,
+                metadata,
+                patient_tags (
+                    id,
+                    name,
+                    color
+                )
+            `)
+            .eq('patient_id', patientId);
+
+        if (error) throw error;
+        // Merge assignment metadata into the tag object for easier frontend usage
+        return data.map((item: any) => ({
+            ...item.patient_tags,
+            metadata: item.metadata,
+            assignmentId: item.id
+        }));
+    },
+    async updateLeadProtocol(leadId: string, updates: { protocol_data?: any, procedure_id?: string }) {
+        const { error } = await supabase
+            .from('leads')
+            .update(updates)
+            .eq('id', leadId);
+
+        if (error) throw error;
+    },
+
+    async updateLead(leadId: string, updates: Partial<Lead>) {
+        const { error } = await supabase
+            .from('leads')
+            .update(updates)
+            .eq('id', leadId);
+
+        if (error) throw error;
+    },
 };
 
 // Helper to map DB treatment to Frontend type

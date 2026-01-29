@@ -58,6 +58,7 @@ export interface Patient {
   stageData?: Record<string, StageData>;
   activeTreatmentsCount?: number;
   completedTreatmentsCount?: number;
+  tags?: { id: string; name: string; color: string; metadata?: any; }[];
 }
 
 export interface StageData {
@@ -242,5 +243,7 @@ export interface Lead {
   ai_urgency?: 'baixa' | 'média' | 'alta';
   ai_summary?: string;
   kanban_status: 'Frio' | 'Morno' | 'Quente' | 'Ultra Quente';
+  protocol_data?: any;
+  procedure_id?: string;
   created_at: string;
 }
