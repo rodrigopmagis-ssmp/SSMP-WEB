@@ -73,6 +73,18 @@ const Header: React.FC<HeaderProps> = ({ currentView, onViewChange, onNewRegistr
             >
               CRM / Leads
             </button>
+            <button
+              className={`${currentView === 'sales_pipeline' ? 'text-primary border-b-2 border-primary' : 'text-[#1b0d11] dark:text-[#fcf8f9] font-medium'} text-sm leading-normal pb-1 transition-all`}
+              onClick={() => onViewChange('sales_pipeline')}
+            >
+              Negócios
+            </button>
+            <button
+              className={`${currentView === 'ombudsman' ? 'text-primary border-b-2 border-primary' : 'text-[#1b0d11] dark:text-[#fcf8f9] font-medium'} text-sm leading-normal pb-1 transition-all`}
+              onClick={() => onViewChange('ombudsman')}
+            >
+              Ouvidoria
+            </button>
           </nav>
 
           <div className="flex items-center gap-4">

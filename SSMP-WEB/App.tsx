@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from './lib/supabase';
 import { Auth } from './components/Auth';
 import { Session } from '@supabase/supabase-js';
-import { Patient, Procedure, PatientTreatment, Lead } from './types';
+import { Patient, Procedure, PatientTreatment, Lead, ProcedureCategory } from './types';
 import { supabaseService } from './src/services/supabaseService';
 import { fetchPatients, createPatient, updatePatient } from './lib/patients';
 import Dashboard from './components/Dashboard';
@@ -18,11 +18,14 @@ import LeadQuiz from './components/LeadQuiz';
 import CRMKanban from './components/CRMKanban';
 import CRMContainer from './components/CRMContainer';
 import LeadDetails from './components/LeadDetails';
+import { SalesPipeline } from './components/SalesPipeline';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import ClinicSettings from './components/ClinicSettings';
 import UserManagement from './components/UserManagement';
+import OmbudsmanDashboard from './components/ombudsman/OmbudsmanDashboard';
 import { ThemeProvider } from './lib/theme';
+import { Toaster } from 'react-hot-toast';
 
 const App: React.FC = () => {
   const [session, setSession] = useState<Session | null>(null);
@@ -31,10 +34,11 @@ const App: React.FC = () => {
   // Data State
   const [patients, setPatients] = useState<Patient[]>([]);
   const [procedures, setProcedures] = useState<Procedure[]>([]);
+  const [categories, setCategories] = useState<ProcedureCategory[]>([]);
   const [activeTreatments, setActiveTreatments] = useState<PatientTreatment[]>([]);
 
   // View State
-  const [currentView, setCurrentView] = useState<'dashboard' | 'patients' | 'financial' | 'reports' | 'settings' | 'users' | 'quiz' | 'crm_kanban' | 'lead_details'>('dashboard');
+  const [currentView, setCurrentView] = useState<'dashboard' | 'patients' | 'financial' | 'reports' | 'settings' | 'users' | 'quiz' | 'crm_kanban' | 'lead_details' | 'sales_pipeline' | 'ombudsman'>('dashboard');
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [selectedProcedureId, setSelectedProcedureId] = useState<string | null>(null);
   const [selectedTreatmentId, setSelectedTreatmentId] = useState<string | undefined>(undefined);
@@ -46,10 +50,26 @@ const App: React.FC = () => {
 
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setLoading(false);
-    });
+    const initAuth = async () => {
+      // Create a timeout promise to prevent infinite loading
+      const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('Auth timeout')), 5000));
+
+      try {
+        // Race between auth check and timeout
+        await Promise.race([
+          supabase.auth.getSession().then(({ data: { session } }) => {
+            setSession(session);
+          }),
+          timeout
+        ]);
+      } catch (error) {
+        console.error('Auth initialization error:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    initAuth();
 
     // Check URL URLSearchParams for view=quiz OR pathname /quiz
     const params = new URLSearchParams(window.location.search);
@@ -146,6 +166,10 @@ const App: React.FC = () => {
       } else {
         setProcedures(loadedProcedures);
       }
+
+      // 2.1 Load Categories
+      const loadedCategories = await supabaseService.getProcedureCategories();
+      setCategories(loadedCategories);
 
       // 3. Load Active Treatments
       const loadedTreatments = await supabaseService.getAllActiveTreatments();
@@ -343,6 +367,7 @@ const App: React.FC = () => {
             selectedProcedureId={selectedProcedureId}
             onSelectProcedure={setSelectedProcedureId}
             procedures={procedures}
+            categories={categories}
             onUpdateProcedure={async (updated) => {
               console.log('App.tsx: onUpdateProcedure called', updated);
               try {
@@ -402,11 +427,16 @@ const App: React.FC = () => {
             onBack={() => setCurrentView('crm_kanban')}
             onReanalyze={async () => {
               // Placeholder for re-analyze
-              await supabaseService.reanalyzeLead(selectedLead.id);
+              console.log('Reanálise solicitada para:', selectedLead.id);
+              // await supabaseService.reanalyzeLead(selectedLead.id);
               alert("Reanálise solicitada (Simulação)");
             }}
           />
         ) : <CRMKanban onSelectLead={navigateToLead} />;
+      case 'sales_pipeline':
+        return <SalesPipeline />;
+      case 'ombudsman':
+        return <OmbudsmanDashboard patients={patients} />;
       // return <UserManagement onBack={() => setCurrentView('dashboard')} />;
       default:
         return <Dashboard patients={patients} onPatientSelect={navigateToProfile} onNewRegistration={() => { setEditingPatient(null); setCurrentView('register'); }} />;
@@ -417,6 +447,7 @@ const App: React.FC = () => {
   if (currentView === 'quiz') {
     return (
       <ThemeProvider>
+        <Toaster position="top-right" />
         {renderView()}
       </ThemeProvider>
     );
@@ -424,21 +455,27 @@ const App: React.FC = () => {
 
   return (
     <ThemeProvider>
+      <Toaster position="top-right" />
       <div className="flex flex-col min-h-screen">
         <Header currentView={currentView} onViewChange={setCurrentView} onNewRegistration={() => { setEditingPatient(null); setCurrentView('register'); }} />
         <div className="flex flex-1 overflow-hidden">
-          {(currentView === 'procedures' || currentView === 'procedure_register') && (
+          {currentView === 'procedures' && (
             <Sidebar
               currentView={currentView}
               onViewChange={setCurrentView}
               procedures={procedures}
+              categories={categories}
+              onUpdateCategories={async () => {
+                const cats = await supabaseService.getProcedureCategories();
+                setCategories(cats);
+              }}
               onNewProcedure={() => setCurrentView('procedure_register')}
               selectedProcedureId={selectedProcedureId}
               onSelectProcedure={(id) => setSelectedProcedureId(id)}
             />
           )}
-          <main className={`flex-1 bg-background-light dark:bg-background-dark ${currentView === 'crm_kanban' ? 'overflow-hidden flex flex-col' : 'overflow-y-auto custom-scrollbar'}`}>
-            {currentView === 'crm_kanban' ? (
+          <main className={`flex-1 bg-background-light dark:bg-background-dark ${(currentView === 'crm_kanban' || currentView === 'sales_pipeline') ? 'overflow-hidden flex flex-col' : 'overflow-y-auto custom-scrollbar'}`}>
+            {(currentView === 'crm_kanban' || currentView === 'sales_pipeline') ? (
               renderView()
             ) : (
               <div className="max-w-7xl mx-auto w-full px-4 md:px-10 py-8">

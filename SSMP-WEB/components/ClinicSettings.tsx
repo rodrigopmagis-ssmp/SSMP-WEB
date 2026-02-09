@@ -386,6 +386,55 @@ const ClinicSettings: React.FC<ClinicSettingsProps> = ({ onBack }) => {
 
                 <div className="h-px bg-gray-100 dark:bg-gray-800 my-4"></div>
 
+                {/* Quiz Link Section */}
+                {clinic.slug && (
+                    <div>
+                        <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-2 flex items-center gap-2">
+                            <span className="material-symbols-outlined text-primary">link</span>
+                            Link do Quiz
+                        </h2>
+                        <p className="text-sm text-gray-500 mb-4">
+                            Compartilhe este link para captação de leads. Ele direcionará para o quiz da sua clínica.
+                        </p>
+
+                        <div className="flex flex-col sm:flex-row gap-3">
+                            <div className="flex-1 relative">
+                                <input
+                                    type="text"
+                                    readOnly
+                                    value={`https://ssmp-web.vercel.app/?view=quiz&clinic=${clinic.slug}`}
+                                    className="w-full p-3 pr-12 rounded-lg border-2 border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-mono text-sm"
+                                />
+                                <button
+                                    onClick={() => {
+                                        navigator.clipboard.writeText(`https://ssmp-web.vercel.app/?view=quiz&clinic=${clinic.slug}`);
+                                        setToast({ message: 'Link copiado!', type: 'success', visible: true });
+                                    }}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                                    title="Copiar link"
+                                >
+                                    <span className="material-symbols-outlined text-gray-500">content_copy</span>
+                                </button>
+                            </div>
+                            <a
+                                href={`https://ssmp-web.vercel.app/?view=quiz&clinic=${clinic.slug}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="px-4 py-3 bg-primary/10 text-primary font-bold rounded-lg hover:bg-primary/20 transition-colors flex items-center gap-2 justify-center"
+                            >
+                                <span className="material-symbols-outlined text-sm">open_in_new</span>
+                                Testar
+                            </a>
+                        </div>
+
+                        <p className="text-xs text-gray-400 mt-2">
+                            <span className="font-semibold">Slug:</span> {clinic.slug}
+                        </p>
+                    </div>
+                )}
+
+                <div className="h-px bg-gray-100 dark:bg-gray-800 my-4"></div>
+
                 {/* Endereço e Contato Section */}
                 <div>
                     <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-2 flex items-center gap-2">

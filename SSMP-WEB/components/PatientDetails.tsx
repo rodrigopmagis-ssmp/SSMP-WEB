@@ -3,7 +3,9 @@ import { Patient, SurveyStatus, Procedure, ScriptStage, StageData, ClinicalNote,
 import { calculateDueDate, getSLAStatus, formatDueDate } from '../src/utils/sla';
 import { cleanAndFormatScript } from '../src/utils/scriptFormatter';
 import { supabaseService } from '../src/services/supabaseService';
+
 import Toast from './ui/Toast';
+import ComplaintCreationModal from './ombudsman/ComplaintCreationModal';
 
 interface PatientDetailsProps {
   patient: Patient;
@@ -30,7 +32,7 @@ const PatientDetails: React.FC<PatientDetailsProps> = ({ patient, procedures = [
   const [isTagMenuOpen, setIsTagMenuOpen] = useState(false);
   const [isComplaintModalOpen, setIsComplaintModalOpen] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
-  const [complaintText, setComplaintText] = useState('');
+  // complaintText state removed
   const [pendingTagId, setPendingTagId] = useState<string | null>(null);
   const [activeTagToRemove, setActiveTagToRemove] = useState<any>(null);
   const [isRemoveTagModalOpen, setIsRemoveTagModalOpen] = useState(false);
@@ -49,7 +51,7 @@ const PatientDetails: React.FC<PatientDetailsProps> = ({ patient, procedures = [
       // Add
       if (tag.name.toLowerCase().includes('reclamação')) {
         setPendingTagId(tag.id);
-        setComplaintText('');
+        // setComplaintText(''); // Removed
         setIsComplaintModalOpen(true);
         setIsTagMenuOpen(false);
         return;
@@ -79,16 +81,19 @@ const PatientDetails: React.FC<PatientDetailsProps> = ({ patient, procedures = [
     }
   };
 
-  const handleSaveComplaint = async () => {
+  const handleComplaintSuccess = async (complaint: any) => {
     if (!pendingTagId) return;
     try {
-      await supabaseService.assignTag(patient.id, pendingTagId, { complaint: complaintText });
+      // Assign tag with metadata linking to the complaint
+      await supabaseService.assignTag(patient.id, pendingTagId, { complaint_id: complaint.id });
       const newTags = await supabaseService.getPatientTags(patient.id);
       setPatientTags(newTags);
+      setToast({ message: 'Reclamação registrada e etiqueta atribuída com sucesso!', type: 'success' });
       setIsComplaintModalOpen(false);
       setPendingTagId(null);
     } catch (error) {
       console.error('Error saving complaint tag', error);
+      setToast({ message: 'Erro ao atribuir etiqueta.', type: 'error' });
     }
   };
 
@@ -1771,34 +1776,13 @@ const PatientDetails: React.FC<PatientDetailsProps> = ({ patient, procedures = [
           </div>
         </div>
       )}  {/* Complaint Modal */}
-      {isComplaintModalOpen && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-[#1a0f12] rounded-xl p-6 max-w-md w-full shadow-2xl animate-in zoom-in-95 duration-200">
-            <h3 className="text-lg font-bold mb-4 text-[#1b0d11] dark:text-white">Registrar Reclamação</h3>
-            <textarea
-              className="w-full h-32 p-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm focus:ring-2 focus:ring-primary/20 outline-none resize-none"
-              placeholder="Descreva a reclamação do paciente..."
-              value={complaintText}
-              onChange={e => setComplaintText(e.target.value)}
-            />
-            <div className="flex justify-end gap-2 mt-4">
-              <button
-                onClick={() => setIsComplaintModalOpen(false)}
-                className="px-4 py-2 text-sm font-bold text-gray-500 hover:bg-gray-100 rounded-lg"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleSaveComplaint}
-                disabled={!complaintText.trim()}
-                className="px-4 py-2 text-sm font-bold bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50"
-              >
-                Salvar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Complaint Modal */}
+      <ComplaintCreationModal
+        isOpen={isComplaintModalOpen}
+        onClose={() => setIsComplaintModalOpen(false)}
+        patientId={patient.id}
+        onSuccess={handleComplaintSuccess}
+      />
 
       {/* Remove Tag Confirmation Modal */}
       {isRemoveTagModalOpen && activeTagToRemove && (

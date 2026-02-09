@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Procedure, ScriptStage, TimingUnit } from '../types';
+import { Procedure, ScriptStage, TimingUnit, ProcedureCategory } from '../types';
 import { updateProcedure } from '../lib/procedures';
 import { supabaseService } from '../src/services/supabaseService';
 import Button from './ui/Button';
@@ -9,6 +9,7 @@ interface ProceduresAdminProps {
   selectedProcedureId?: string | null;
   onSelectProcedure?: (id: string) => void;
   procedures: Procedure[];
+  categories: ProcedureCategory[];
   onUpdateProcedure?: (procedure: Procedure) => void;
   onDeleteProcedure?: (id: string) => void;
 }
@@ -17,6 +18,7 @@ const ProceduresAdmin: React.FC<ProceduresAdminProps> = ({
   selectedProcedureId,
   onSelectProcedure,
   procedures,
+  categories,
   onUpdateProcedure,
   onDeleteProcedure
 }) => {
@@ -37,14 +39,15 @@ const ProceduresAdmin: React.FC<ProceduresAdminProps> = ({
 
   // Header Edit State
   const [isEditingHeader, setIsEditingHeader] = useState(false);
-  const [headerForm, setHeaderForm] = useState({ name: '', icon: '', description: '' });
+  const [headerForm, setHeaderForm] = useState({ name: '', icon: '', description: '', category_id: '' });
 
   const startEditingHeader = () => {
     if (!selectedProc) return;
     setHeaderForm({
       name: selectedProc.name,
       icon: selectedProc.icon,
-      description: selectedProc.description
+      description: selectedProc.description,
+      category_id: selectedProc.category_id || ''
     });
     setIsEditingHeader(true);
   };
@@ -57,7 +60,8 @@ const ProceduresAdmin: React.FC<ProceduresAdminProps> = ({
       ...selectedProc,
       name: headerForm.name,
       icon: headerForm.icon,
-      description: headerForm.description
+      description: headerForm.description,
+      category_id: headerForm.category_id || undefined
     };
 
     setSelectedProc(updatedProc);
@@ -303,6 +307,19 @@ const ProceduresAdmin: React.FC<ProceduresAdminProps> = ({
                   </div>
                 </div>
                 <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Categoria</label>
+                  <select
+                    value={headerForm.category_id}
+                    onChange={e => setHeaderForm({ ...headerForm, category_id: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-primary outline-none bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                  >
+                    <option value="">Sem Categoria</option>
+                    {categories.map(cat => (
+                      <option key={cat.id} value={cat.id}>{cat.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Descrição</label>
                   <textarea
                     value={headerForm.description}
@@ -388,17 +405,19 @@ const ProceduresAdmin: React.FC<ProceduresAdminProps> = ({
             </span>
             {selectedProc.is_active === false ? 'Reativar' : 'Inativar'}
           </button>
-          <button
-            onClick={handleSaveChanges}
-            disabled={saving || isEditing}
-            title={isEditing ? "Finalize a edição do estágio e clique em Salvar (verde) antes de salvar as alterações gerais." : ""}
-            className={`flex min-w-[84px] cursor-pointer items-center justify-center rounded-lg h-10 px-4 text-sm font-bold shadow-lg transition-all ${saving || isEditing
-              ? 'bg-gray-300 text-gray-500 cursor-not-allowed shadow-none'
-              : 'bg-primary text-white shadow-primary/20 hover:bg-primary/90'
-              }`}
-          >
-            {saving ? 'Salvando...' : isEditing ? 'Finalize Edição' : 'Salvar Alterações'}
-          </button>
+          {!procedures.some(p => p.id === selectedProc.id) && (
+            <button
+              onClick={handleSaveChanges}
+              disabled={saving || isEditing}
+              title={isEditing ? "Finalize a edição do estágio e clique em Salvar (verde) antes de salvar as alterações gerais." : ""}
+              className={`flex min-w-[84px] cursor-pointer items-center justify-center rounded-lg h-10 px-4 text-sm font-bold shadow-lg transition-all ${saving || isEditing
+                ? 'bg-gray-300 text-gray-500 cursor-not-allowed shadow-none'
+                : 'bg-primary text-white shadow-primary/20 hover:bg-primary/90'
+                }`}
+            >
+              {saving ? 'Salvando...' : isEditing ? 'Finalize Edição' : 'Salvar Procedimento'}
+            </button>
+          )}
         </div>
       </div>
 
@@ -559,57 +578,59 @@ const ProceduresAdmin: React.FC<ProceduresAdminProps> = ({
       </div>
 
       {/* Delete Confirmation Modal */}
-      {isDeleteModalOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl max-w-md w-full p-6 animate-in zoom-in-95 duration-200">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="size-12 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
-                <span className="material-symbols-outlined text-red-600 dark:text-red-400 text-3xl">warning</span>
+      {
+        isDeleteModalOpen && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl max-w-md w-full p-6 animate-in zoom-in-95 duration-200">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="size-12 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                  <span className="material-symbols-outlined text-red-600 dark:text-red-400 text-3xl">warning</span>
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900 dark:text-white">Excluir Procedimento?</h3>
+                  <p className="text-sm text-gray-500">Esta ação não pode ser desfeita</p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-xl font-bold text-gray-900 dark:text-white">Excluir Procedimento?</h3>
-                <p className="text-sm text-gray-500">Esta ação não pode ser desfeita</p>
+
+              <div className="bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800 rounded-lg p-4 mb-4">
+                <p className="text-sm text-red-800 dark:text-red-300 font-medium">
+                  ⚠️ Você está prestes a excluir permanentemente o procedimento <strong>"{selectedProc?.name}"</strong>.
+                </p>
               </div>
-            </div>
 
-            <div className="bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800 rounded-lg p-4 mb-4">
-              <p className="text-sm text-red-800 dark:text-red-300 font-medium">
-                ⚠️ Você está prestes a excluir permanentemente o procedimento <strong>"{selectedProc?.name}"</strong>.
-              </p>
-            </div>
+              <div className="mb-6">
+                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
+                  Para confirmar, resolva: {mathChallenge.n1} + {mathChallenge.n2} = ?
+                </label>
+                <input
+                  type="number"
+                  value={deleteAnswer}
+                  onChange={(e) => setDeleteAnswer(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 dark:bg-gray-800 dark:text-white"
+                  placeholder="Digite a resposta"
+                  autoFocus
+                />
+              </div>
 
-            <div className="mb-6">
-              <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
-                Para confirmar, resolva: {mathChallenge.n1} + {mathChallenge.n2} = ?
-              </label>
-              <input
-                type="number"
-                value={deleteAnswer}
-                onChange={(e) => setDeleteAnswer(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 dark:bg-gray-800 dark:text-white"
-                placeholder="Digite a resposta"
-                autoFocus
-              />
-            </div>
-
-            <div className="flex gap-3">
-              <button
-                onClick={() => setIsDeleteModalOpen(false)}
-                className="flex-1 px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg font-bold hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleDeleteProcedure}
-                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700 transition-colors shadow-lg shadow-red-600/20"
-              >
-                Confirmar Exclusão
-              </button>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setIsDeleteModalOpen(false)}
+                  className="flex-1 px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg font-bold hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleDeleteProcedure}
+                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700 transition-colors shadow-lg shadow-red-600/20"
+                >
+                  Confirmar Exclusão
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        )
+      }
+    </div >
   );
 };
 

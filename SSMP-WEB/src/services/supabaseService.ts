@@ -1,5 +1,5 @@
-import { supabase } from '../lib/supabase';
-import { Patient, Procedure, PatientTreatment, SurveyStatus, TreatmentLog, UserProfile, Lead } from '../../types';
+﻿import { supabase } from '../lib/supabase';
+import { Patient, Procedure, PatientTreatment, SurveyStatus, TreatmentLog, UserProfile, Lead, OmbudsmanComplaint, OmbudsmanTimeline, ComplaintSeverity, OmbudsmanContact, ResponseStatus } from '../../types';
 import { PROCEDURES as INITIAL_PROCEDURES } from '../../constants';
 
 export const supabaseService = {
@@ -207,7 +207,8 @@ export const supabaseService = {
             scripts: procedure.scripts || [],
             user_id: user.id,
             clinic_id: await this._getClinicId(),
-            is_active: true
+            is_active: true,
+            category_id: procedure.category_id
         };
 
         const { data, error } = await supabase
@@ -232,6 +233,7 @@ export const supabaseService = {
             icon: procedure.icon,
             description: procedure.description,
             scripts: procedure.scripts,
+            category_id: procedure.category_id,
         };
 
         const { data, error } = await supabase
@@ -303,6 +305,42 @@ export const supabaseService = {
 
         if (error) throw error;
         return data as Procedure;
+    },
+
+    // --- Procedure Categories ---
+
+    async getProcedureCategories() {
+        const clinicId = await this._getClinicId();
+        const { data, error } = await supabase
+            .from('procedure_categories')
+            .select('*')
+            .eq('clinic_id', clinicId)
+            .order('name', { ascending: true });
+
+        if (error) throw error;
+        return data;
+    },
+
+    async createProcedureCategory(name: string) {
+        const clinicId = await this._getClinicId();
+        const { data, error } = await supabase
+            .from('procedure_categories')
+            .insert([{ name, clinic_id: clinicId }])
+            .select()
+            .single();
+
+        if (error) throw error;
+        return data;
+    },
+
+    async deleteProcedureCategory(id: string) {
+        const { error } = await supabase
+            .from('procedure_categories')
+            .delete()
+            .eq('id', id);
+
+        if (error) throw error;
+        return true;
     },
 
     // --- Patient Treatments (New multi-protocol support) ---
@@ -826,6 +864,28 @@ export const supabaseService = {
         return data;
     },
 
+    async createLead(leadData: Partial<Lead>) {
+        // Use explicit clinic_id if provided, otherwise fallback to user's default clinic
+        const clinicId = leadData.clinic_id || await this._getClinicId();
+
+        const dbLead = {
+            ...leadData,
+            clinic_id: clinicId,
+            created_at: new Date().toISOString()
+        };
+
+        const { data, error } = await supabase
+            .from('leads')
+            .insert([dbLead])
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        const settings = await this.getCRMSettings();
+        return mapDbToLead(data, settings);
+    },
+
     // --- Patient Tags ---
 
     async getTags() {
@@ -924,14 +984,240 @@ export const supabaseService = {
         if (error) throw error;
     },
 
-    async updateLead(leadId: string, updates: Partial<Lead>) {
-        const { error } = await supabase
-            .from('leads')
-            .update(updates)
-            .eq('id', leadId);
+    // --- Ombudsman ---
+
+    async createComplaint(complaint: Partial<OmbudsmanComplaint>) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('User not authenticated');
+
+        const clinicId = await this._getClinicId();
+
+        // Calculate SLA deadline
+        const slaDeadline = this._calculateSLADeadline(complaint.severity || 'baixa');
+        const slaDays = {
+            'critica': 1,
+            'alta': 1,
+            'media': 2,
+            'baixa': 3
+        }[complaint.severity || 'baixa'];
+
+        const dbComplaint = {
+            ...complaint,
+            clinic_id: clinicId,
+            created_by: user.id,
+            sla_deadline: slaDeadline.toISOString(),
+            sla_status: 'on_time',
+            sla_days: slaDays
+        };
+
+        const { data, error } = await supabase
+            .from('ombudsman_complaints')
+            .insert([dbComplaint])
+            .select()
+            .single();
 
         if (error) throw error;
+        return data;
     },
+
+    async getComplaints() {
+        const clinicId = await this._getClinicId();
+        const { data, error } = await supabase
+            .from('ombudsman_complaints')
+            .select(`
+                *,
+                patient:patients!patient_id(*)
+            `)
+            .eq('clinic_id', clinicId)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        return data as OmbudsmanComplaint[];
+    },
+
+    async getComplaintById(id: string) {
+        const { data, error } = await supabase
+            .from('ombudsman_complaints')
+            .select(`
+                *,
+                patient:patients!patient_id(*)
+            `)
+            .eq('id', id)
+            .single();
+
+        if (error) throw error;
+        return data as OmbudsmanComplaint;
+    },
+
+    async updateComplaint(id: string, updates: Partial<OmbudsmanComplaint>) {
+        const { data, error } = await supabase
+            .from('ombudsman_complaints')
+            .update({ ...updates, updated_at: new Date().toISOString() })
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) throw error;
+        return data;
+    },
+
+    async closeComplaint(
+        complaintId: string,
+        resolutionStatus: string,
+        resolutionReason: string,
+        userId: string
+    ) {
+        // Validar se há pelo menos 1 contato registrado
+        const { data: contacts, error: contactsError } = await supabase
+            .from('ombudsman_contacts')
+            .select('id')
+            .eq('complaint_id', complaintId)
+            .limit(1);
+
+        if (contactsError) throw contactsError;
+
+        if (!contacts || contacts.length === 0) {
+            throw new Error('É necessário registrar pelo menos 1 contato antes de encerrar a reclamação.');
+        }
+
+        // Encerrar reclamação
+        const { data, error } = await supabase
+            .from('ombudsman_complaints')
+            .update({
+                status: 'encerrada',
+                resolution_status: resolutionStatus,
+                resolution_reason: resolutionReason,
+                resolved_at: new Date().toISOString(),
+                resolved_by: userId
+            })
+            .eq('id', complaintId)
+            .select()
+            .single();
+
+        if (error) throw error;
+        return data;
+    },
+
+    async getComplaintTimeline(complaintId: string) {
+        const { data, error } = await supabase
+            .from('ombudsman_timeline')
+            .select('*')
+            .eq('complaint_id', complaintId)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        return data as OmbudsmanTimeline[];
+    },
+
+    async addComplaintEvent(event: Partial<OmbudsmanTimeline>) {
+        const { data: { user } } = await supabase.auth.getUser();
+
+        const dbEvent = {
+            ...event,
+            created_by: user?.id
+        };
+
+        const { data, error } = await supabase
+            .from('ombudsman_timeline')
+            .insert([dbEvent])
+            .select()
+            .single();
+
+        if (error) throw error;
+        return data;
+    },
+
+    async getEmployees() {
+        const { data, error } = await supabase
+            .from('profiles')
+            .select('id, full_name, role, email')
+            .in('role', ['admin', 'master', 'receptionist', 'doctor', 'manager'])
+            .order('full_name');
+
+        if (error) {
+            console.error('Error fetching employees:', error);
+            return [];
+        }
+        return data || [];
+    },
+
+    // SLA Helper Function
+    _calculateSLADeadline(severity: ComplaintSeverity, createdAt: Date = new Date()): Date {
+        const businessDays: Record<ComplaintSeverity, number> = {
+            'critica': 1,
+            'alta': 1,
+            'media': 2,
+            'baixa': 3
+        };
+
+        const days = businessDays[severity] || 3;
+        let deadline = new Date(createdAt);
+        let addedDays = 0;
+
+        while (addedDays < days) {
+            deadline.setDate(deadline.getDate() + 1);
+            const dayOfWeek = deadline.getDay();
+            // 0 = Domingo, 6 = Sábado
+            if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+                addedDays++;
+            }
+        }
+
+        // Set to end of business day (18:00)
+        deadline.setHours(18, 0, 0, 0);
+        return deadline;
+    },
+
+    // Contact Methods
+    async getComplaintContacts(complaintId: string) {
+        const { data, error } = await supabase
+            .from('ombudsman_contacts')
+            .select('*')
+            .eq('complaint_id', complaintId)
+            .order('contacted_at', { ascending: false });
+
+        if (error) {
+            console.error('Error fetching contacts:', error);
+            return [];
+        }
+        return data || [];
+    },
+
+    async addContact(contact: Partial<OmbudsmanContact>) {
+        const { data: { user } } = await supabase.auth.getUser();
+
+        const { data, error } = await supabase
+            .from('ombudsman_contacts')
+            .insert({
+                ...contact,
+                created_by: user?.id,
+                response_status: contact.response_status || 'pending'
+            })
+            .select()
+            .single();
+
+        if (error) throw error;
+        return data;
+    },
+
+    async updateContactResponse(contactId: string, response: string, responseStatus: ResponseStatus = 'responded') {
+        const { data, error } = await supabase
+            .from('ombudsman_contacts')
+            .update({
+                response,
+                responded_at: new Date().toISOString(),
+                response_status: responseStatus,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', contactId)
+            .select()
+            .single();
+
+        if (error) throw error;
+        return data;
+    },
+
+
 };
 
 // Helper to map DB treatment to Frontend type

@@ -94,6 +94,14 @@ export interface Procedure {
   is_active?: boolean;
   created_at?: string;
   updated_at?: string;
+  category_id?: string;
+}
+
+export interface ProcedureCategory {
+  id: string;
+  name: string;
+  clinic_id?: string;
+  created_at: string;
 }
 
 // Novos tipos para timing estruturado
@@ -214,6 +222,12 @@ export interface Clinic {
 
   // Branding
   logo_url?: string;
+
+  // Quiz Link
+  slug?: string;
+
+  // Business name (for legal entities)
+  business_name?: string;
 }
 
 export interface UserProfile {
@@ -245,5 +259,215 @@ export interface Lead {
   kanban_status: 'Frio' | 'Morno' | 'Quente' | 'Ultra Quente';
   protocol_data?: any;
   procedure_id?: string;
+  clinic_id?: string;
   created_at: string;
+}
+
+// ============================================
+// Sales Pipeline (Negócios) Types
+// ============================================
+
+export type Estagio =
+  | 'lead_quiz'
+  | 'em_atendimento'
+  | 'qualificado'
+  | 'oferta_consulta'
+  | 'consulta_aceita'
+  | 'consulta_paga'
+  | 'ganho'
+  | 'consulta_realizada'
+  | 'perdido';
+
+export type StatusPagamento =
+  | 'pendente'
+  | 'processando'
+  | 'pago'
+  | 'falhou'
+  | 'reembolsado';
+
+export type MotivoPerda =
+  | 'bloqueou'
+  | 'sem_interesse'
+  | 'nao_respondeu'
+  | 'objecao_preco'
+  | 'objecao_tempo'
+  | 'concorrente'
+  | 'nao_pode_pagar';
+
+export type TipoAtividade =
+  | 'mudanca_estagio'
+  | 'tentativa_contato'
+  | 'nota'
+  | 'atualizacao_pagamento'
+  | 'agendado'
+  | 'perdido'
+  | 'reativado';
+
+export interface Negocio {
+  id: string;
+  id_lead: string;
+  id_paciente?: string;
+  id_clinica: string;
+
+  // Etapa do Pipeline
+  estagio: Estagio;
+  subestagio?: string;
+
+  // Responsabilidade
+  id_vendedor?: string;
+  nome_vendedor?: string; // Populado via join
+
+  // Valor do Negócio
+  valor_consulta: number;
+
+  // Rastreamento de Contato
+  tentativas_contato: number;
+  ultimo_contato_em?: string;
+
+  // Rastreamento de Perda
+  motivo_perda?: MotivoPerda;
+  detalhes_perda?: string;
+  perdido_em?: string;
+
+  // Agendamento
+  data_agendamento?: string;
+  agendamento_confirmado: boolean;
+
+  // Pagamento
+  status_pagamento: StatusPagamento;
+  id_pagamento?: string;
+  gateway_pagamento?: string;
+  pago_em?: string;
+
+  // Flags de Automação
+  pre_vendas_iniciado: boolean;
+  pre_vendas_mensagem_em?: string;
+  alerta_sla_enviado: boolean;
+  perda_automatica_aplicada: boolean;
+
+  // Timestamps
+  criado_em: string;
+  atualizado_em: string;
+  entrou_pipeline_em?: string;
+
+  // Metadados
+  metadados?: any;
+
+  // Populado via joins
+  lead?: Lead;
+}
+
+export interface AtividadeNegocio {
+  id: string;
+  id_negocio: string;
+  id_usuario: string;
+  nome_usuario?: string; // Populado via join
+
+  tipo_atividade: TipoAtividade;
+  descricao: string;
+  metadados?: any;
+
+  criado_em: string;
+}
+
+export interface FiltrosNegocio {
+  estagio?: Estagio;
+  id_vendedor?: string;
+  assignedTo?: string;
+  source?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  minValue?: number;
+  maxValue?: number;
+  paymentStatus?: string;
+  searchTerm?: string;
+}
+
+export interface EstatisticasNegocio {
+  total_negocios: number;
+  por_estagio: Record<Estagio, number>;
+  taxa_conversao: number;
+  tempo_medio_pipeline: number; // em dias
+  receita_total: number;
+}
+
+
+// ============================================
+// Ombudsman (Ouvidoria) Types
+// ============================================
+
+export type ComplaintStatus = 'nova' | 'em_analise' | 'aguardando_acao' | 'em_negociacao' | 'resolvida' | 'escalada' | 'encerrada';
+
+// Status de Resolução Final (9 opções)
+export type ComplaintResolutionStatus =
+  | 'resolvida'                    // Resolvida
+  | 'resolvida_acompanhamento'     // Resolvida com Acompanhamento
+  | 'nao_procedente'               // Não Procedente
+  | 'parcialmente_resolvida'       // Parcialmente Resolvida
+  | 'nao_resolvida'                // Não Resolvida
+  | 'encerrada_inatividade'        // Encerrada por Inatividade
+  | 'cancelada_duplicada'          // Cancelada / Duplicada
+  | 'encerrada_acordo'             // Encerrada por Acordo
+  | 'encerrada_juridico';          // Encerrada com Escalonamento Jurídico
+export type ComplaintSeverity = 'baixa' | 'media' | 'alta' | 'critica';
+
+export interface OmbudsmanComplaint {
+  id: string;
+  patient_id: string;
+  description: string;
+  status: ComplaintStatus;
+  severity: ComplaintSeverity;
+  type: string;
+  origin: string;
+  category?: string;
+  subcategory?: string;
+  responsible_area?: string;
+  risk_legal: boolean;
+  risk_reputation: boolean;
+  risk_financial: boolean;
+  clinic_id?: string;
+  created_by?: string;
+  assigned_to?: string;
+  created_at: string;
+  updated_at: string;
+  sla_deadline?: string;
+  sla_status?: 'on_time' | 'at_risk' | 'overdue';
+  sla_days?: number;
+  // Campos de Resolução/Encerramento
+  resolution_status?: ComplaintResolutionStatus;
+  resolution_reason?: string;
+  resolved_at?: string;
+  resolved_by?: string;
+  patient?: Patient; // Joined
+  employee?: UserProfile; // Joined (assigned_to)
+}
+
+export interface OmbudsmanTimeline {
+  id: string;
+  complaint_id: string;
+  action: string;
+  description: string;
+  metadata?: any;
+  created_by?: string;
+  created_at: string;
+  user_email?: string; // For display purposes
+}
+
+export type ContactType = 'outgoing' | 'incoming';
+export type ContactMethod = 'phone' | 'whatsapp' | 'email' | 'in_person';
+export type ResponseStatus = 'pending' | 'responded' | 'no_response';
+
+export interface OmbudsmanContact {
+  id: string;
+  complaint_id: string;
+  contact_type: ContactType;
+  contact_method: ContactMethod;
+  message: string;
+  response?: string;
+  contacted_at: string;
+  responded_at?: string;
+  response_status: ResponseStatus;
+  created_by?: string;
+  created_at: string;
+  updated_at: string;
 }

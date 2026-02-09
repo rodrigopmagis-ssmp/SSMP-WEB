@@ -53,6 +53,33 @@ const LeadQuiz: React.FC<LeadQuizProps> = ({ onBackendComplete }) => {
     });
 
     const [questions, setQuestions] = useState<any[]>([]);
+    const [clinicId, setClinicId] = useState<string | null>(null);
+
+    // Read clinic slug from URL and lookup clinic ID
+    useEffect(() => {
+        const loadClinicFromUrl = async () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const clinicSlug = urlParams.get('clinic');
+
+            if (clinicSlug) {
+                try {
+                    const { data: clinicData } = await supabase
+                        .from('clinics')
+                        .select('id')
+                        .eq('slug', clinicSlug)
+                        .single();
+
+                    if (clinicData?.id) {
+                        setClinicId(clinicData.id);
+                        console.log('LeadQuiz: Loaded clinic from URL slug:', clinicSlug, '-> ID:', clinicData.id);
+                    }
+                } catch (err) {
+                    console.warn('LeadQuiz: Could not find clinic with slug:', clinicSlug);
+                }
+            }
+        };
+        loadClinicFromUrl();
+    }, []);
 
     useEffect(() => {
         loadQuestions();
@@ -283,10 +310,10 @@ const LeadQuiz: React.FC<LeadQuizProps> = ({ onBackendComplete }) => {
     const submitQuiz = async () => {
         setLoading(true);
         try {
-            console.log('Submitting Quiz...', data);
+            console.log('Submitting Quiz...', data, 'clinicId:', clinicId);
 
             const { data: result, error } = await supabase.functions.invoke('new-lead', {
-                body: data
+                body: { ...data, clinic_id: clinicId }
             });
 
             if (error) throw error;
