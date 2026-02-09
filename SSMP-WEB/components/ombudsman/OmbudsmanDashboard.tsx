@@ -163,38 +163,38 @@ const OmbudsmanDashboard: React.FC<OmbudsmanDashboardProps> = ({ patients = [] }
             </div>
 
             {/* KPI Cards - Clickable with Filter */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
                 <div
                     onClick={() => handleCardClick('all')}
-                    className={`bg-white dark:bg-[#2d181e] rounded-xl p-6 shadow-sm border cursor-pointer transition-all hover:shadow-md ${activeFilter === 'all' ? 'border-primary ring-2 ring-primary/20' : 'border-gray-200 dark:border-primary/10'
+                    className={`bg-white dark:bg-[#2d181e] rounded-xl p-4 md:p-6 shadow-sm border cursor-pointer transition-all hover:shadow-md ${activeFilter === 'all' ? 'border-primary ring-2 ring-primary/20' : 'border-gray-200 dark:border-primary/10'
                         }`}
                 >
-                    <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Total de Reclamações</p>
-                    <h3 className="text-3xl font-black text-gray-800 dark:text-white">{getStats().total}</h3>
+                    <p className="text-[10px] md:text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Total de Reclamações</p>
+                    <h3 className="text-2xl md:text-3xl font-black text-gray-800 dark:text-white">{getStats().total}</h3>
                 </div>
                 <div
                     onClick={() => handleCardClick('open')}
-                    className={`bg-blue-50 dark:bg-blue-900/10 rounded-xl p-6 shadow-sm border cursor-pointer transition-all hover:shadow-md ${activeFilter === 'open' ? 'border-blue-500 ring-2 ring-blue-500/20' : 'border-blue-100 dark:border-blue-800/30'
+                    className={`bg-blue-50 dark:bg-blue-900/10 rounded-xl p-4 md:p-6 shadow-sm border cursor-pointer transition-all hover:shadow-md ${activeFilter === 'open' ? 'border-blue-500 ring-2 ring-blue-500/20' : 'border-blue-100 dark:border-blue-800/30'
                         }`}
                 >
-                    <p className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider mb-1">Em Aberto</p>
-                    <h3 className="text-3xl font-black text-blue-800 dark:text-blue-200">{getStats().open}</h3>
+                    <p className="text-[10px] md:text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider mb-1">Em Aberto</p>
+                    <h3 className="text-2xl md:text-3xl font-black text-blue-800 dark:text-blue-200">{getStats().open}</h3>
                 </div>
                 <div
                     onClick={() => handleCardClick('critical')}
-                    className={`bg-red-50 dark:bg-red-900/10 rounded-xl p-6 shadow-sm border cursor-pointer transition-all hover:shadow-md ${activeFilter === 'critical' ? 'border-red-500 ring-2 ring-red-500/20' : 'border-red-100 dark:border-red-800/30'
+                    className={`bg-red-50 dark:bg-red-900/10 rounded-xl p-4 md:p-6 shadow-sm border cursor-pointer transition-all hover:shadow-md ${activeFilter === 'critical' ? 'border-red-500 ring-2 ring-red-500/20' : 'border-red-100 dark:border-red-800/30'
                         }`}
                 >
-                    <p className="text-xs font-bold text-red-600 dark:text-red-400 uppercase tracking-wider mb-1">Alto Risco / Críticas</p>
-                    <h3 className="text-3xl font-black text-red-800 dark:text-red-200">{getStats().critical}</h3>
+                    <p className="text-[10px] md:text-xs font-bold text-red-600 dark:text-red-400 uppercase tracking-wider mb-1">Alto Risco / Críticas</p>
+                    <h3 className="text-2xl md:text-3xl font-black text-red-800 dark:text-red-200">{getStats().critical}</h3>
                 </div>
                 <div
                     onClick={() => handleCardClick('resolved')}
-                    className={`bg-green-50 dark:bg-green-900/10 rounded-xl p-6 shadow-sm border cursor-pointer transition-all hover:shadow-md ${activeFilter === 'resolved' ? 'border-green-500 ring-2 ring-green-500/20' : 'border-green-100 dark:border-green-800/30'
+                    className={`bg-green-50 dark:bg-green-900/10 rounded-xl p-4 md:p-6 shadow-sm border cursor-pointer transition-all hover:shadow-md ${activeFilter === 'resolved' ? 'border-green-500 ring-2 ring-green-500/20' : 'border-green-100 dark:border-green-800/30'
                         }`}
                 >
-                    <p className="text-xs font-bold text-green-600 dark:text-green-400 uppercase tracking-wider mb-1">Resolvidas (Total)</p>
-                    <h3 className="text-3xl font-black text-green-800 dark:text-green-200">{getStats().resolved}</h3>
+                    <p className="text-[10px] md:text-xs font-bold text-green-600 dark:text-green-400 uppercase tracking-wider mb-1">Resolvidas (Total)</p>
+                    <h3 className="text-2xl md:text-3xl font-black text-green-800 dark:text-green-200">{getStats().resolved}</h3>
                 </div>
             </div>
 

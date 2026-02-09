@@ -134,44 +134,56 @@ const Dashboard: React.FC<DashboardProps> = ({ patients, procedures, activeTreat
       </div>
 
       {/* Stats Overview - Dense & Readable */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <div className="bg-pink-50/40 dark:bg-pink-900/10 rounded-2xl p-6 shadow-sm border border-pink-100/50 dark:border-pink-800/30 flex items-center justify-between hover:shadow-md transition-shadow">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-8">
+        <div
+          onClick={() => { setStatusFilter('Todos'); setTimeFilter('Todos'); setProcedureFilter('Todos'); }}
+          className="bg-pink-50/40 dark:bg-pink-900/10 rounded-2xl p-4 md:p-6 shadow-sm border border-pink-100/50 dark:border-pink-800/30 flex items-center justify-between hover:shadow-md transition-all cursor-pointer ring-0 hover:ring-2 hover:ring-pink-100 dark:hover:ring-pink-900 active:scale-[0.98]"
+        >
           <div>
-            <p className="text-xs font-bold text-pink-900/60 dark:text-pink-400 uppercase tracking-wider mb-1">Protocolos Ativos</p>
-            <h3 className="text-3xl font-black text-gray-800 dark:text-white">{stats.totalOpenProtocols}</h3>
+            <p className="text-[10px] md:text-xs font-bold text-pink-900/60 dark:text-pink-400 uppercase tracking-wider mb-1">Protocolos Ativos</p>
+            <h3 className="text-2xl md:text-3xl font-black text-gray-800 dark:text-white">{stats.totalOpenProtocols}</h3>
           </div>
-          <div className="size-12 rounded-xl bg-pink-100 dark:bg-pink-900/50 flex items-center justify-center text-pink-600 dark:text-pink-400 shadow-inner">
-            <span className="material-symbols-outlined text-2xl">medical_services</span>
+          <div className="size-10 md:size-12 rounded-xl bg-pink-100 dark:bg-pink-900/50 flex items-center justify-center text-pink-600 dark:text-pink-400 shadow-inner">
+            <span className="material-symbols-outlined text-xl md:text-2xl">medical_services</span>
           </div>
         </div>
 
-        <div className="bg-blue-50/40 dark:bg-blue-900/10 rounded-2xl p-6 shadow-sm border border-blue-100/50 dark:border-blue-800/30 flex items-center justify-between hover:shadow-md transition-shadow">
+        <div
+          onClick={() => { setStatusFilter('Todos'); setTimeFilter('Todos'); setProcedureFilter('Todos'); }}
+          className="bg-blue-50/40 dark:bg-blue-900/10 rounded-2xl p-4 md:p-6 shadow-sm border border-blue-100/50 dark:border-blue-800/30 flex items-center justify-between hover:shadow-md transition-all cursor-pointer ring-0 hover:ring-2 hover:ring-blue-100 dark:hover:ring-blue-900 active:scale-[0.98]"
+        >
           <div>
-            <p className="text-xs font-bold text-blue-900/60 dark:text-blue-400 uppercase tracking-wider mb-1">Ações Pendentes</p>
-            <h3 className="text-3xl font-black text-gray-800 dark:text-white">{stats.totalRemainingActions}</h3>
+            <p className="text-[10px] md:text-xs font-bold text-blue-900/60 dark:text-blue-400 uppercase tracking-wider mb-1">Ações Pendentes</p>
+            <h3 className="text-2xl md:text-3xl font-black text-gray-800 dark:text-white">{stats.totalRemainingActions}</h3>
           </div>
-          <div className="size-12 rounded-xl bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center text-blue-600 dark:text-blue-400 shadow-inner">
-            <span className="material-symbols-outlined text-2xl">assignment</span>
+          <div className="size-10 md:size-12 rounded-xl bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center text-blue-600 dark:text-blue-400 shadow-inner">
+            <span className="material-symbols-outlined text-xl md:text-2xl">assignment</span>
           </div>
         </div>
 
-        <div className="bg-orange-50/40 dark:bg-orange-900/10 rounded-2xl p-6 shadow-sm border border-orange-100/50 dark:border-orange-800/30 flex items-center justify-between hover:shadow-md transition-shadow">
+        <div
+          onClick={() => { setStatusFilter(PatientStatus.DUE_TODAY); setTimeFilter('Todos'); }}
+          className="bg-orange-50/40 dark:bg-orange-900/10 rounded-2xl p-4 md:p-6 shadow-sm border border-orange-100/50 dark:border-orange-800/30 flex items-center justify-between hover:shadow-md transition-all cursor-pointer ring-0 hover:ring-2 hover:ring-orange-100 dark:hover:ring-orange-900 active:scale-[0.98]"
+        >
           <div>
-            <p className="text-xs font-bold text-orange-900/60 dark:text-orange-400 uppercase tracking-wider mb-1">Atenção Hoje</p>
-            <h3 className="text-3xl font-black text-gray-800 dark:text-white">{stats.dueToday}</h3>
+            <p className="text-[10px] md:text-xs font-bold text-orange-900/60 dark:text-orange-400 uppercase tracking-wider mb-1">Atenção Hoje</p>
+            <h3 className="text-2xl md:text-3xl font-black text-gray-800 dark:text-white">{stats.dueToday}</h3>
           </div>
-          <div className="size-12 rounded-xl bg-orange-100 dark:bg-orange-900/50 flex items-center justify-center text-orange-600 dark:text-orange-400 shadow-inner">
-            <span className="material-symbols-outlined text-2xl">notifications_active</span>
+          <div className="size-10 md:size-12 rounded-xl bg-orange-100 dark:bg-orange-900/50 flex items-center justify-center text-orange-600 dark:text-orange-400 shadow-inner">
+            <span className="material-symbols-outlined text-xl md:text-2xl">notifications_active</span>
           </div>
         </div>
 
-        <div className="bg-red-50/40 dark:bg-red-900/10 rounded-2xl p-6 shadow-sm border border-red-100/50 dark:border-red-800/30 flex items-center justify-between hover:shadow-md transition-shadow">
+        <div
+          onClick={() => { setStatusFilter(PatientStatus.LATE); setTimeFilter('Todos'); }}
+          className="bg-red-50/40 dark:bg-red-900/10 rounded-2xl p-4 md:p-6 shadow-sm border border-red-100/50 dark:border-red-800/30 flex items-center justify-between hover:shadow-md transition-all cursor-pointer ring-0 hover:ring-2 hover:ring-red-100 dark:hover:ring-red-900 active:scale-[0.98]"
+        >
           <div>
-            <p className="text-xs font-bold text-red-900/60 dark:text-red-400 uppercase tracking-wider mb-1">Atrasados</p>
-            <h3 className="text-3xl font-black text-gray-800 dark:text-white">{stats.overdue}</h3>
+            <p className="text-[10px] md:text-xs font-bold text-red-900/60 dark:text-red-400 uppercase tracking-wider mb-1">Atrasados</p>
+            <h3 className="text-2xl md:text-3xl font-black text-gray-800 dark:text-white">{stats.overdue}</h3>
           </div>
-          <div className="size-12 rounded-xl bg-red-100 dark:bg-red-900/50 flex items-center justify-center text-red-600 dark:text-red-400 shadow-inner">
-            <span className="material-symbols-outlined text-2xl">warning</span>
+          <div className="size-10 md:size-12 rounded-xl bg-red-100 dark:bg-red-900/50 flex items-center justify-center text-red-600 dark:text-red-400 shadow-inner">
+            <span className="material-symbols-outlined text-xl md:text-2xl">warning</span>
           </div>
         </div>
       </div>
@@ -193,6 +205,7 @@ const Dashboard: React.FC<DashboardProps> = ({ patients, procedures, activeTreat
                 value={procedureFilter}
                 onChange={(e) => setProcedureFilter(e.target.value)}
                 className="bg-white dark:bg-[#2d181e] border border-gray-300 dark:border-gray-700 rounded-md text-sm font-medium text-gray-700 dark:text-gray-200 py-1 pl-2 pr-8 focus:ring-primary focus:border-primary max-w-[150px]"
+                aria-label="Filtrar por Procedimento"
               >
                 <option value="Todos">Todos</option>
                 {procedures.map(p => (
@@ -208,6 +221,7 @@ const Dashboard: React.FC<DashboardProps> = ({ patients, procedures, activeTreat
                 value={timeFilter}
                 onChange={(e) => setTimeFilter(e.target.value)}
                 className="bg-white dark:bg-[#2d181e] border border-gray-300 dark:border-gray-700 rounded-md text-sm font-medium text-gray-700 dark:text-gray-200 py-1 pl-2 pr-8 focus:ring-primary focus:border-primary"
+                aria-label="Filtrar por Vencimento"
               >
                 <option value="Todos">Todos</option>
                 <option value="1h">Próxima 1h</option>
@@ -227,6 +241,7 @@ const Dashboard: React.FC<DashboardProps> = ({ patients, procedures, activeTreat
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
                 className="bg-white dark:bg-[#2d181e] border border-gray-300 dark:border-gray-700 rounded-md text-sm font-medium text-gray-700 dark:text-gray-200 py-1 pl-2 pr-8 focus:ring-primary focus:border-primary"
+                aria-label="Filtrar por Status"
               >
                 <option value="Todos">Todos</option>
                 <option value={PatientStatus.DUE_TODAY}>Atenção</option>
