@@ -43,12 +43,15 @@ const ComplaintDetailsModal: React.FC<ComplaintDetailsModalProps> = ({ isOpen, o
         if (!complaint) return;
         try {
             // Query direta para contar contatos
-            const { data } = await supabase
+            const { count, error } = await supabase
                 .from('ombudsman_contacts')
-                .select('id', { count: 'exact', head: true })
+                .select('*', { count: 'exact', head: true })
                 .eq('complaint_id', complaint.id);
 
-            setContactsCount(data?.length || 0);
+            if (error) throw error;
+
+            console.log('Contacts count:', count); // Debug
+            setContactsCount(count || 0);
         } catch (error) {
             console.error('Error fetching contacts count:', error);
             setContactsCount(0);
