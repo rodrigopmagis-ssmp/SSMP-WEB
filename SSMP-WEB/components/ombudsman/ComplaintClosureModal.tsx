@@ -246,7 +246,7 @@ const ComplaintClosureModal: React.FC<ComplaintClosureModalProps> = ({
                                     placeholder="Descreva detalhadamente o motivo do encerramento, ações tomadas e resultado final..."
                                 />
                                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                    Mínimo recomendado: 50 caracteres. Atual: {resolutionReason.length}
+                                    Mínimo recomendado: 10 caracteres. Atual: {resolutionReason.length}
                                 </p>
                             </div>
                         </div>
@@ -261,7 +261,7 @@ const ComplaintClosureModal: React.FC<ComplaintClosureModalProps> = ({
                             </button>
                             <button
                                 onClick={handleSubmit}
-                                disabled={!selectedStatus || !resolutionReason.trim() || !hasContacts}
+                                disabled={!selectedStatus || resolutionReason.trim().length < 10 || !hasContacts}
                                 className="px-5 py-2.5 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                             >
                                 <span className="material-symbols-outlined">lock</span>
