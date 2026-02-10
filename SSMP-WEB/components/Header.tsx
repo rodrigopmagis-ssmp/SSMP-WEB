@@ -4,6 +4,7 @@ import Button from './ui/Button';
 import { supabase } from '../lib/supabase';
 
 import TagManager from './TagManager';
+import { NotificationsPopover } from './tasks/NotificationsPopover';
 
 interface HeaderProps {
   currentView: string;
@@ -80,6 +81,12 @@ const Header: React.FC<HeaderProps> = ({ currentView, onViewChange, onNewRegistr
               Negócios
             </button>
             <button
+              className={`${currentView === 'tasks' ? 'text-primary border-b-2 border-primary' : 'text-[#1b0d11] dark:text-[#fcf8f9] font-medium'} text-sm leading-normal pb-1 transition-all`}
+              onClick={() => onViewChange('tasks')}
+            >
+              Tarefas
+            </button>
+            <button
               className={`${currentView === 'ombudsman' ? 'text-primary border-b-2 border-primary' : 'text-[#1b0d11] dark:text-[#fcf8f9] font-medium'} text-sm leading-normal pb-1 transition-all`}
               onClick={() => onViewChange('ombudsman')}
             >
@@ -96,9 +103,13 @@ const Header: React.FC<HeaderProps> = ({ currentView, onViewChange, onNewRegistr
               <span className="material-symbols-outlined text-lg">add</span>
               Novo Paciente
             </Button>
-            <Button variant="secondary" className="rounded-full !p-2">
-              <span className="material-symbols-outlined">notifications</span>
-            </Button>
+
+            <NotificationsPopover onTaskClick={(task) => {
+              sessionStorage.setItem('pendingTaskId', task.id);
+              window.dispatchEvent(new CustomEvent('open-task', { detail: { taskId: task.id } }));
+              onViewChange('tasks');
+            }} />
+
             <div className="relative">
               <div
                 className="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10 border-2 border-primary/20 cursor-pointer hover:border-primary transition-colors flex items-center justify-center text-primary font-bold bg-primary/10"

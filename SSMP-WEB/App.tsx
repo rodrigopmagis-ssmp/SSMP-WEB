@@ -24,6 +24,7 @@ import Header from './components/Header';
 import ClinicSettings from './components/ClinicSettings';
 import UserManagement from './components/UserManagement';
 import OmbudsmanDashboard from './components/ombudsman/OmbudsmanDashboard';
+import { TasksDashboard } from './components/tasks/TasksDashboard';
 import { ThemeProvider } from './lib/theme';
 import { Toaster } from 'react-hot-toast';
 
@@ -38,7 +39,7 @@ const App: React.FC = () => {
   const [activeTreatments, setActiveTreatments] = useState<PatientTreatment[]>([]);
 
   // View State
-  const [currentView, setCurrentView] = useState<'dashboard' | 'patients' | 'financial' | 'reports' | 'settings' | 'users' | 'quiz' | 'crm_kanban' | 'lead_details' | 'sales_pipeline' | 'ombudsman'>('dashboard');
+  const [currentView, setCurrentView] = useState<'dashboard' | 'patients' | 'financial' | 'reports' | 'settings' | 'users' | 'quiz' | 'crm_kanban' | 'lead_details' | 'sales_pipeline' | 'ombudsman' | 'tasks'>('dashboard');
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [selectedProcedureId, setSelectedProcedureId] = useState<string | null>(null);
   const [selectedTreatmentId, setSelectedTreatmentId] = useState<string | undefined>(undefined);
@@ -437,6 +438,8 @@ const App: React.FC = () => {
         return <SalesPipeline />;
       case 'ombudsman':
         return <OmbudsmanDashboard patients={patients} />;
+      case 'tasks':
+        return <TasksDashboard />;
       // return <UserManagement onBack={() => setCurrentView('dashboard')} />;
       default:
         return <Dashboard patients={patients} onPatientSelect={navigateToProfile} onNewRegistration={() => { setEditingPatient(null); setCurrentView('register'); }} />;

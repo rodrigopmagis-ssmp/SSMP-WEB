@@ -471,3 +471,121 @@ export interface OmbudsmanContact {
   created_at: string;
   updated_at: string;
 }
+
+// ============================================
+// Tipos: Módulo de Tarefas & Lembretes
+// ============================================
+
+export enum TaskType {
+  ONE_TIME = 'one_time',
+  RECURRING = 'recurring'
+}
+
+export enum TaskPriority {
+  LOW = 'low',
+  MEDIUM = 'medium',
+  HIGH = 'high',
+  CRITICAL = 'critical'
+}
+
+export enum TaskStatusEnum {
+  PENDING = 'pending',
+  IN_PROGRESS = 'in_progress',
+  COMPLETED = 'completed',
+  CANCELLED = 'cancelled'
+}
+
+export enum TaskVisibility {
+  PRIVATE = 'private',
+  PUBLIC = 'public',
+  RESTRICTED = 'restricted'
+}
+
+export interface TaskAssignment {
+  id: string;
+  taskId: string;
+  userId: string;
+  assignedAt: string;
+  user?: {
+    name: string;
+    avatar_url?: string;
+  };
+}
+
+export interface TaskCategory {
+  id: string;
+  name: string;
+  description?: string;
+  color: string; // Hex color code (e.g., #EC4899)
+  icon: string; // Material Symbols icon name
+  clinicId?: string;
+  isActive: boolean;
+  isDefault: boolean; // System default categories
+  createdAt: string;
+  updatedAt: string;
+  createdBy?: string;
+}
+
+export interface Task {
+  id: string;
+  title: string;
+  description?: string;
+  type: TaskType;
+  status: TaskStatusEnum;
+  priority: TaskPriority;
+  categoryId?: string; // NEW: Category reference
+  category?: TaskCategory; // NEW: Populated category data
+  dueAt?: string;
+  reminderMinutes?: number;
+  recurrenceRule?: {
+    frequency: 'daily' | 'weekly' | 'monthly';
+    interval?: number;
+    endDate?: string;
+    daysOfWeek?: number[];
+    count?: number;
+    index?: number;
+  };
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+  completedAt?: string;
+  completedBy?: string;
+  assignments?: TaskAssignment[];
+  assigneeIds?: string[];
+  visibility?: TaskVisibility;
+  clinicId?: string;
+}
+
+export interface TaskComment {
+  id: string;
+  taskId: string;
+  userId: string;
+  content: string;
+  createdAt: string;
+  user?: {
+    name: string;
+    avatar_url?: string;
+  };
+}
+// ... existing code ...
+
+export interface TaskHistory {
+  id: string;
+  taskId: string;
+  userId: string | null;
+  action: string;
+  details: any;
+  createdAt: string;
+  user?: {
+    name: string;
+    avatar_url?: string;
+  };
+}
+
+export enum TaskHistoryAction {
+  CREATED = 'CREATED',
+  UPDATED = 'UPDATED',
+  STATUS_CHANGE = 'STATUS_CHANGE',
+  COMMENT_ADDED = 'COMMENT_ADDED',
+  ASSIGNED = 'ASSIGNED'
+}
