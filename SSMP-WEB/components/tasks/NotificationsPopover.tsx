@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { taskService } from '../../src/services/tasksService';
 import { Task, TaskStatusEnum } from '../../types';
-import { format, isPast, isToday, addHours, addMinutes, addDays } from 'date-fns';
+import { format, isPast, isToday, addHours, addMinutes, addDays, subMinutes, isBefore } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import toast from 'react-hot-toast';
 
@@ -16,6 +16,8 @@ export const NotificationsPopover: React.FC<NotificationsPopoverProps> = ({ onTa
     const [loading, setLoading] = useState(false);
     const [postponingTaskId, setPostponingTaskId] = useState<string | null>(null);
     const [showPostponeMenu, setShowPostponeMenu] = useState<string | null>(null);
+    // Map stores taskId -> timestamp of last notification
+    const notifiedTaskIds = useRef<Map<string, number>>(new Map());
 
     const fetchNotifications = async () => {
         setLoading(true);
@@ -32,11 +34,14 @@ export const NotificationsPopover: React.FC<NotificationsPopoverProps> = ({ onTa
             const relevantTasks = myTasks.filter(t => {
                 if (!t.dueAt) return false;
                 const dueDate = new Date(t.dueAt);
-                // Somente tarefas ATRASADAS devem aparecer nas notificações.
-                // Isso resolve o pedido de "sumir ao adiar" e "sumir ao concluir".
-                // Se o usuário adiou, a data de vencimento passou a ser futura, então ela some.
+
+                const reminderMinutes = t.reminderMinutes || 0;
+                const reminderTime = subMinutes(dueDate, reminderMinutes);
+
+                const isTimeForNotification = isPast(reminderTime);
                 const isOverdue = (isPast(dueDate) && t.status !== TaskStatusEnum.COMPLETED && t.status !== TaskStatusEnum.CANCELLED);
-                return isOverdue;
+
+                return isTimeForNotification || isOverdue;
             });
 
             relevantTasks.sort((a, b) => {
@@ -44,6 +49,77 @@ export const NotificationsPopover: React.FC<NotificationsPopoverProps> = ({ onTa
             });
 
             setTasks(relevantTasks);
+
+            // Verificar se precisamos exibir o popup (Toast)
+            relevantTasks.forEach(task => {
+                const dueDate = new Date(task.dueAt!);
+                const isOverdue = isPast(dueDate);
+
+                const lastNotificationTime = notifiedTaskIds.current.get(task.id) || 0;
+                const timeSinceLastNotification = Date.now() - lastNotificationTime;
+
+                // Lógica de Notificação:
+                // 1. Se nunca foi notificado na sessão: Notifica.
+                // 2. Se já foi notificado e está ATRASADA: Notifica a cada 60 minutos.
+                // 3. Se é apenas lembrete (não atrasada): Notifica apenas uma vez (já coberto pelo check de map has).
+
+                let shouldNotify = false;
+
+                if (!notifiedTaskIds.current.has(task.id)) {
+                    shouldNotify = true;
+                } else if (isOverdue && timeSinceLastNotification > 60 * 60 * 1000) {
+                    // Recorrência de 60 min para atrasadas
+                    shouldNotify = true;
+                }
+
+                if (shouldNotify) {
+                    // Atualiza timestamp da notificação
+                    notifiedTaskIds.current.set(task.id, Date.now());
+
+                    toast((t) => (
+                        <div className="flex flex-col gap-2 min-w-[300px]">
+                            <div className="flex items-start gap-3">
+                                <span className={`material-symbols-outlined text-2xl ${isOverdue ? 'text-red-500' : 'text-amber-500'}`}>
+                                    {isOverdue ? 'error' : 'notifications'}
+                                </span>
+                                <div className="flex-1">
+                                    <h4 className="font-bold text-gray-900 dark:text-white text-sm">
+                                        {isOverdue ? 'Tarefa Atrasada!' : 'Lembrete de Tarefa'}
+                                    </h4>
+                                    <p className="text-sm text-gray-600 dark:text-gray-300 line-clamp-2">
+                                        {task.title}
+                                    </p>
+                                    <p className="text-xs text-gray-500 mt-1">
+                                        {isOverdue ? `Venceu às ${format(dueDate, "HH:mm")}` : `Vence às ${format(dueDate, "HH:mm")}`}
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex gap-2 mt-2">
+                                <button
+                                    onClick={() => {
+                                        toast.dismiss(t.id);
+                                        if (onTaskClick) onTaskClick(task);
+                                    }}
+                                    className="flex-1 px-3 py-1.5 bg-primary text-white text-xs font-medium rounded hover:bg-primary/90 transition-colors"
+                                >
+                                    Ver Tarefa
+                                </button>
+                                <button
+                                    onClick={() => toast.dismiss(t.id)}
+                                    className="px-3 py-1.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-xs font-medium rounded hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                                >
+                                    Fechar
+                                </button>
+                            </div>
+                        </div>
+                    ), {
+                        duration: Infinity, // Só fecha se o usuário clicar
+                        position: 'bottom-right',
+                        id: `task-alert-${task.id}` // Evita duplicatas do Hot Toast
+                    });
+                }
+            });
+
         } catch (error) {
             console.error('Error fetching notifications:', error);
         } finally {
@@ -64,12 +140,17 @@ export const NotificationsPopover: React.FC<NotificationsPopoverProps> = ({ onTa
             // e suma das notificações conforme solicitado pelo usuário.
             const newDue = addMinutes(new Date(), minutes);
 
-            await taskService.updateTask(taskId, {
-                dueAt: newDue.toISOString()
-            }, user.id);
+            await taskService.postponeTask(taskId, newDue.toISOString(), user.id);
 
             const label = minutes < 60 ? `${minutes} minutos` : minutes < 1440 ? `${minutes / 60} hora(s)` : `${minutes / 1440} dia(s)`;
             toast.success(`Tarefa adiada por ${label}`);
+
+            // Remove do map de notificados para que possa notificar novamente quando vencer o novo prazo
+            // Ou atualiza para garantir que não notifique imediatamente se algo der errado, mas delete é melhor para reinício de ciclo
+            notifiedTaskIds.current.delete(taskId);
+
+            // Remove o toast atual se houver (opcional, mas boa prática de UX)
+            toast.dismiss(`task-alert-${taskId}`);
 
             setShowPostponeMenu(null);
             fetchNotifications();
@@ -115,7 +196,7 @@ export const NotificationsPopover: React.FC<NotificationsPopoverProps> = ({ onTa
                     className="relative p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-white/5 rounded-full transition-colors group"
                     title="Lembretes e Notificações"
                 >
-                    <span className={`material-symbols-outlined text-2xl ${overdueCount > 0 ? 'text-red-500 animate-pulse' : 'text-gray-500 dark:text-gray-400'}`}>
+                    <span className={`material-symbols-outlined text-2xl ${tasks.length > 0 ? 'text-primary animate-pulse' : 'text-gray-500 dark:text-gray-400'}`}>
                         notifications
                     </span>
                     {tasks.length > 0 && (
@@ -188,17 +269,20 @@ export const NotificationsPopover: React.FC<NotificationsPopoverProps> = ({ onTa
                         <div className="divide-y divide-gray-100 dark:divide-gray-800">
                             {tasks.map(task => {
                                 const dueDate = new Date(task.dueAt!);
-                                const isLate = isPast(dueDate);
+                                const isOverdue = isPast(dueDate);
+                                const reminderMinutes = task.reminderMinutes || 0;
+                                // Verifica se está no período de lembrete mas não vencido
+                                const isReminderTime = !isOverdue && isPast(subMinutes(dueDate, reminderMinutes));
 
                                 return (
                                     <div key={task.id} className="p-4 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
                                         <div className="flex gap-4">
                                             <div className="flex-shrink-0 pt-1">
-                                                <div className={`size-3 rounded-full ${isLate ? 'bg-red-500 animate-pulse' : 'bg-amber-500'}`} />
+                                                <div className={`size-3 rounded-full ${isOverdue ? 'bg-red-500 animate-pulse' : isReminderTime ? 'bg-amber-500 animate-pulse' : 'bg-green-500'}`} />
                                             </div>
 
                                             <div className="flex-1 min-w-0">
-                                                <h4 className={`font-semibold text-base mb-1 ${isLate ? 'text-red-600 dark:text-red-400' : 'text-gray-800 dark:text-gray-200'}`}>
+                                                <h4 className={`font-semibold text-base mb-1 ${isOverdue ? 'text-red-600 dark:text-red-400' : 'text-gray-800 dark:text-gray-200'}`}>
                                                     {task.title}
                                                 </h4>
 
@@ -209,9 +293,9 @@ export const NotificationsPopover: React.FC<NotificationsPopoverProps> = ({ onTa
                                                 )}
 
                                                 <div className="flex flex-wrap items-center gap-2 mb-3">
-                                                    <span className={`text-xs flex items-center gap-1 px-2 py-1 rounded-full ${isLate ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400' : 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400'}`}>
+                                                    <span className={`text-xs flex items-center gap-1 px-2 py-1 rounded-full ${isOverdue ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400' : 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400'}`}>
                                                         <span className="material-symbols-outlined text-[14px]">schedule</span>
-                                                        {isLate ? 'Atrasado desde ' : 'Vence '}
+                                                        {isOverdue ? 'Atrasado desde ' : 'Vence '}
                                                         {format(dueDate, "dd/MM HH:mm")}
                                                     </span>
                                                     {task.priority === 'critical' && (

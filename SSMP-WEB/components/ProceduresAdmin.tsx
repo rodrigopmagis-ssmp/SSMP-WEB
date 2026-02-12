@@ -39,7 +39,17 @@ const ProceduresAdmin: React.FC<ProceduresAdminProps> = ({
 
   // Header Edit State
   const [isEditingHeader, setIsEditingHeader] = useState(false);
-  const [headerForm, setHeaderForm] = useState({ name: '', icon: '', description: '', category_id: '' });
+  const [headerForm, setHeaderForm] = useState({
+    name: '',
+    icon: '',
+    description: '',
+    category_id: '',
+    price: '',
+    promotional_price: '',
+    use_in_budget: false,
+    budget_description: '',
+    allows_sessions: false
+  });
 
   const startEditingHeader = () => {
     if (!selectedProc) return;
@@ -47,7 +57,12 @@ const ProceduresAdmin: React.FC<ProceduresAdminProps> = ({
       name: selectedProc.name,
       icon: selectedProc.icon,
       description: selectedProc.description,
-      category_id: selectedProc.category_id || ''
+      category_id: selectedProc.category_id || '',
+      price: selectedProc.price ? String(selectedProc.price) : '',
+      promotional_price: selectedProc.promotional_price ? String(selectedProc.promotional_price) : '',
+      use_in_budget: selectedProc.use_in_budget || false,
+      budget_description: selectedProc.budget_description || '',
+      allows_sessions: selectedProc.allows_sessions || false
     });
     setIsEditingHeader(true);
   };
@@ -61,7 +76,12 @@ const ProceduresAdmin: React.FC<ProceduresAdminProps> = ({
       name: headerForm.name,
       icon: headerForm.icon,
       description: headerForm.description,
-      category_id: headerForm.category_id || undefined
+      category_id: headerForm.category_id || undefined,
+      price: headerForm.price ? parseFloat(headerForm.price) : null,
+      promotional_price: headerForm.promotional_price ? parseFloat(headerForm.promotional_price) : null,
+      use_in_budget: headerForm.use_in_budget,
+      budget_description: headerForm.budget_description,
+      allows_sessions: headerForm.allows_sessions
     };
 
     setSelectedProc(updatedProc);
@@ -289,7 +309,7 @@ const ProceduresAdmin: React.FC<ProceduresAdminProps> = ({
                   </div>
                   <div className="w-1/3">
                     <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
-                      <a href="https://fonts.google.com/icons" target="_blank" rel="noreferrer" className="flex items-center gap-1 hover:text-primary hover:underline">
+                      <a href="https://fonts.google.com/icons" target="_blank" rel="noreferrer noopener" className="flex items-center gap-1 hover:text-primary hover:underline">
                         Ícone (Google Fonts) <span className="material-symbols-outlined text-xs">open_in_new</span>
                       </a>
                     </label>
@@ -318,6 +338,93 @@ const ProceduresAdmin: React.FC<ProceduresAdminProps> = ({
                       <option key={cat.id} value={cat.id}>{cat.name}</option>
                     ))}
                   </select>
+                </div>
+
+                <div className="bg-gray-50 dark:bg-gray-800/50 rounded-2xl p-6 border border-gray-100 dark:border-gray-700 my-4">
+                  <div className="flex items-center justify-between mb-6">
+                    <h4 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                      <div className="p-1.5 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-lg">
+                        <span className="material-symbols-outlined text-lg">attach_money</span>
+                      </div>
+                      Configuração Financeira
+                    </h4>
+
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        className="sr-only peer"
+                        checked={headerForm.use_in_budget}
+                        onChange={e => setHeaderForm({ ...headerForm, use_in_budget: e.target.checked })}
+                      />
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-emerald-600"></div>
+                      <span className="ml-3 text-xs font-bold uppercase text-gray-500 dark:text-gray-400">
+                        {headerForm.use_in_budget ? 'Habilitado' : 'Desabilitado'}
+                      </span>
+                    </label>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
+                    <div className="relative group">
+                      <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 ml-1">Valor Unitário (R$)</label>
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                          <span className="text-gray-400 text-sm font-bold">R$</span>
+                        </div>
+                        <input
+                          value={headerForm.price}
+                          onChange={e => setHeaderForm({ ...headerForm, price: e.target.value })}
+                          placeholder="0,00"
+                          type="number"
+                          className="w-full pl-9 pr-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white font-bold placeholder-gray-300 focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all hover:border-emerald-300"
+                        />
+                      </div>
+                    </div>
+                    <div className="relative group">
+                      <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 ml-1">Valor Promocional (Opcional)</label>
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                          <span className="text-gray-400 text-sm font-bold">R$</span>
+                        </div>
+                        <input
+                          value={headerForm.promotional_price}
+                          onChange={e => setHeaderForm({ ...headerForm, promotional_price: e.target.value })}
+                          placeholder="0,00"
+                          type="number"
+                          className="w-full pl-9 pr-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white font-bold placeholder-gray-300 focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all hover:border-teal-300"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between mb-4 p-3 bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-700">
+                    <div className="flex flex-col">
+                      <span className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase">Prevê Sessões?</span>
+                      <span className="text-[10px] text-gray-500">Habilita campo de quantidade de sessões no orçamento</span>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        className="sr-only peer"
+                        checked={headerForm.allows_sessions}
+                        onChange={e => setHeaderForm({ ...headerForm, allows_sessions: e.target.checked })}
+                      />
+                      <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-emerald-500"></div>
+                    </label>
+                  </div>
+
+                  {headerForm.use_in_budget && (
+                    <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                      <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 ml-1">Descrição Comercial (Para Orçamentos)</label>
+                      <textarea
+                        value={headerForm.budget_description}
+                        onChange={e => setHeaderForm({ ...headerForm, budget_description: e.target.value })}
+                        rows={3}
+                        className="w-full px-4 py-3 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 outline-none resize-none transition-all hover:border-emerald-300"
+                        placeholder="Ex: Inclui retorno de 15 dias e kit pós-procedimento..."
+                      />
+                      <p className="text-[10px] text-gray-400 mt-1.5 ml-1 text-right">Esta descrição aparecerá no PDF do orçamento</p>
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Descrição</label>
@@ -391,6 +498,80 @@ const ProceduresAdmin: React.FC<ProceduresAdminProps> = ({
             </div>
           )}
         </div>
+
+        {/* Compact Premium Budget Bar */}
+        {(selectedProc.use_in_budget || selectedProc.price || selectedProc.promotional_price) && (
+          <div className="w-full bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm mb-6 overflow-hidden animate-in fade-in slide-in-from-top-2">
+            <div className="flex flex-col md:flex-row items-center justify-between p-4 gap-4">
+
+              {/* Left: Price & Status */}
+              <div className="flex items-center gap-4 w-full md:w-auto">
+                <div className="p-2.5 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-lg">
+                  <span className="material-symbols-outlined text-xl">payments</span>
+                </div>
+
+                <div className="flex flex-col">
+                  <div className="flex items-baseline gap-2">
+                    {selectedProc.promotional_price ? (
+                      <>
+                        <span className="text-xl font-bold text-gray-900 dark:text-white">
+                          R$ {selectedProc.promotional_price.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                        <span className="text-xs font-medium text-gray-400 line-through decoration-red-400/50">
+                          R$ {selectedProc.price?.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                        <span className="bg-emerald-100 text-emerald-700 text-[10px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wide">
+                          Promo
+                        </span>
+                      </>
+                    ) : (
+                      <span className="text-xl font-bold text-gray-900 dark:text-white">
+                        R$ {selectedProc.price?.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0,00'}
+                      </span>
+                    )}
+                  </div>
+
+                  {selectedProc.use_in_budget && (
+                    <div className="flex flex-col gap-1 mt-1">
+                      <div className="flex items-center gap-1.5">
+                        <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
+                        <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
+                          Ativo para Orçamento
+                        </span>
+                      </div>
+                      {selectedProc.allows_sessions && (
+                        <div className="flex items-center gap-1.5">
+                          <div className="h-1.5 w-1.5 rounded-full bg-blue-500"></div>
+                          <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">
+                            Prevê Sessões
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Middle: Vertical Divider for Desktop */}
+              <div className="hidden md:block w-px h-8 bg-gray-100 dark:bg-gray-700"></div>
+
+              {/* Right: Description */}
+              <div className="flex-1 w-full md:w-auto">
+                {selectedProc.budget_description ? (
+                  <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed line-clamp-2 md:line-clamp-1">
+                    <span className="font-bold text-xs text-gray-400 uppercase mr-2 tracking-wide">Info:</span>
+                    {selectedProc.budget_description}
+                  </p>
+                ) : (
+                  <p className="text-xs text-gray-400 italic">
+                    Sem descrição adicional para orçamento.
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="flex gap-3">
           <button
             onClick={handleToggleActive}
@@ -539,7 +720,7 @@ const ProceduresAdmin: React.FC<ProceduresAdminProps> = ({
                   id: Math.random().toString(36).substr(2, 9),
                   title: 'Pesquisa de Satisfação',
                   delay: 'Após o procedimento',
-                  timing: { type: 'delay', delay: { value: 1, unit: 'dias' } },
+                  timing: { type: 'delay', delay: { value: 1, unit: TimingUnit.DAYS } },
                   template: 'Olá! Gostaríamos de saber como foi sua experiência conosco. Poderia responder brevemente?',
                   autoSend: true,
                   attachPdf: false,
@@ -559,7 +740,7 @@ const ProceduresAdmin: React.FC<ProceduresAdminProps> = ({
                   id: Math.random().toString(36).substr(2, 9),
                   title: 'Resultado Final',
                   delay: '30 dias depois',
-                  timing: { type: 'delay', delay: { value: 30, unit: 'dias' } },
+                  timing: { type: 'delay', delay: { value: 30, unit: TimingUnit.DAYS } },
                   template: 'Olá! Já faz um tempo desde seu procedimento. Como estão os resultados? Poderia nos enviar uma foto?',
                   autoSend: true,
                   attachPdf: false,

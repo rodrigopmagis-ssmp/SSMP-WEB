@@ -16,7 +16,7 @@ interface TaskDetailsModalProps {
 
 export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task: initialTask, onClose, onEdit, onUpdate, users }) => {
     const [task, setTask] = useState(initialTask);
-    const [activeTab, setActiveTab] = useState<'details' | 'comments' | 'history'>('details');
+    const [activeTab, setActiveTab] = useState<'details' | 'comments' | 'history' | 'summary'>('details');
     const [comments, setComments] = useState<TaskComment[]>([]);
     const [history, setHistory] = useState<any[]>([]); // TODO: Type this properly
     const [newComment, setNewComment] = useState('');
@@ -61,12 +61,19 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task: initia
 
     useEffect(() => {
         getCurrentUser();
+        // Sempre carregar histórico para verificar status de adiamento
+        loadHistory();
         if (activeTab === 'comments') {
             loadComments();
-        } else if (activeTab === 'history') {
-            loadHistory();
         }
-    }, [activeTab]);
+    }, [activeTab, task.id]);
+
+    // ... (rest of imports and code)
+
+    // Check if task was recently postponed
+    const lastAction = history.length > 0 ? history[0] : null;
+    const isPostponed = lastAction?.action === 'POSTPONED';
+    const postponedTime = isPostponed && lastAction?.details?.newDueAt ? new Date(lastAction.details.newDueAt) : null;
 
     useEffect(() => {
         // Scroll to bottom when comments change
@@ -182,22 +189,35 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task: initia
 
                 {/* Header */}
                 <div className="flex items-center justify-between p-6 pb-2 border-b border-gray-100 dark:border-gray-800 shrink-0">
-                    <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-3">
-                            <h2 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white line-clamp-1">
-                                {task.title}
-                            </h2>
-                            <span className={`text-xs px-2.5 py-0.5 rounded-full border font-medium uppercase tracking-wide ${getPriorityColor(task.priority)}`}>
-                                {getPriorityLabel(task.priority)}
-                            </span>
-                            {task.type === TaskType.RECURRING && (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 dark:bg-purple-900/20 dark:text-purple-400 text-xs font-bold border border-purple-100 dark:border-purple-800/50" title="Tarefa Recorrente">
-                                    <span className="material-symbols-outlined text-sm">repeat</span>
-                                    {task.recurrenceRule?.index || 1} de {task.recurrenceRule?.count || '∞'}
+                    <div className="flex flex-col gap-1 w-full mr-8">
+                        <div className="flex items-center justify-between w-full">
+                            <div className="flex items-center gap-3">
+                                <h2 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white line-clamp-1">
+                                    {task.title}
+                                </h2>
+                                <span className={`text-xs px-2.5 py-0.5 rounded-full border font-medium uppercase tracking-wide ${getPriorityColor(task.priority)}`}>
+                                    {getPriorityLabel(task.priority)}
                                 </span>
+                                {task.type === TaskType.RECURRING && (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 dark:bg-purple-900/20 dark:text-purple-400 text-xs font-bold border border-purple-100 dark:border-purple-800/50" title="Tarefa Recorrente">
+                                        <span className="material-symbols-outlined text-sm">repeat</span>
+                                        {task.recurrenceRule?.index || 1} de {task.recurrenceRule?.count || '∞'}
+                                    </span>
+                                )}
+                            </div>
+
+                            {/* Visualização de Adiamento (Estilo "Hand-drawn" conforme pedido) */}
+                            {isPostponed && postponedTime && (
+                                <div className="hidden md:flex items-center gap-2 transform -rotate-2 border-2 border-blue-500 rounded-full px-4 py-1 text-blue-600 font-handwriting bg-white dark:bg-[#2d181e] shadow-sm animate-in fade-in zoom-in duration-300">
+                                    <span className="material-symbols-outlined text-xl">update</span>
+                                    <span className="font-bold text-lg leading-none">
+                                        Novo lembrete <span className="text-xl">{format(postponedTime, "HH:mm")}</span>
+                                    </span>
+                                </div>
                             )}
                         </div>
-                        <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-2">
+
+                        <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-2 mt-1">
                             <span className="material-symbols-outlined text-base">event</span>
                             Vence em {task.dueAt ? format(new Date(task.dueAt), "dd 'de' MMMM 'às' HH:mm", { locale: ptBR }) : 'Sem data'}
                             <span className="mx-2">•</span>
@@ -210,7 +230,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task: initia
                     </div>
                     <button
                         onClick={onClose}
-                        className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-white/5 rounded-full transition-colors"
+                        className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-white/5 rounded-full transition-colors absolute top-4 right-4"
                     >
                         <span className="material-symbols-outlined text-xl">close</span>
                     </button>
@@ -244,6 +264,15 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task: initia
                     >
                         <span className="material-symbols-outlined text-lg">history</span>
                         Histórico
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('summary')}
+                        className={`py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap flex items-center gap-2 ${activeTab === 'summary'
+                            ? 'border-primary text-primary'
+                            : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
+                    >
+                        <span className="material-symbols-outlined text-lg">integration_instructions</span>
+                        Resumo (Automação)
                     </button>
                 </div>
 
@@ -579,6 +608,14 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task: initia
                                                 actionLabel = 'Atribuição';
                                                 detailsText = item.details?.count ? `${item.details.count} responsável(is)` : '';
                                                 break;
+                                            case 'POSTPONED':
+                                                iconColor = 'bg-indigo-500';
+                                                actionIcon = 'update';
+                                                actionLabel = 'Tarefa Adiada';
+                                                if (item.details?.newDueAt) {
+                                                    detailsText = `Para: ${format(new Date(item.details.newDueAt), "dd/MM HH:mm")}`;
+                                                }
+                                                break;
                                         }
 
                                         return (
@@ -587,6 +624,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task: initia
                                                     <span className="material-symbols-outlined text-sm">{actionIcon}</span>
                                                 </div>
                                                 <div className="bg-white dark:bg-[#3d242a] p-4 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm">
+
                                                     <div className="flex flex-col gap-1">
                                                         <div className="flex items-center justify-between">
                                                             <p className="font-bold text-gray-900 dark:text-white text-sm">
@@ -610,6 +648,109 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task: initia
                                         );
                                     })
                                 )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* SUMMARY TAB (AUTOMATION) */}
+                    {activeTab === 'summary' && (
+                        <div className="p-6 overflow-y-auto h-full custom-scrollbar space-y-6 animate-in fade-in slide-in-from-right-2 duration-300">
+
+
+                            <div className="grid grid-cols-1 gap-6">
+                                {/* Reminder Message */}
+                                <div>
+                                    <div className="flex items-center justify-between mb-2">
+                                        <h4 className="text-sm font-bold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                                            <span className="material-symbols-outlined text-green-500">notifications_active</span>
+                                            Mensagem de Lembrete
+                                        </h4>
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                onClick={() => {
+                                                    const msg = `🔔 *Lembrete de Tarefa*\n\n📌 *${task.title}*\n\n📅 *Vencimento:* ${task.dueAt ? format(new Date(task.dueAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR }) : 'Sem data'}\n👤 *Responsável:* ${localAssigneeIds.map(id => users.find(u => u.id === id)?.name).join(', ') || 'Sem responsável'}\n🔥 *Prioridade:* ${getPriorityLabel(task.priority)}\n\n📝 *Detalhes:* ${task.description || 'Sem descrição detalhada.'}`;
+                                                    const encodedMsg = encodeURIComponent(msg);
+                                                    window.open(`https://wa.me/?text=${encodedMsg}`, '_blank');
+                                                }}
+                                                className="text-xs flex items-center gap-1 text-green-600 hover:text-green-700 font-medium px-2 py-1 hover:bg-green-50 dark:hover:bg-green-900/20 rounded transition-colors"
+                                                title="Enviar por WhatsApp"
+                                            >
+                                                <span className="material-symbols-outlined text-sm">send</span>
+                                                WhatsApp
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    const msg = `🔔 *Lembrete de Tarefa*\n\n📌 *${task.title}*\n\n📅 *Vencimento:* ${task.dueAt ? format(new Date(task.dueAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR }) : 'Sem data'}\n👤 *Responsável:* ${localAssigneeIds.map(id => users.find(u => u.id === id)?.name).join(', ') || 'Sem responsável'}\n🔥 *Prioridade:* ${getPriorityLabel(task.priority)}\n\n📝 *Detalhes:* ${task.description || 'Sem descrição detalhada.'}`;
+                                                    navigator.clipboard.writeText(msg);
+                                                    toast.success('Copiado para a área de transferência');
+                                                }}
+                                                className="text-xs flex items-center gap-1 text-primary hover:text-primary-dark font-medium px-2 py-1 hover:bg-primary/5 rounded transition-colors"
+                                            >
+                                                <span className="material-symbols-outlined text-sm">content_copy</span>
+                                                Copiar
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div className="bg-gray-50 dark:bg-black/20 p-4 rounded-xl border border-gray-200 dark:border-gray-700 font-mono text-xs text-gray-600 dark:text-gray-400 whitespace-pre-wrap leading-relaxed shadow-inner">
+                                        {`🔔 *Lembrete de Tarefa*
+
+📌 *${task.title}*
+
+📅 *Vencimento:* ${task.dueAt ? format(new Date(task.dueAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR }) : 'Sem data'}
+👤 *Responsável:* ${localAssigneeIds.map(id => users.find(u => u.id === id)?.name).join(', ') || 'Sem responsável'}
+🔥 *Prioridade:* ${getPriorityLabel(task.priority)}
+
+📝 *Detalhes:* ${task.description || 'Sem descrição detalhada.'}`}
+                                    </div>
+                                </div>
+
+                                {/* Overdue Message */}
+                                <div>
+                                    <div className="flex items-center justify-between mb-2">
+                                        <h4 className="text-sm font-bold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                                            <span className="material-symbols-outlined text-red-500">warning</span>
+                                            Mensagem de Atraso
+                                        </h4>
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                onClick={() => {
+                                                    const msg = `⚠️ *Tarefa Atrasada*\n\n📌 *${task.title}*\n\n📅 *Venceu em:* ${task.dueAt ? format(new Date(task.dueAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR }) : 'Sem data'}\n👤 *Responsável:* ${localAssigneeIds.map(id => users.find(u => u.id === id)?.name).join(', ') || 'Sem responsável'}\n🔥 *Prioridade:* ${getPriorityLabel(task.priority)}\n\n❗ *Ação Necessária:* Esta tarefa está vencida. Favor verificar o andamento imediatamente.`;
+                                                    const encodedMsg = encodeURIComponent(msg);
+                                                    window.open(`https://wa.me/?text=${encodedMsg}`, '_blank');
+                                                }}
+                                                className="text-xs flex items-center gap-1 text-green-600 hover:text-green-700 font-medium px-2 py-1 hover:bg-green-50 dark:hover:bg-green-900/20 rounded transition-colors"
+                                                title="Enviar por WhatsApp"
+                                            >
+                                                <span className="material-symbols-outlined text-sm">send</span>
+                                                WhatsApp
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    const msg = `⚠️ *Tarefa Atrasada*\n\n📌 *${task.title}*\n\n📅 *Venceu em:* ${task.dueAt ? format(new Date(task.dueAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR }) : 'Sem data'}\n👤 *Responsável:* ${localAssigneeIds.map(id => users.find(u => u.id === id)?.name).join(', ') || 'Sem responsável'}\n🔥 *Prioridade:* ${getPriorityLabel(task.priority)}\n\n❗ *Ação Necessária:* Esta tarefa está vencida. Favor verificar o andamento imediatamente.`;
+                                                    navigator.clipboard.writeText(msg);
+                                                    toast.success('Copiado para a área de transferência');
+                                                }}
+                                                className="text-xs flex items-center gap-1 text-primary hover:text-primary-dark font-medium px-2 py-1 hover:bg-primary/5 rounded transition-colors"
+                                            >
+                                                <span className="material-symbols-outlined text-sm">content_copy</span>
+                                                Copiar
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div className="bg-gray-50 dark:bg-black/20 p-4 rounded-xl border border-gray-200 dark:border-gray-700 font-mono text-xs text-gray-600 dark:text-gray-400 whitespace-pre-wrap leading-relaxed shadow-inner">
+                                        {`⚠️ *Tarefa Atrasada*
+
+📌 *${task.title}*
+
+📅 *Venceu em:* ${task.dueAt ? format(new Date(task.dueAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR }) : 'Sem data'}
+👤 *Responsável:* ${localAssigneeIds.map(id => users.find(u => u.id === id)?.name).join(', ') || 'Sem responsável'}
+🔥 *Prioridade:* ${getPriorityLabel(task.priority)}
+
+❗ *Ação Necessária:* Esta tarefa está vencida. Favor verificar o andamento imediatamente.`}
+                                    </div>
+                                </div>
+
+
                             </div>
                         </div>
                     )}

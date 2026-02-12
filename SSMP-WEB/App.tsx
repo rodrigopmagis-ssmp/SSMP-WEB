@@ -25,6 +25,7 @@ import ClinicSettings from './components/ClinicSettings';
 import UserManagement from './components/UserManagement';
 import OmbudsmanDashboard from './components/ombudsman/OmbudsmanDashboard';
 import { TasksDashboard } from './components/tasks/TasksDashboard';
+import { BudgetsPage } from './src/pages/Budgets';
 import { ThemeProvider } from './lib/theme';
 import { Toaster } from 'react-hot-toast';
 
@@ -43,10 +44,11 @@ const App: React.FC = () => {
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [selectedProcedureId, setSelectedProcedureId] = useState<string | null>(null);
   const [selectedTreatmentId, setSelectedTreatmentId] = useState<string | undefined>(undefined);
-  const [editingPatient, setEditingPatient] = useState<Patient | null>(null);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [ombudsmanAction, setOmbudsmanAction] = useState<{ type: 'create', patientId: string } | null>(null);
 
   const [buildingAccess, setBuildingAccess] = useState<'checking' | 'allowed' | 'pending' | 'rejected'>('checking');
+  const [editingPatient, setEditingPatient] = useState<Patient | null>(null);
 
 
 
@@ -254,6 +256,15 @@ const App: React.FC = () => {
     setCurrentView('details');
   };
 
+  const handleNavigateView = (view: any, action?: any) => {
+    setCurrentView(view);
+    if (view === 'ombudsman' && action) {
+      setOmbudsmanAction(action);
+    } else {
+      setOmbudsmanAction(null);
+    }
+  };
+
   const handleSavePatient = async (patient: Patient) => {
     try {
       if (editingPatient) {
@@ -361,6 +372,7 @@ const App: React.FC = () => {
             setCurrentView('protocol_register');
           }}
           onUpdate={loadData}
+          onViewChange={handleNavigateView}
         />;
       case 'procedures':
         return (
@@ -437,9 +449,15 @@ const App: React.FC = () => {
       case 'sales_pipeline':
         return <SalesPipeline />;
       case 'ombudsman':
-        return <OmbudsmanDashboard patients={patients} />;
+        return <OmbudsmanDashboard
+          patients={patients}
+          initialAction={ombudsmanAction}
+          onClearAction={() => setOmbudsmanAction(null)}
+        />;
       case 'tasks':
         return <TasksDashboard />;
+      case 'budgets':
+        return <BudgetsPage />;
       // return <UserManagement onBack={() => setCurrentView('dashboard')} />;
       default:
         return <Dashboard patients={patients} onPatientSelect={navigateToProfile} onNewRegistration={() => { setEditingPatient(null); setCurrentView('register'); }} />;

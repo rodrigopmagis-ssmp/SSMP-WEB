@@ -9,9 +9,15 @@ import ComplaintDetailsModal from './ComplaintDetailsModal';
 
 interface OmbudsmanDashboardProps {
     patients?: Patient[];
+    initialAction?: { type: 'create', patientId: string } | null;
+    onClearAction?: () => void;
 }
 
-const OmbudsmanDashboard: React.FC<OmbudsmanDashboardProps> = ({ patients = [] }) => {
+const OmbudsmanDashboard: React.FC<OmbudsmanDashboardProps> = ({
+    patients = [],
+    initialAction,
+    onClearAction
+}) => {
     const [complaints, setComplaints] = useState<OmbudsmanComplaint[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -20,10 +26,21 @@ const OmbudsmanDashboard: React.FC<OmbudsmanDashboardProps> = ({ patients = [] }
     const [selectedComplaint, setSelectedComplaint] = useState<OmbudsmanComplaint | null>(null);
     const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
     const [activeFilter, setActiveFilter] = useState<string>('all');
+    const [ombudsmanPatientId, setOmbudsmanPatientId] = useState<string>('');
+    const [isPatientFixed, setIsPatientFixed] = useState(false);
 
     useEffect(() => {
         fetchComplaints();
     }, []);
+
+    useEffect(() => {
+        if (initialAction?.type === 'create' && initialAction.patientId) {
+            setOmbudsmanPatientId(initialAction.patientId);
+            setIsPatientFixed(true);
+            setIsModalOpen(true);
+            if (onClearAction) onClearAction();
+        }
+    }, [initialAction, onClearAction]);
 
     const fetchComplaints = async () => {
         try {
@@ -301,9 +318,14 @@ const OmbudsmanDashboard: React.FC<OmbudsmanDashboardProps> = ({ patients = [] }
 
             <ComplaintCreationModal
                 isOpen={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
-                patientId="" // Empty implies we need selection in modal
-                patients={patients} // Pass all patients for selection
+                onClose={() => {
+                    setIsModalOpen(false);
+                    setOmbudsmanPatientId('');
+                    setIsPatientFixed(false);
+                }}
+                patientId={ombudsmanPatientId}
+                isPatientFixed={isPatientFixed}
+                patients={patients}
                 onSuccess={handleComplaintSuccess}
             />
 

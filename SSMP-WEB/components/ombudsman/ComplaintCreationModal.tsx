@@ -5,12 +5,20 @@ import { ComplaintSeverity, ComplaintStatus, Patient } from '../../types';
 interface ComplaintCreationModalProps {
     isOpen: boolean;
     onClose: () => void;
-    patientId?: string; // Made optional
-    patients?: Patient[]; // Added patients list
+    patientId?: string;
+    isPatientFixed?: boolean;
+    patients?: Patient[];
     onSuccess: (complaint: any) => void;
 }
 
-const ComplaintCreationModal: React.FC<ComplaintCreationModalProps> = ({ isOpen, onClose, patientId, patients = [], onSuccess }) => {
+const ComplaintCreationModal: React.FC<ComplaintCreationModalProps> = ({
+    isOpen,
+    onClose,
+    patientId,
+    isPatientFixed = false,
+    patients = [],
+    onSuccess
+}) => {
     if (!isOpen) return null;
 
     const [description, setDescription] = useState('');
@@ -40,7 +48,14 @@ const ComplaintCreationModal: React.FC<ComplaintCreationModalProps> = ({ isOpen,
             const patient = patients.find(p => p.id === patientId);
             if (patient) {
                 setSelectedPatientName(patient.name);
+                setIsPatientConfirmed(true);
             }
+        } else {
+            // If patientId is removed/empty, reset
+            setSelectedPatientId('');
+            setSelectedPatientName('');
+            setIsPatientConfirmed(false);
+            setSearchTerm('');
         }
     }, [patientId, patients]);
 
@@ -125,6 +140,21 @@ const ComplaintCreationModal: React.FC<ComplaintCreationModalProps> = ({ isOpen,
 
             console.log('✅ DEBUG - Complaint created:', data);
 
+            // AUTO-TAGGING LOGIC:
+            // When a complaint is created, automatically add the "Reclamação" tag to the patient
+            try {
+                const availableTags = await supabaseService.getTags();
+                const complaintTag = availableTags?.find((t: any) => t.name.toLowerCase().includes('reclamação'));
+
+                if (complaintTag) {
+                    await supabaseService.assignTag(selectedPatientId, complaintTag.id, { complaint_id: data.id });
+                    console.log('✅ DEBUG - Auto-tagged patient with complaint tag');
+                }
+            } catch (tagErr) {
+                console.error('Error auto-tagging patient:', tagErr);
+                // We don't block the complaint success if tagging fails
+            }
+
             onSuccess(data);
             onClose();
             // Reset form
@@ -165,8 +195,8 @@ const ComplaintCreationModal: React.FC<ComplaintCreationModalProps> = ({ isOpen,
                         </div>
                     )}
 
-                    {/* Patient Selection if ID not provided */}
-                    {!patientId && (
+                    {/* Patient Selection if ID not provided or if we want to show it but potentially lock it */}
+                    {(!patientId || isPatientFixed) && (
                         <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Paciente *</label>
                             <div className="flex gap-2">
@@ -224,7 +254,7 @@ const ComplaintCreationModal: React.FC<ComplaintCreationModalProps> = ({ isOpen,
                                         Confirmar
                                     </button>
                                 )}
-                                {isPatientConfirmed && (
+                                {isPatientConfirmed && !isPatientFixed && (
                                     <button
                                         type="button"
                                         onClick={() => {

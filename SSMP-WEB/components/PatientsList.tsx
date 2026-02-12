@@ -3,20 +3,15 @@ import React, { useState } from 'react';
 import { Patient, PatientStatus } from '../types';
 import Button from './ui/Button';
 import Input from './ui/Input';
-
-interface PatientsListProps {
-  patients: Patient[];
-  onPatientSelect: (id: string) => void;
-}
-
 import { supabaseService } from '../src/services/supabaseService';
 
 interface PatientsListProps {
   patients: Patient[];
   onPatientSelect: (id: string) => void;
+  onNewRegistration: () => void;
 }
 
-const PatientsList: React.FC<PatientsListProps> = ({ patients, onPatientSelect }) => {
+const PatientsList: React.FC<PatientsListProps> = ({ patients, onPatientSelect, onNewRegistration }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [tags, setTags] = useState<any[]>([]);
@@ -54,6 +49,15 @@ const PatientsList: React.FC<PatientsListProps> = ({ patients, onPatientSelect }
             <span className="text-xs font-bold text-[#9a4c5f] uppercase tracking-wider">Data:</span>
             <input className="rounded-lg border-[#e7cfd5] dark:border-[#4d3239] bg-background-light dark:bg-[#3d242a] focus:ring-primary focus:border-primary text-sm py-2 px-3 h-10 outline-none" type="date" />
           </div>
+
+          <Button
+            variant="primary"
+            onClick={onNewRegistration}
+            className="h-10 shadow-md"
+          >
+            <span className="material-symbols-outlined text-lg">add</span>
+            Novo Paciente
+          </Button>
 
           <Button
             variant={showFilters ? 'secondary' : 'outline'}

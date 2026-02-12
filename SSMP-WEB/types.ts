@@ -84,6 +84,31 @@ export interface PatientPhoto {
   metadata?: any;
 }
 
+export interface Consultation {
+  id: string;
+  patientId: string;
+  doctorId: string;
+  audioPath?: string;
+  rawTranscript?: string;
+  cleanTranscript?: string;
+  aiProntuario?: any;
+  aiResumo?: string;
+  status: 'draft' | 'processing' | 'review_needed' | 'signed';
+  metadata?: any;
+  createdAt: string;
+}
+
+export interface PatientMemory {
+  id: string;
+  patientId: string;
+  type: string;
+  description: string;
+  suggestion?: string;
+  isActive: boolean;
+  sourceConsultationId?: string;
+  createdAt: string;
+}
+
 export interface Procedure {
   id: string;
   name: string;
@@ -95,6 +120,48 @@ export interface Procedure {
   created_at?: string;
   updated_at?: string;
   category_id?: string;
+  price?: number | null;
+  promotional_price?: number | null;
+  use_in_budget?: boolean;
+  budget_description?: string;
+  allows_sessions?: boolean;
+}
+
+export interface Budget {
+  id: string;
+  patient_id: string;
+  patient?: Patient; // Join
+  clinic_id?: string;
+  status: 'draft' | 'sent' | 'approved' | 'cancelled';
+  payment_method?: 'pix' | 'credit_card' | 'boleto' | 'cash';
+  installments?: number;
+  card_fee_percent?: number;
+  subtotal: number;
+  total_with_fee: number;
+  valid_until?: string;
+  created_at: string;
+  updated_at: string;
+  items?: BudgetItem[];
+  payment_methods?: PaymentItem[];
+}
+
+export interface PaymentItem {
+  method: 'pix' | 'credit_card' | 'boleto' | 'cash';
+  amount: number;
+  installments?: number;
+  card_fee_percent?: number;
+}
+
+export interface BudgetItem {
+  id: string;
+  budget_id: string;
+  procedure_id?: string;
+  procedure_name_snapshot: string;
+  description_snapshot?: string;
+  unit_price: number;
+  sessions: number;
+  total_price: number;
+  created_at: string;
 }
 
 export interface ProcedureCategory {

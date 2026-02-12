@@ -1,5 +1,5 @@
 ﻿import { supabase } from '../lib/supabase';
-import { Patient, Procedure, PatientTreatment, SurveyStatus, TreatmentLog, UserProfile, Lead, OmbudsmanComplaint, OmbudsmanTimeline, ComplaintSeverity, OmbudsmanContact, ResponseStatus } from '../../types';
+import { Patient, Procedure, PatientTreatment, SurveyStatus, TreatmentLog, UserProfile, Lead, OmbudsmanComplaint, OmbudsmanTimeline, ComplaintSeverity, OmbudsmanContact, ResponseStatus, Consultation, PatientMemory, Budget, BudgetItem } from '../../types';
 import { PROCEDURES as INITIAL_PROCEDURES } from '../../constants';
 
 export const supabaseService = {
@@ -48,6 +48,32 @@ export const supabaseService = {
 
             return mapDbToPatient(patientWithProcedures);
         });
+    },
+
+    async getPatient(id: string) {
+        const { data, error } = await supabase
+            .from('patients')
+            .select(`
+                *,
+                patient_treatments (
+                    procedure_name,
+                    status
+                )
+            `)
+            .eq('id', id)
+            .single();
+
+        if (error) throw error;
+
+        const treatments = data.patient_treatments || [];
+        const procedureNames = Array.from(new Set(treatments.map((t: any) => t.procedure_name).filter(Boolean)));
+
+        const patientWithProcedures = {
+            ...data,
+            procedures: procedureNames
+        };
+
+        return mapDbToPatient(patientWithProcedures);
     },
 
     async createPatient(patient: Partial<Patient>) {
@@ -149,7 +175,7 @@ export const supabaseService = {
     async getProcedures(activeOnly: boolean = false) {
         let query = supabase
             .from('procedures')
-            .select('*')
+            .select('*, budget_description')
             .order('name', { ascending: true });
 
         if (activeOnly) {
@@ -208,7 +234,12 @@ export const supabaseService = {
             user_id: user.id,
             clinic_id: await this._getClinicId(),
             is_active: true,
-            category_id: procedure.category_id
+            category_id: procedure.category_id,
+            price: procedure.price,
+            promotional_price: procedure.promotional_price,
+            use_in_budget: procedure.use_in_budget,
+            budget_description: procedure.budget_description,
+            allows_sessions: procedure.allows_sessions
         };
 
         const { data, error } = await supabase
@@ -234,6 +265,11 @@ export const supabaseService = {
             description: procedure.description,
             scripts: procedure.scripts,
             category_id: procedure.category_id,
+            price: procedure.price,
+            promotional_price: procedure.promotional_price,
+            use_in_budget: procedure.use_in_budget,
+            budget_description: procedure.budget_description,
+            allows_sessions: procedure.allows_sessions
         };
 
         const { data, error } = await supabase
@@ -1049,6 +1085,21 @@ export const supabaseService = {
         return data as OmbudsmanComplaint;
     },
 
+    async hasOpenComplaints(patientId: string) {
+        const { data, error } = await supabase
+            .from('ombudsman_complaints')
+            .select('id')
+            .eq('patient_id', patientId)
+            .neq('status', 'encerrada')
+            .limit(1);
+
+        if (error) {
+            console.error('Error checking open complaints:', error);
+            return false;
+        }
+        return (data || []).length > 0;
+    },
+
     async updateComplaint(id: string, updates: Partial<OmbudsmanComplaint>) {
         const { data, error } = await supabase
             .from('ombudsman_complaints')
@@ -1218,7 +1269,359 @@ export const supabaseService = {
     },
 
 
+
+    // --- Budgets ---
+
+    async getBudgets() {
+        const { data, error } = await supabase
+            .from('budgets')
+            .select(`
+                *,
+                patient:patients(id, name, avatar),
+                items:budget_items(*)
+            `)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        return data as any[];
+    },
+
+    async getBudgetById(id: string) {
+        const { data, error } = await supabase
+            .from('budgets')
+            .select(`
+                *,
+                patient:patients(id, name, cpf, phone, email, address),
+                clinic:clinics(*),
+                items:budget_items(*)
+            `)
+            .eq('id', id)
+            .single();
+
+        if (error) throw error;
+        return data;
+    },
+
+    async createBudget(budget: Partial<Budget>, items: Partial<BudgetItem>[]) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('User not authenticated');
+
+        const clinicId = await this._getClinicId();
+
+        // 1. Create Budget
+        const dbBudget = {
+            patient_id: budget.patient_id,
+            clinic_id: clinicId,
+            status: budget.status || 'draft',
+            payment_method: budget.payment_method,
+            installments: budget.installments,
+            card_fee_percent: budget.card_fee_percent,
+            subtotal: budget.subtotal,
+            total_with_fee: budget.total_with_fee,
+            valid_until: budget.valid_until,
+            payment_methods: budget.payment_methods
+        };
+
+        const { data: budgetData, error: budgetError } = await supabase
+            .from('budgets')
+            .insert([dbBudget])
+            .select()
+            .single();
+
+        if (budgetError) throw budgetError;
+
+        // 2. Create Items
+        if (items && items.length > 0) {
+            const dbItems = items.map(item => ({
+                budget_id: budgetData.id,
+                procedure_id: item.procedure_id,
+                procedure_name_snapshot: item.procedure_name_snapshot,
+                description_snapshot: item.description_snapshot,
+                unit_price: item.unit_price,
+                sessions: item.sessions,
+                total_price: item.total_price
+            }));
+
+            const { error: itemsError } = await supabase
+                .from('budget_items')
+                .insert(dbItems);
+
+            if (itemsError) {
+                // Determine if we should delete the budget if items fail, 
+                // but for now let's just throw
+                throw itemsError;
+            }
+        }
+
+        return budgetData;
+    },
+
+    async updateBudget(id: string, updates: Partial<Budget>, newItems?: Partial<BudgetItem>[]) {
+        // 1. Update Budget Fields
+        const { data, error } = await supabase
+            .from('budgets')
+            .update({
+                ...updates,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        // 2. Update Items (Strategy: Delete all and recreate if newItems is provided)
+        // This is simpler for "snapshot" style editing where we save the whole state.
+        if (newItems) {
+            // Delete existing
+            await supabase.from('budget_items').delete().eq('budget_id', id);
+
+            // Insert new
+            const dbItems = newItems.map(item => ({
+                budget_id: id,
+                procedure_id: item.procedure_id,
+                procedure_name_snapshot: item.procedure_name_snapshot,
+                description_snapshot: item.description_snapshot,
+                unit_price: item.unit_price,
+                sessions: item.sessions,
+                total_price: item.total_price
+            }));
+
+            if (dbItems.length > 0) {
+                const { error: itemsError } = await supabase
+                    .from('budget_items')
+                    .insert(dbItems);
+
+                if (itemsError) throw itemsError;
+            }
+        }
+
+        return data;
+    },
+
+    async deleteBudget(id: string) {
+        const { error } = await supabase
+            .from('budgets')
+            .delete()
+            .eq('id', id);
+
+        if (error) throw error;
+        return true;
+    },
+
+    // --- AI Clinical Copilot ---
+
+    async createConsultation(consultation: Partial<Consultation>) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('User not authenticated');
+
+        // Ensure doctor_id is set to current user if not provided
+        const dbConsultation = {
+            patient_id: consultation.patientId,
+            doctor_id: consultation.doctorId || user.id,
+            audio_path: consultation.audioPath,
+            status: consultation.status || 'draft',
+            created_at: new Date().toISOString()
+        };
+
+        const { data, error } = await supabase
+            .from('consultations')
+            .insert([dbConsultation])
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        return {
+            ...data,
+            patientId: data.patient_id,
+            doctorId: data.doctor_id,
+            audioPath: data.audio_path,
+            rawTranscript: data.raw_transcript,
+            cleanTranscript: data.clean_transcript,
+            aiProntuario: data.ai_prontuario,
+            aiResumo: data.ai_resumo,
+            createdAt: data.created_at
+        } as Consultation;
+    },
+
+    async getConsultationById(id: string) {
+        const { data, error } = await supabase
+            .from('consultations')
+            .select('*')
+            .eq('id', id)
+            .single();
+
+        if (error) throw error;
+
+        // Parse ai_prontuario if it's a string
+        let aiProntuario = data.ai_prontuario;
+        if (typeof aiProntuario === 'string') {
+            try {
+                aiProntuario = JSON.parse(aiProntuario);
+            } catch (e) {
+                console.error('Failed to parse ai_prontuario:', e);
+                aiProntuario = null;
+            }
+        }
+
+        return {
+            id: data.id,
+            patientId: data.patient_id,
+            doctorId: data.doctor_id,
+            audioPath: data.audio_path,
+            rawTranscript: data.raw_transcript,
+            cleanTranscript: data.clean_transcript,
+            aiProntuario: aiProntuario,
+            aiResumo: data.ai_resumo,
+            status: data.status,
+            metadata: data.metadata,
+            createdAt: data.created_at
+        } as Consultation;
+    },
+
+    async updateConsultation(id: string, updates: Partial<Consultation>) {
+        const dbUpdates: any = {};
+        if (updates.status) dbUpdates.status = updates.status;
+        if (updates.rawTranscript) dbUpdates.raw_transcript = updates.rawTranscript;
+        if (updates.cleanTranscript) dbUpdates.clean_transcript = updates.cleanTranscript;
+        if (updates.aiProntuario) dbUpdates.ai_prontuario = updates.aiProntuario;
+        if (updates.aiResumo) dbUpdates.ai_resumo = updates.aiResumo;
+        if (updates.audioPath) dbUpdates.audio_path = updates.audioPath;
+        if (updates.metadata) dbUpdates.metadata = updates.metadata;
+
+        dbUpdates.updated_at = new Date().toISOString();
+
+        const { data, error } = await supabase
+            .from('consultations')
+            .update(dbUpdates)
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        return {
+            ...data,
+            patientId: data.patient_id,
+            doctorId: data.doctor_id,
+            audioPath: data.audio_path,
+            rawTranscript: data.raw_transcript,
+            cleanTranscript: data.clean_transcript,
+            aiProntuario: data.ai_prontuario,
+            aiResumo: data.ai_resumo,
+            createdAt: data.created_at
+        } as Consultation;
+    },
+
+    async getPatientConsultations(patientId: string) {
+        const { data, error } = await supabase
+            .from('consultations')
+            .select('*')
+            .eq('patient_id', patientId)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        return data.map((c: any) => ({
+            id: c.id,
+            patientId: c.patient_id,
+            doctorId: c.doctor_id,
+            audioPath: c.audio_path,
+            rawTranscript: c.raw_transcript,
+            cleanTranscript: c.clean_transcript,
+            aiProntuario: c.ai_prontuario,
+            aiResumo: c.ai_resumo,
+            status: c.status,
+            metadata: c.metadata,
+            createdAt: c.created_at
+        })) as Consultation[];
+    },
+
+    async uploadConsultationAudio(patientId: string, file: Blob) {
+        const fileExt = 'webm'; // Assuming webm from MediaRecorder
+        const fileName = `${patientId}/${Date.now()}.${fileExt}`;
+        const filePath = fileName;
+
+        const { error: uploadError } = await supabase.storage
+            .from('secure-consultations')
+            .upload(filePath, file, {
+                contentType: 'audio/webm',
+                upsert: true
+            });
+
+        if (uploadError) throw uploadError;
+
+        return filePath;
+    },
+
+    async getPatientMemories(patientId: string) {
+        const { data, error } = await supabase
+            .from('patient_memories')
+            .select('*')
+            .eq('patient_id', patientId)
+            .eq('is_active', true)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        return data.map((m: any) => ({
+            id: m.id,
+            patientId: m.patient_id,
+            type: m.type,
+            description: m.description,
+            suggestion: m.suggestion,
+            isActive: m.is_active,
+            sourceConsultationId: m.source_consultation_id,
+            createdAt: m.created_at
+        })) as PatientMemory[];
+    },
+
+    async triggerCopilotProcessing(consultationId: string, audioPath: string) {
+        console.log('Triggering n8n processing for:', consultationId, audioPath);
+
+        // URL do Webhook do n8n (Production vs Dev)
+        // Idealmente isso estaria em variáveis de ambiente (VITE_N8N_WEBHOOK_URL)
+        const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_URL;
+        const apiKey = import.meta.env.VITE_N8N_API_KEY || 'aesthetic-secret-key-123';
+
+        if (!webhookUrl || webhookUrl.includes('seu-n8n-instance')) {
+            console.warn('⚠️ N8N Webhook URL not configured or is placeholder. AI processing will be skipped.');
+            console.warn('Please configure VITE_N8N_WEBHOOK_URL in your .env file.');
+            return false;
+        }
+
+        try {
+            const response = await fetch(webhookUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-api-key': apiKey
+                },
+                body: JSON.stringify({
+                    consultationId,
+                    audio_path: audioPath
+                })
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                // Log detailed error but don't crash the app
+                console.error(`❌ n8n Error (${response.status}): ${errorText}`);
+                throw new Error(`n8n responded with ${response.status}: ${errorText}`);
+            }
+
+            console.log('✅ n8n triggered successfully');
+            return true;
+        } catch (error) {
+            console.error('Failed to trigger n8n processing:', error);
+            // Re-throw to let the UI know, but the UI now handles this gracefully
+            throw error;
+        }
+    }
+
 };
+
 
 // Helper to map DB treatment to Frontend type
 const mapDbToTreatment = (dbT: any): PatientTreatment => {

@@ -473,5 +473,20 @@ export const taskService = {
             details: item.details,
             createdAt: item.created_at
         }));
+    },
+
+    async postponeTask(taskId: string, newDueAt: string, userId: string) {
+        const { data, error } = await supabase
+            .from('tasks')
+            .update({ due_at: newDueAt })
+            .eq('id', taskId)
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        await this.logHistory(taskId, userId, 'POSTPONED', { newDueAt });
+
+        return data;
     }
 };

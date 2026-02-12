@@ -12,7 +12,11 @@ const ProcedureRegistration: React.FC<ProcedureRegistrationProps> = ({ onSave, o
     const [formData, setFormData] = useState({
         name: '',
         icon: 'healing',
-        description: ''
+        description: '',
+        price: '',
+        promotional_price: '',
+        use_in_budget: false,
+        budget_description: ''
     });
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -22,6 +26,10 @@ const ProcedureRegistration: React.FC<ProcedureRegistrationProps> = ({ onSave, o
             name: formData.name,
             icon: formData.icon,
             description: formData.description,
+            price: formData.price ? parseFloat(formData.price) : null,
+            promotional_price: formData.promotional_price ? parseFloat(formData.promotional_price) : null,
+            use_in_budget: formData.use_in_budget,
+            budget_description: formData.budget_description,
             scripts: []
         };
         onSave(newProcedure);
@@ -73,6 +81,49 @@ const ProcedureRegistration: React.FC<ProcedureRegistrationProps> = ({ onSave, o
                                 onChange={e => setFormData({ ...formData, description: e.target.value })}
                             />
                         </label>
+
+                        <div className="border-t border-[#f3e7ea] dark:border-[#3d242a] pt-6 mt-2">
+                            <h3 className="text-lg font-bold text-[#1b0d11] dark:text-white mb-4">Informações de Orçamento</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                <Input
+                                    label="Valor (R$)"
+                                    type="number"
+                                    placeholder="0,00"
+                                    value={formData.price}
+                                    onChange={e => setFormData({ ...formData, price: e.target.value })}
+                                />
+                                <Input
+                                    label="Valor Promocional (R$)"
+                                    type="number"
+                                    placeholder="0,00"
+                                    value={formData.promotional_price}
+                                    onChange={e => setFormData({ ...formData, promotional_price: e.target.value })}
+                                />
+                            </div>
+                            <div className="flex flex-col gap-4">
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        className="rounded text-primary focus:ring-primary border-[#f3e7ea]"
+                                        checked={formData.use_in_budget}
+                                        onChange={e => setFormData({ ...formData, use_in_budget: e.target.checked })}
+                                    />
+                                    <span className="text-sm font-medium text-[#1b0d11] dark:text-white">Disponível para Orçamento</span>
+                                </label>
+
+                                {formData.use_in_budget && (
+                                    <label className="flex flex-col gap-2 w-full animate-in fade-in slide-in-from-top-2">
+                                        <span className="text-sm font-bold text-[#1b0d11] dark:text-white">Descrição para Orçamento</span>
+                                        <textarea
+                                            className="rounded-xl border-[#e7cfd5] dark:border-[#4d3239] bg-background-light dark:bg-[#3d242a] focus:ring-primary focus:border-primary min-h-[80px] p-4 outline-none"
+                                            placeholder="Descrição detalhada que aparecerá no orçamento..."
+                                            value={formData.budget_description}
+                                            onChange={e => setFormData({ ...formData, budget_description: e.target.value })}
+                                        />
+                                    </label>
+                                )}
+                            </div>
+                        </div>
                     </div>
                 </div>
 

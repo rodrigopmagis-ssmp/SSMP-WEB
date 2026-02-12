@@ -44,7 +44,7 @@ const Header: React.FC<HeaderProps> = ({ currentView, onViewChange, onNewRegistr
             <span className="material-symbols-outlined text-3xl">360</span>
           </div>
           <h2 className="text-[#1b0d11] dark:text-[#fcf8f9] text-xl font-extrabold leading-tight tracking-[-0.015em]">
-            Jornada 360 <span className="font-light text-primary">Acompanhamento</span>
+            Jornada 360
           </h2>
         </div>
 
@@ -92,17 +92,16 @@ const Header: React.FC<HeaderProps> = ({ currentView, onViewChange, onNewRegistr
             >
               Ouvidoria
             </button>
+            <button
+              className={`${currentView === 'budgets' ? 'text-primary border-b-2 border-primary' : 'text-[#1b0d11] dark:text-[#fcf8f9] font-medium'} text-sm leading-normal pb-1 transition-all`}
+              onClick={() => onViewChange('budgets')}
+            >
+              Orçamentos
+            </button>
           </nav>
 
           <div className="flex items-center gap-4">
-            <Button
-              variant="primary"
-              onClick={onNewRegistration}
-              className="hidden md:flex shadow-md"
-            >
-              <span className="material-symbols-outlined text-lg">add</span>
-              Novo Paciente
-            </Button>
+
 
             <NotificationsPopover onTaskClick={(task) => {
               sessionStorage.setItem('pendingTaskId', task.id);
