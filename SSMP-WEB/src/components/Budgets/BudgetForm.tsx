@@ -23,6 +23,8 @@ interface BudgetFormData {
         description_snapshot?: string;
         unit_price: number;
         sessions: number;
+        unit?: string;
+        discount?: number;
         total_price: number;
         allows_sessions: boolean;
     }[];
@@ -31,6 +33,7 @@ interface BudgetFormData {
         amount: number;
         installments?: number;
         card_fee_percent?: number;
+        discount?: number;
     }[];
 }
 
@@ -59,10 +62,15 @@ export const BudgetForm: React.FC<BudgetFormProps> = ({ initialData, onSave, onC
                 description_snapshot: i.description_snapshot,
                 unit_price: i.unit_price,
                 sessions: i.sessions,
+                unit: i.unit || 'sessions', // Default to 'sessions'
+                discount: i.discount || 0,
                 total_price: i.total_price,
                 allows_sessions: true // We'll update this when loading procedures, default true to avoid hiding
             })) || [],
-            payment_methods: initialData?.payment_methods || []
+            payment_methods: initialData?.payment_methods?.map(pm => ({
+                ...pm,
+                discount: pm.discount || 0
+            })) || []
         }
     });
 
@@ -127,6 +135,9 @@ export const BudgetForm: React.FC<BudgetFormProps> = ({ initialData, onSave, onC
 
         const unitPrice = procedure.price || 0;
         const sessions = 1;
+        const discount = 0;
+        let totalPrice = (unitPrice * sessions) - discount;
+        if (totalPrice < 0) totalPrice = 0;
 
         updateItem(index, {
             procedure_id: procedure.id,
@@ -134,8 +145,20 @@ export const BudgetForm: React.FC<BudgetFormProps> = ({ initialData, onSave, onC
             description_snapshot: procedure.budget_description,
             unit_price: unitPrice,
             sessions: sessions,
-            total_price: unitPrice * sessions,
+            unit: 'sessions', // Default unit
+            discount: discount,
+            total_price: totalPrice,
             allows_sessions: procedure.allows_sessions || false
+        });
+    };
+
+    const onUnitChange = (index: number, unit: string) => {
+        const item = watchedItems[index];
+        if (!item) return;
+
+        updateItem(index, {
+            ...item,
+            unit: unit
         });
     };
 
@@ -143,10 +166,17 @@ export const BudgetForm: React.FC<BudgetFormProps> = ({ initialData, onSave, onC
         const item = watchedItems[index];
         if (!item) return;
         const safePrice = Math.max(0, price);
+        let totalPrice = 0;
+
+        if (item) {
+            totalPrice = (safePrice * item.sessions) - (item.discount || 0);
+            if (totalPrice < 0) totalPrice = 0;
+        }
+
         updateItem(index, {
             ...item,
             unit_price: safePrice,
-            total_price: safePrice * (item.sessions || 1)
+            total_price: totalPrice
         });
     };
 
@@ -157,10 +187,31 @@ export const BudgetForm: React.FC<BudgetFormProps> = ({ initialData, onSave, onC
         // Ensure sessions is at least 1
         const safeSessions = Math.max(1, sessions);
 
+        let totalPrice = 0;
+        if (item) {
+            totalPrice = (item.unit_price * safeSessions) - (item.discount || 0);
+            if (totalPrice < 0) totalPrice = 0;
+        }
+
         updateItem(index, {
             ...item,
             sessions: safeSessions,
-            total_price: item.unit_price * safeSessions
+            total_price: totalPrice
+        });
+    };
+
+    const onDiscountChange = (index: number, discount: number) => {
+        const item = watchedItems[index];
+        if (!item) return;
+
+        const safeDiscount = Math.max(0, discount);
+        let totalPrice = (item.unit_price * item.sessions) - safeDiscount;
+        if (totalPrice < 0) totalPrice = 0;
+
+        updateItem(index, {
+            ...item,
+            discount: safeDiscount,
+            total_price: totalPrice
         });
     };
 
@@ -200,6 +251,8 @@ export const BudgetForm: React.FC<BudgetFormProps> = ({ initialData, onSave, onC
                 description_snapshot: item.description_snapshot,
                 unit_price: item.unit_price,
                 sessions: item.sessions,
+                unit: item.unit,
+                discount: item.discount,
                 total_price: item.total_price
             }));
 
@@ -296,7 +349,8 @@ export const BudgetForm: React.FC<BudgetFormProps> = ({ initialData, onSave, onC
                                 sessions: 1,
                                 total_price: 0,
                                 allows_sessions: false,
-                                description_snapshot: ''
+                                description_snapshot: '',
+                                discount: 0
                             })}
                             className="text-primary hover:text-primary-dark font-medium text-sm flex items-center gap-1"
                         >
@@ -316,8 +370,8 @@ export const BudgetForm: React.FC<BudgetFormProps> = ({ initialData, onSave, onC
                                     <span className="material-symbols-outlined text-sm">delete</span>
                                 </button>
 
-                                <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
-                                    <div className="md:col-span-5">
+                                <div className="grid grid-cols-12 gap-2 items-end pr-8 min-w-[700px]">
+                                    <div className="col-span-6">
                                         <label className="block text-xs font-medium text-gray-500 mb-1">Procedimento</label>
                                         <select
                                             value={watchedItems[index]?.procedure_id || ''}
@@ -329,6 +383,9 @@ export const BudgetForm: React.FC<BudgetFormProps> = ({ initialData, onSave, onC
                                             <option value="">Selecione...</option>
                                             {procedures
                                                 .filter(p => {
+                                                    // Filter by financial configuration
+                                                    if (!p.use_in_budget) return false;
+
                                                     // Prevent duplicate: hide procedures already selected in other rows
                                                     const selectedIds = watchedItems
                                                         .map((it, i) => i !== index ? it.procedure_id : null)
@@ -343,47 +400,65 @@ export const BudgetForm: React.FC<BudgetFormProps> = ({ initialData, onSave, onC
                                         </select>
                                     </div>
 
-                                    <div className="md:col-span-2">
+                                    <div className="col-span-2">
                                         <label className="block text-xs font-medium text-gray-500 mb-1">Valor Unit.</label>
+                                        <div className="relative">
+                                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">R$</span>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                step="0.01"
+                                                value={watchedItems[index]?.unit_price || 0}
+                                                onChange={(e) => onUnitPriceChange(index, parseFloat(e.target.value) || 0)}
+                                                className="w-full text-sm pl-8 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:ring-primary focus:border-primary"
+                                                aria-label="Valor Unitário"
+                                                title="Valor Unitário"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="col-span-1">
+                                        <label className="block text-xs font-medium text-gray-500 mb-1">Qtd.</label>
                                         <input
                                             type="number"
-                                            step="0.01"
-                                            min="0"
-                                            value={watchedItems[index]?.unit_price || 0}
-                                            onChange={(e) => onUnitPriceChange(index, parseFloat(e.target.value) || 0)}
-                                            className="w-full text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:ring-primary focus:border-primary"
-                                            aria-label="Valor Unitário"
-                                            title="Valor Unitário"
-                                            placeholder="0,00"
+                                            min="1"
+                                            value={watchedItems[index]?.sessions || 1}
+                                            onChange={(e) => onSessionsChange(index, parseInt(e.target.value) || 1)}
+                                            className="w-full text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:ring-primary focus:border-primary px-2"
+                                            aria-label="Quantidade"
+                                            title="Quantidade"
                                         />
                                     </div>
 
-                                    <div className="md:col-span-2">
-                                        <label className="block text-xs font-medium text-gray-500 mb-1">Sessões</label>
-                                        {watchedItems[index]?.allows_sessions ? (
+                                    <div className="col-span-1">
+                                        <label className="block text-xs font-medium text-gray-500 mb-1">Desc. Item</label>
+                                        <div className="relative">
+                                            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500 text-xs text-[10px]">R$</span>
                                             <input
                                                 type="number"
-                                                min="1"
-                                                value={watchedItems[index]?.sessions || 1}
-                                                onChange={(e) => onSessionsChange(index, parseInt(e.target.value) || 1)}
-                                                className="w-full text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:ring-primary focus:border-primary"
-                                                aria-label="Número de Sessões"
-                                                title="Número de Sessões"
+                                                min="0"
+                                                step="0.01"
+                                                value={watchedItems[index]?.discount || 0}
+                                                onChange={(e) => onDiscountChange(index, parseFloat(e.target.value) || 0)}
+                                                className="w-full text-sm pl-6 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:ring-primary focus:border-primary" // reduced padding
+                                                aria-label="Desconto do Item"
+                                                title="Desconto do Item"
                                             />
-                                        ) : (
-                                            <div className="w-full text-sm py-2 px-3 bg-gray-100 dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-400 italic text-center">
-                                                N/A
-                                            </div>
-                                        )}
+                                        </div>
                                     </div>
 
-                                    <div className="md:col-span-3">
+                                    <div className="col-span-2">
                                         <label className="block text-xs font-medium text-gray-500 mb-1">Total Item</label>
                                         <div className="w-full text-sm py-2 px-3 bg-gray-100 dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-600 font-bold text-gray-900 dark:text-white text-right">
                                             {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(watchedItems[index]?.total_price || 0)}
                                         </div>
                                     </div>
                                 </div>
+                                {watchedItems[index]?.description_snapshot && (
+                                    <div className="mt-2 text-xs text-gray-500 dark:text-gray-400 italic text-justify">
+                                        {watchedItems[index].description_snapshot}
+                                    </div>
+                                )}
                             </div>
                         ))}
 
@@ -406,7 +481,8 @@ export const BudgetForm: React.FC<BudgetFormProps> = ({ initialData, onSave, onC
                                 method: 'pix',
                                 amount: remainingBalance,
                                 installments: 1,
-                                card_fee_percent: 0
+                                card_fee_percent: 0,
+                                discount: 0
                             })}
                             className="text-primary hover:text-primary-dark font-medium text-sm flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
                             title={watchedItems.length === 0 ? 'Adicione procedimentos primeiro' : ''}
@@ -428,8 +504,8 @@ export const BudgetForm: React.FC<BudgetFormProps> = ({ initialData, onSave, onC
                                         <span className="material-symbols-outlined text-sm">delete</span>
                                     </button>
 
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
-                                        <div>
+                                    <div className="grid grid-cols-12 gap-3 mb-3">
+                                        <div className="col-span-4">
                                             <label className="block text-xs font-medium text-gray-500 mb-1">Método</label>
                                             <select
                                                 {...register(`payment_methods.${index}.method` as const)}
@@ -443,7 +519,7 @@ export const BudgetForm: React.FC<BudgetFormProps> = ({ initialData, onSave, onC
                                                 <option value="cash">Dinheiro</option>
                                             </select>
                                         </div>
-                                        <div>
+                                        <div className="col-span-4">
                                             <label className="block text-xs font-medium text-gray-500 mb-1">Valor</label>
                                             <input
                                                 type="number"
@@ -454,6 +530,27 @@ export const BudgetForm: React.FC<BudgetFormProps> = ({ initialData, onSave, onC
                                                 aria-label="Valor do Pagamento"
                                                 title="Valor do Pagamento"
                                             />
+                                        </div>
+                                        <div className="col-span-4">
+                                            <label className="block text-xs font-medium text-gray-500 mb-1">Desconto</label>
+                                            <div className="relative">
+                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">R$</span>
+                                                <input
+                                                    type="number"
+                                                    step="0.01"
+                                                    value={watchedPaymentMethods[index]?.discount || 0}
+                                                    onChange={(e) => {
+                                                        const val = parseFloat(e.target.value) || 0;
+                                                        const newPaymentMethods = [...watchedPaymentMethods];
+                                                        newPaymentMethods[index].discount = val;
+                                                        setValue('payment_methods', newPaymentMethods);
+                                                    }}
+                                                    className="w-full text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white pl-8"
+                                                    placeholder="0,00"
+                                                    aria-label="Desconto do Pagamento"
+                                                    title="Desconto do Pagamento"
+                                                />
+                                            </div>
                                         </div>
                                     </div>
 
@@ -497,47 +594,99 @@ export const BudgetForm: React.FC<BudgetFormProps> = ({ initialData, onSave, onC
                         </div>
 
                         <div className="bg-white dark:bg-gray-800 p-6 rounded-xl border border-gray-100 dark:border-gray-700 space-y-3 h-fit">
-                            <div className="flex justify-between text-sm">
-                                <span className="text-gray-600 dark:text-gray-400">Subtotal (Procedimentos):</span>
-                                <span className="font-medium">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(subtotal)}</span>
-                            </div>
+                            {/* Calculate Totals for Display */}
+                            {(() => {
+                                const grossTotal = watchedItems.reduce((acc, item) => acc + ((item.unit_price || 0) * (item.sessions || 1)), 0);
+                                const totalItemDiscounts = watchedItems.reduce((acc, item) => acc + (item.discount || 0), 0);
+                                const totalPaymentDiscounts = watchedPaymentMethods.reduce((acc, pm) => acc + (pm.discount || 0), 0);
+                                const totalFees = watchedPaymentMethods.reduce((acc, pm) => {
+                                    if (pm.method === 'credit_card' && (pm.card_fee_percent || 0) > 0) {
+                                        return acc + ((pm.amount || 0) * ((pm.card_fee_percent || 0) / 100));
+                                    }
+                                    return acc;
+                                }, 0);
+                                const finalTotal = grossTotal - totalItemDiscounts - totalPaymentDiscounts + totalFees;
 
-                            {watchedPaymentMethods.map((pm, idx) => {
-                                if (pm.method === 'credit_card' && (pm.card_fee_percent || 0) > 0) {
-                                    const feeVal = (pm.amount || 0) * ((pm.card_fee_percent || 0) / 100);
-                                    return (
-                                        <div key={idx} className="flex justify-between text-xs text-red-500">
-                                            <span>Taxa Maq. ({pm.card_fee_percent}%):</span>
-                                            <span>+ {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(feeVal)}</span>
+                                return (
+                                    <>
+                                        <div className="space-y-2">
+                                            {/* 1. Total Geral (Gross) */}
+                                            <div className="flex justify-between text-sm">
+                                                <span className="text-gray-600 dark:text-gray-400">Total Geral:</span>
+                                                <span className="font-medium text-gray-900 dark:text-white">
+                                                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(grossTotal)}
+                                                </span>
+                                            </div>
+
+                                            {/* 2. Descontos (Itens) */}
+                                            {totalItemDiscounts > 0 && (
+                                                <div className="flex justify-between text-sm text-red-600 dark:text-red-400">
+                                                    <span>(-) Desconto Itens:</span>
+                                                    <span>
+                                                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalItemDiscounts)}
+                                                    </span>
+                                                </div>
+                                            )}
+
+                                            {/* 3. Descontos (Pagamento) */}
+                                            {totalPaymentDiscounts > 0 && (
+                                                <div className="flex justify-between text-sm text-red-600 dark:text-red-400">
+                                                    <span>(-) Desconto Pagto:</span>
+                                                    <span>
+                                                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalPaymentDiscounts)}
+                                                    </span>
+                                                </div>
+                                            )}
+
+                                            {/* 4. Acréscimos (Taxas) */}
+                                            {totalFees > 0 && (
+                                                <div className="flex justify-between text-sm text-amber-600 dark:text-amber-500">
+                                                    <span>(+) Acréscimos (Taxas):</span>
+                                                    <span>
+                                                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalFees)}
+                                                    </span>
+                                                </div>
+                                            )}
                                         </div>
-                                    );
-                                }
-                                return null;
-                            })}
 
-                            <div className="h-px bg-gray-200 dark:bg-gray-600 my-2"></div>
+                                        <div className="h-px bg-gray-200 dark:bg-gray-600 my-3"></div>
 
-                            <div className="flex justify-between text-lg font-bold text-primary">
-                                <span>Total Final (com taxas):</span>
-                                <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalWithFee)}</span>
-                            </div>
+                                        {/* 5. Total Final */}
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-lg font-bold text-gray-900 dark:text-white">Total Final:</span>
+                                            <span className="text-xl font-bold text-primary">
+                                                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(finalTotal)}
+                                            </span>
+                                        </div>
 
-                            {remainingBalance > 0.01 && watchedPaymentMethods.length > 0 && (
-                                <div className="flex justify-between text-sm font-medium text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 p-2 rounded-lg">
-                                    <span>⚠ Restante a distribuir:</span>
-                                    <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(remainingBalance)}</span>
-                                </div>
-                            )}
+                                        {/* Remaining Balance */}
+                                        <div className="text-right mt-2">
+                                            <span className="text-sm text-gray-500 dark:text-gray-400">Restante a Pagar:</span>
+                                            <span className={`ml-2 text-sm font-medium ${(finalTotal - watchedPaymentMethods.reduce((acc, pm) => acc + (pm.amount || 0), 0)) > 0.01 ? 'text-red-500' : 'text-green-500'}`}>
+                                                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.max(0, finalTotal - watchedPaymentMethods.reduce((acc, pm) => acc + (pm.amount || 0), 0)))}
+                                            </span>
+                                        </div>
 
-                            <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
-                                <p className="text-xs text-center text-gray-500 mb-2">Resumo dos Pagamentos</p>
-                                {watchedPaymentMethods.map((pm, idx) => (
-                                    <div key={idx} className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
-                                        <span className="capitalize">{pm.method === 'credit_card' ? `${pm.installments}x Cartão` : pm.method}:</span>
-                                        <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(pm.amount || 0)}</span>
-                                    </div>
-                                ))}
-                            </div>
+                                        {/* Warning if remaining balance */}
+                                        {(finalTotal - watchedPaymentMethods.reduce((acc, pm) => acc + (pm.amount || 0), 0)) > 0.01 && watchedPaymentMethods.length > 0 && (
+                                            <div className="mt-3 flex justify-between text-xs font-medium text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 p-2 rounded-lg border border-amber-100 dark:border-amber-800">
+                                                <span className="flex items-center gap-1"><span className="material-symbols-outlined text-sm">warning</span> Falta distribuir:</span>
+                                                <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(finalTotal - watchedPaymentMethods.reduce((acc, pm) => acc + (pm.amount || 0), 0))}</span>
+                                            </div>
+                                        )}
+
+                                        <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
+                                            <p className="text-xs text-center text-gray-500 mb-2 font-medium">Resumo dos Pagamentos</p>
+                                            {watchedPaymentMethods.map((pm, idx) => (
+                                                <div key={idx} className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mb-1">
+                                                    <span className="capitalize">{pm.method === 'credit_card' ? `${pm.installments}x Cartão` : pm.method}:</span>
+                                                    <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(pm.amount || 0)}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </>
+                                );
+                            })()}
                         </div>
                     </div>
                 </div>

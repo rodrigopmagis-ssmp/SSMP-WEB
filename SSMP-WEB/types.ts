@@ -150,6 +150,7 @@ export interface PaymentItem {
   amount: number;
   installments?: number;
   card_fee_percent?: number;
+  discount?: number;
 }
 
 export interface BudgetItem {
@@ -160,6 +161,8 @@ export interface BudgetItem {
   description_snapshot?: string;
   unit_price: number;
   sessions: number;
+  unit?: string; // e.g., 'sessions' | 'quantity'
+  discount?: number;
   total_price: number;
   created_at: string;
 }
