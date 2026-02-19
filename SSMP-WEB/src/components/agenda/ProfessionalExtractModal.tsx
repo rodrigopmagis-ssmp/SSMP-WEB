@@ -198,6 +198,8 @@ const ProfessionalExtractModal: React.FC<ProfessionalExtractModalProps> = ({ isO
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">Profissional</label>
                             <select
+                                title="Selecione o profissional"
+                                aria-label="Selecione o profissional"
                                 className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500 text-sm"
                                 value={selectedProfessionalId}
                                 onChange={(e) => setSelectedProfessionalId(e.target.value)}
@@ -211,6 +213,8 @@ const ProfessionalExtractModal: React.FC<ProfessionalExtractModalProps> = ({ isO
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">Período</label>
                             <select
+                                title="Selecione o período"
+                                aria-label="Selecione o período"
                                 className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500 text-sm"
                                 value={periodType}
                                 onChange={(e) => setPeriodType(e.target.value as any)}
@@ -227,6 +231,8 @@ const ProfessionalExtractModal: React.FC<ProfessionalExtractModalProps> = ({ isO
                     {periodType === 'custom' && (
                         <div className="flex items-center gap-2 mt-2">
                             <input
+                                title="Data inicial"
+                                aria-label="Data inicial"
                                 type="date"
                                 className="border-gray-300 rounded-lg text-sm"
                                 value={customRange.start}
@@ -234,6 +240,8 @@ const ProfessionalExtractModal: React.FC<ProfessionalExtractModalProps> = ({ isO
                             />
                             <span className="text-gray-500">até</span>
                             <input
+                                title="Data final"
+                                aria-label="Data final"
                                 type="date"
                                 className="border-gray-300 rounded-lg text-sm"
                                 value={customRange.end}

@@ -62,8 +62,8 @@ export const BudgetPrint: React.FC<BudgetPrintProps> = ({ budgetId, onClose }) =
                                 <img
                                     src={budget.clinic.logo_url}
                                     alt={budget.clinic.fantasy_name || 'Logo da Clínica'}
-                                    className="max-h-[160px] w-auto object-contain"
-                                    style={{ backgroundColor: 'transparent', imageRendering: 'auto', mixBlendMode: 'multiply' }}
+
+                                    className="max-h-[160px] w-auto object-contain bg-transparent mix-blend-multiply"
                                     onError={(e) => {
                                         e.currentTarget.style.display = 'none';
                                         e.currentTarget.parentElement?.classList.add('bg-primary/10', 'rounded-xl', 'w-24', 'h-24', 'justify-center');
@@ -258,8 +258,8 @@ export const BudgetPrint: React.FC<BudgetPrintProps> = ({ budgetId, onClose }) =
                     <p className="mb-2">Este orçamento tem validade até a data estipulada. Após este período, os valores podem sofrer alterações.</p>
                     <p>
                         {budget.clinic?.fantasy_name || budget.clinic?.business_name || 'Aesthetic Clinic'}
-                        {budget.clinic?.cnpj ? ` - CNPJ: ${budget.clinic.cnpj}` : ''}
-                        {budget.clinic?.address ? ` - ${budget.clinic.address}` : ''}
+                        {budget.clinic?.cpf_cnpj ? ` - CNPJ: ${budget.clinic.cpf_cnpj}` : ''}
+                        {budget.clinic?.street ? ` - ${budget.clinic.street}, ${budget.clinic.number || 'S/N'} ${budget.clinic.complement ? `(${budget.clinic.complement})` : ''} - ${budget.clinic.neighborhood} - ${budget.clinic.city}/${budget.clinic.state}` : ''}
                     </p>
                 </div>
 

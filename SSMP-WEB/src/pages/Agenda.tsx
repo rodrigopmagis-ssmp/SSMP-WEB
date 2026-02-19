@@ -320,33 +320,7 @@ const Agenda: React.FC<AgendaProps> = ({ patients, procedures }) => {
         setIsModalOpen(true);
     };
 
-    // Custom day header with a "+" button — always clickable even when slots are full
-    const CustomDayHeader = useCallback(({ date: headerDate, label }: { date: Date; label: string }) => (
-        <div className="rbc-day-header-custom" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', width: '100%', padding: '2px 4px' }}>
-            <span className="capitalize text-sm font-medium text-gray-700">{label}</span>
-            <button
-                title="Novo agendamento"
-                onClick={(e) => {
-                    e.stopPropagation();
-                    const slot = new Date(headerDate);
-                    slot.setHours(9, 0, 0, 0); // default to 09:00
-                    openAppointmentModal(slot);
-                }}
-                className="hover:text-blue-600 text-gray-400 transition-colors"
-                style={{
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
-                    padding: '0',
-                    lineHeight: 1,
-                    display: 'flex',
-                    alignItems: 'center',
-                }}
-            >
-                <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>add_circle</span>
-            </button>
-        </div>
-    ), []);
+
 
     const handleSelectSlot = (slotInfo: { start: Date; end: Date }) => {
         const slot = slotInfo.start;
@@ -404,6 +378,24 @@ const Agenda: React.FC<AgendaProps> = ({ patients, procedures }) => {
     const handleWarningCancel = () => {
         setWarningModal({ isOpen: false, message: '' });
     };
+
+    // State for Mobile Sidebar
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+    // Effect to handle mobile view default
+    useEffect(() => {
+        const handleResize = () => {
+            if (window.innerWidth < 768) {
+                setView(Views.DAY);
+            }
+        };
+
+        // Initial check
+        handleResize();
+
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
 
     // Navigate functions
     const navigatePrev = () => {
@@ -466,10 +458,49 @@ const Agenda: React.FC<AgendaProps> = ({ patients, procedures }) => {
         return {};
     }, []);
 
+    // Custom header with Tailwind classes (fixing lint)
+    const CustomDayHeader = useCallback(({ date: headerDate, label }: { date: Date; label: string }) => (
+        <div className="rbc-day-header-custom flex items-center justify-center gap-2 w-full px-1 py-0.5">
+            <span className="capitalize text-sm font-medium text-gray-700">{label}</span>
+            <button
+                title="Novo agendamento"
+                onClick={(e) => {
+                    e.stopPropagation();
+                    const slot = new Date(headerDate);
+                    slot.setHours(9, 0, 0, 0); // default to 09:00
+                    openAppointmentModal(slot);
+                }}
+                className="hover:text-blue-600 text-gray-400 transition-colors flex items-center justify-center p-0 bg-transparent border-0 cursor-pointer leading-none"
+            >
+                <span className="material-symbols-outlined !text-xl">add_circle</span>
+            </button>
+        </div>
+    ), []);
+
     return (
-        <div className="flex h-screen bg-white overflow-hidden">
+        <div className="flex h-screen bg-white overflow-hidden relative">
+            {/* Mobile Sidebar Overlay */}
+            {isSidebarOpen && (
+                <div
+                    className="fixed inset-0 bg-black/50 z-30 lg:hidden"
+                    onClick={() => setIsSidebarOpen(false)}
+                />
+            )}
+
             {/* Sidebar */}
-            <aside className="w-60 bg-white border-r border-gray-200 flex flex-col h-full">
+            <aside className={`
+                w-64 bg-white border-r border-gray-200 flex flex-col h-full
+                fixed inset-y-0 left-0 z-40 transform transition-transform duration-300 ease-in-out
+                lg:relative lg:translate-x-0 lg:w-60
+                ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+            `}>
+                <div className="flex items-center justify-between p-3 border-b border-gray-100 lg:hidden">
+                    <h3 className="font-bold text-gray-800">Menu da Agenda</h3>
+                    <button onClick={() => setIsSidebarOpen(false)} className="p-1 rounded-full hover:bg-gray-100">
+                        <span className="material-symbols-outlined">close</span>
+                    </button>
+                </div>
+
                 <div className="flex-1 overflow-y-auto p-3 custom-scrollbar">
                     {/* Create Button */}
                     <button
@@ -477,6 +508,7 @@ const Agenda: React.FC<AgendaProps> = ({ patients, procedures }) => {
                             setSelectedEvent(undefined);
                             setSelectedSlot(new Date());
                             setIsModalOpen(true);
+                            setIsSidebarOpen(false);
                         }}
                         className="mb-4 flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-300 rounded-full shadow-sm hover:shadow-md transition-all text-sm font-medium text-gray-700 hover:bg-gray-50 w-full justify-center"
                     >
@@ -486,7 +518,7 @@ const Agenda: React.FC<AgendaProps> = ({ patients, procedures }) => {
 
                     {/* Schedule Block Button */}
                     <button
-                        onClick={() => setIsBlockModalOpen(true)}
+                        onClick={() => { setIsBlockModalOpen(true); setIsSidebarOpen(false); }}
                         className="mb-4 flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-300 rounded-full shadow-sm hover:shadow-md transition-all text-sm font-medium text-gray-700 hover:bg-gray-50 w-full justify-center"
                     >
                         <span className="material-symbols-outlined text-xl">block</span>
@@ -495,7 +527,7 @@ const Agenda: React.FC<AgendaProps> = ({ patients, procedures }) => {
 
                     {/* Report Button */}
                     <button
-                        onClick={() => setIsReportOpen(true)}
+                        onClick={() => { setIsReportOpen(true); setIsSidebarOpen(false); }}
                         className="mb-4 flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-300 rounded-full shadow-sm hover:shadow-md transition-all text-sm font-medium text-gray-700 hover:bg-gray-50 w-full justify-center"
                     >
                         <span className="material-symbols-outlined text-xl">bar_chart</span>
@@ -503,7 +535,7 @@ const Agenda: React.FC<AgendaProps> = ({ patients, procedures }) => {
                     </button>
 
                     <button
-                        onClick={() => setIsExtractOpen(true)}
+                        onClick={() => { setIsExtractOpen(true); setIsSidebarOpen(false); }}
                         className="mb-4 flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-300 rounded-full shadow-sm hover:shadow-md transition-all text-sm font-medium text-gray-700 hover:bg-gray-50 w-full justify-center"
                     >
                         <span className="material-symbols-outlined text-xl">receipt_long</span>
@@ -520,6 +552,7 @@ const Agenda: React.FC<AgendaProps> = ({ patients, procedures }) => {
                                 if (view !== Views.AGENDA && view !== Views.DAY) {
                                     setView(Views.DAY);
                                 }
+                                if (window.innerWidth < 1024) setIsSidebarOpen(false);
                             }}
                         />
                     </div>
@@ -599,36 +632,62 @@ const Agenda: React.FC<AgendaProps> = ({ patients, procedures }) => {
 
             {/* Main Content */}
             <main className="flex-1 flex flex-col min-w-0 bg-gray-50">
-                {/* Custom Toolbar — single header, PT-BR */}
-                <div className="flex items-center justify-between px-6 py-3 bg-white border-b border-gray-200">
-                    {/* Left: Navigation */}
-                    <div className="flex items-center gap-3">
+                {/* Custom Toolbar — responsive */}
+                <div className="flex flex-col md:flex-row items-center justify-between gap-3 px-4 md:px-6 py-3 bg-white border-b border-gray-200">
+                    {/* Top Row on Mobile: Sidebar Toggle + Nav */}
+                    <div className="flex items-center justify-between w-full md:w-auto gap-3">
+                        {/* Mobile Sidebar Toggle */}
                         <button
-                            onClick={() => setDate(new Date())}
-                            className="px-3 py-1.5 text-sm font-medium text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+                            onClick={() => setIsSidebarOpen(true)}
+                            className="lg:hidden p-2 -ml-2 text-gray-600 hover:bg-gray-100 rounded-full"
                         >
-                            Hoje
+                            <span className="material-symbols-outlined">filter_list</span>
                         </button>
-                        <div className="flex items-center gap-1">
+
+                        <div className="flex items-center gap-3">
                             <button
-                                onClick={navigatePrev}
-                                className="p-1.5 text-gray-600 hover:bg-gray-100 rounded transition-colors"
-                                title="Anterior"
+                                onClick={() => setDate(new Date())}
+                                className="px-3 py-1.5 text-sm font-medium text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
                             >
-                                <span className="material-symbols-outlined text-xl">chevron_left</span>
+                                Hoje
+                            </button>
+                            <div className="flex items-center gap-1">
+                                <button
+                                    onClick={navigatePrev}
+                                    className="p-1.5 text-gray-600 hover:bg-gray-100 rounded transition-colors"
+                                    title="Anterior"
+                                >
+                                    <span className="material-symbols-outlined text-xl">chevron_left</span>
+                                </button>
+                                <button
+                                    onClick={navigateNext}
+                                    className="p-1.5 text-gray-600 hover:bg-gray-100 rounded transition-colors"
+                                    title="Próximo"
+                                >
+                                    <span className="material-symbols-outlined text-xl">chevron_right</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* View Selector (Mobile - moved up) */}
+                        <div className="flex md:hidden items-center gap-1 bg-gray-100 rounded-md p-1 ml-auto">
+                            <button
+                                onClick={() => setView(Views.DAY)}
+                                className={`px-2 py-1 text-xs font-medium rounded transition-colors ${view === Views.DAY ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600'}`}
+                            >
+                                Dia
                             </button>
                             <button
-                                onClick={navigateNext}
-                                className="p-1.5 text-gray-600 hover:bg-gray-100 rounded transition-colors"
-                                title="Próximo"
+                                onClick={() => setView(Views.AGENDA)}
+                                className={`px-2 py-1 text-xs font-medium rounded transition-colors ${view === Views.AGENDA ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600'}`}
                             >
-                                <span className="material-symbols-outlined text-xl">chevron_right</span>
+                                Lista
                             </button>
                         </div>
                     </div>
 
-                    {/* Center: Current Date */}
-                    <div className="flex items-center justify-center gap-3">
+                    {/* Center: Current Date - Full width center on mobile */}
+                    <div className="flex items-center justify-center gap-3 w-full md:w-auto">
                         <div className="text-sm font-medium text-gray-700 capitalize">
                             {format(date, view === Views.DAY ? 'EEE dd/MM' : (view === Views.MONTH ? 'MMMM yyyy' : 'dd MMMM yyyy'), { locale: ptBR })}
                         </div>
@@ -648,13 +707,13 @@ const Agenda: React.FC<AgendaProps> = ({ patients, procedures }) => {
                                 }}
                                 className="text-gray-400 hover:text-primary transition-colors flex items-center"
                             >
-                                <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>add_circle</span>
+                                <span className="material-symbols-outlined !text-xl">add_circle</span>
                             </button>
                         )}
                     </div>
 
-                    {/* Right: View Selector */}
-                    <div className="flex items-center gap-1 bg-gray-100 rounded-md p-1">
+                    {/* Right: View Selector (Desktop Only) */}
+                    <div className="hidden md:flex items-center gap-1 bg-gray-100 rounded-md p-1">
                         {([Views.MONTH, Views.WEEK, Views.DAY, Views.AGENDA] as View[]).map(v => (
                             <button
                                 key={v}

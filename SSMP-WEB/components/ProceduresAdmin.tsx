@@ -297,17 +297,18 @@ const ProceduresAdmin: React.FC<ProceduresAdminProps> = ({
           {isEditingHeader ? (
             <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl border border-primary/20 shadow-lg animate-in fade-in zoom-in-95 duration-200">
               <div className="flex flex-col gap-4">
-                <div className="flex gap-4">
-                  <div className="flex-1">
+                <div className="flex flex-col md:flex-row gap-4">
+                  <div className="flex-1 w-full">
                     <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Nome do Procedimento</label>
                     <input
                       value={headerForm.name}
                       onChange={e => setHeaderForm({ ...headerForm, name: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-primary outline-none bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                       placeholder="Nome do procedimento"
+                      aria-label="Nome do procedimento"
                     />
                   </div>
-                  <div className="w-1/3">
+                  <div className="w-full md:w-1/3">
                     <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
                       <a href="https://fonts.google.com/icons" target="_blank" rel="noreferrer noopener" className="flex items-center gap-1 hover:text-primary hover:underline">
                         Ícone (Google Fonts) <span className="material-symbols-outlined text-xs">open_in_new</span>
@@ -319,6 +320,7 @@ const ProceduresAdmin: React.FC<ProceduresAdminProps> = ({
                         onChange={e => setHeaderForm({ ...headerForm, icon: e.target.value })}
                         className="w-full px-3 py-2 pl-10 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-primary outline-none bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                         placeholder="Ex: face"
+                        aria-label="Ícone do procedimento"
                       />
                       <div className="absolute left-3 top-1/2 -translate-y-1/2 text-primary">
                         <span className="material-symbols-outlined text-xl">{headerForm.icon || 'help'}</span>
@@ -332,6 +334,7 @@ const ProceduresAdmin: React.FC<ProceduresAdminProps> = ({
                     value={headerForm.category_id}
                     onChange={e => setHeaderForm({ ...headerForm, category_id: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-primary outline-none bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                    aria-label="Categoria do procedimento"
                   >
                     <option value="">Sem Categoria</option>
                     {categories.map(cat => (
@@ -355,6 +358,7 @@ const ProceduresAdmin: React.FC<ProceduresAdminProps> = ({
                         className="sr-only peer"
                         checked={headerForm.use_in_budget}
                         onChange={e => setHeaderForm({ ...headerForm, use_in_budget: e.target.checked })}
+                        aria-label="Habilitar configuração financeira"
                       />
                       <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-emerald-600"></div>
                       <span className="ml-3 text-xs font-bold uppercase text-gray-500 dark:text-gray-400">
@@ -376,6 +380,7 @@ const ProceduresAdmin: React.FC<ProceduresAdminProps> = ({
                           placeholder="0,00"
                           type="number"
                           className="w-full pl-9 pr-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white font-bold placeholder-gray-300 focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all hover:border-emerald-300"
+                          aria-label="Valor unitário"
                         />
                       </div>
                     </div>
@@ -391,6 +396,7 @@ const ProceduresAdmin: React.FC<ProceduresAdminProps> = ({
                           placeholder="0,00"
                           type="number"
                           className="w-full pl-9 pr-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white font-bold placeholder-gray-300 focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all hover:border-teal-300"
+                          aria-label="Valor promocional"
                         />
                       </div>
                     </div>
@@ -407,6 +413,7 @@ const ProceduresAdmin: React.FC<ProceduresAdminProps> = ({
                         className="sr-only peer"
                         checked={headerForm.allows_sessions}
                         onChange={e => setHeaderForm({ ...headerForm, allows_sessions: e.target.checked })}
+                        aria-label="Habilitar previsão de sessões"
                       />
                       <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-emerald-500"></div>
                     </label>
@@ -421,6 +428,7 @@ const ProceduresAdmin: React.FC<ProceduresAdminProps> = ({
                         rows={3}
                         className="w-full px-4 py-3 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 outline-none resize-none transition-all hover:border-emerald-300"
                         placeholder="Ex: Inclui retorno de 15 dias e kit pós-procedimento..."
+                        aria-label="Descrição comercial"
                       />
                       <p className="text-[10px] text-gray-400 mt-1.5 ml-1 text-right">Esta descrição aparecerá no PDF do orçamento</p>
                     </div>
@@ -434,6 +442,7 @@ const ProceduresAdmin: React.FC<ProceduresAdminProps> = ({
                     rows={6}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-primary outline-none bg-white dark:bg-gray-900 text-gray-900 dark:text-white resize-none"
                     placeholder="Descrição curta do procedimento..."
+                    aria-label="Descrição do procedimento"
                   />
                 </div>
                 <div className="flex justify-end gap-3 pt-2">
@@ -475,11 +484,11 @@ const ProceduresAdmin: React.FC<ProceduresAdminProps> = ({
                     {selectedProc.description || 'Sem descrição definida.'}
                   </p>
 
-                  <div className="flex items-center gap-4 mt-3 text-xs font-medium text-gray-500 dark:text-gray-500">
+                  <div className="flex flex-wrap items-center gap-4 mt-3 text-xs font-medium text-gray-500 dark:text-gray-500">
                     {selectedProc.created_at && (
                       <div className="flex items-center gap-1.5 bg-gray-100 dark:bg-gray-800/50 px-2 py-1 rounded-md">
                         <span className="material-symbols-outlined text-[14px]">calendar_today</span>
-                        Criado em: {new Date(selectedProc.created_at).toLocaleDateString()}
+                        Criado: {new Date(selectedProc.created_at).toLocaleDateString()}
                       </div>
                     )}
                     {selectedProc.updated_at && (
@@ -658,6 +667,7 @@ const ProceduresAdmin: React.FC<ProceduresAdminProps> = ({
                           rows={4}
                           value={script.template}
                           onChange={(e) => handleTemplateChange(script.id, e.target.value)}
+                          aria-label="Modelo de mensagem WhatsApp"
                         />
                         <div className="absolute bottom-2 right-2 flex gap-1">
                           <button className="text-[10px] bg-white dark:bg-[#3a2228] border border-[#f3e7ea] dark:border-[#3a2228] px-2 py-1 rounded text-[#9a4c5f] hover:bg-primary hover:text-white transition-colors">#NomePaciente</button>
@@ -713,7 +723,7 @@ const ProceduresAdmin: React.FC<ProceduresAdminProps> = ({
         )}
 
         {!isAddingStage && !editingStageId && (
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <button
               onClick={() => {
                 handleSaveStage({

@@ -135,12 +135,12 @@ const StageEditor: React.FC<StageEditorProps> = ({ initialData, onSave, onCancel
             </div>
 
             {/* Tabs */}
-            <div className="flex border-b border-[#f3e7ea] dark:border-[#3d242a] px-6">
+            <div className="flex border-b border-[#f3e7ea] dark:border-[#3d242a] px-6 overflow-x-auto custom-scrollbar">
                 {tabs.map(tab => (
                     <button
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id)}
-                        className={`flex items-center gap-2 px-4 py-3 border-b-2 transition-all ${activeTab === tab.id
+                        className={`flex items-center gap-2 px-4 py-3 border-b-2 transition-all whitespace-nowrap ${activeTab === tab.id
                             ? 'border-primary text-primary font-bold'
                             : 'border-transparent text-[#9a4c5f] hover:text-primary'
                             }`}
@@ -184,7 +184,7 @@ const StageEditor: React.FC<StageEditorProps> = ({ initialData, onSave, onCancel
                                                 Após um intervalo
                                             </div>
                                             {formData.timingType === 'delay' && (
-                                                <div className="flex gap-2 items-center">
+                                                <div className="flex gap-2 items-center flex-wrap">
                                                     <input
                                                         type="number"
                                                         min="1"

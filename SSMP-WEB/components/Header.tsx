@@ -15,6 +15,7 @@ interface HeaderProps {
 const Header: React.FC<HeaderProps> = ({ currentView, onViewChange, onNewRegistration }) => {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isTagManagerOpen, setIsTagManagerOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const [userProfile, setUserProfile] = useState<any>(null);
 
@@ -38,18 +39,33 @@ const Header: React.FC<HeaderProps> = ({ currentView, onViewChange, onNewRegistr
 
   return (
     <>
-      <header className="flex items-center justify-between border-b border-solid border-[#f3e7ea] dark:border-[#3d242a] bg-white dark:bg-[#2d181e] px-10 py-3 sticky top-0 z-50">
+      <header className="flex items-center justify-between border-b border-solid border-[#f3e7ea] dark:border-[#3d242a] bg-white dark:bg-[#2d181e] px-4 md:px-10 py-3 sticky top-0 z-50">
         <div className="flex items-center gap-4 text-primary cursor-pointer" onClick={() => onViewChange('dashboard')}>
+          {/* Mobile Menu Button */}
+          <button
+            className="lg:hidden p-1 -ml-2 rounded-full hover:bg-gray-100 dark:hover:bg-white/10"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsMobileMenuOpen(true);
+            }}
+          >
+            <span className="material-symbols-outlined text-2xl text-[#1b0d11] dark:text-white">menu</span>
+          </button>
+
           <div className="size-8 flex items-center justify-center">
             <span className="material-symbols-outlined text-3xl">360</span>
           </div>
-          <h2 className="text-[#1b0d11] dark:text-[#fcf8f9] text-xl font-extrabold leading-tight tracking-[-0.015em]">
+          <h2 className="hidden md:block text-[#1b0d11] dark:text-[#fcf8f9] text-xl font-extrabold leading-tight tracking-[-0.015em]">
             Jornada 360
+          </h2>
+          <h2 className="md:hidden text-[#1b0d11] dark:text-[#fcf8f9] text-lg font-extrabold leading-tight tracking-[-0.015em]">
+            Jornada
           </h2>
         </div>
 
-        <div className="flex flex-1 justify-end gap-8 items-center">
-          <nav className="flex items-center gap-9">
+        <div className="flex flex-1 justify-end gap-4 md:gap-8 items-center">
+          {/* Desktop Nav */}
+          <nav className="hidden lg:flex items-center gap-6 xl:gap-9">
             <button
               className={`${currentView === 'dashboard' ? 'text-primary border-b-2 border-primary' : 'text-[#1b0d11] dark:text-[#fcf8f9] font-medium'} text-sm leading-normal pb-1 transition-all`}
               onClick={() => onViewChange('dashboard')}
@@ -106,7 +122,7 @@ const Header: React.FC<HeaderProps> = ({ currentView, onViewChange, onNewRegistr
             </button>
           </nav>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 md:gap-4">
 
 
             <NotificationsPopover onTaskClick={(task) => {
@@ -117,7 +133,7 @@ const Header: React.FC<HeaderProps> = ({ currentView, onViewChange, onNewRegistr
 
             <div className="relative">
               <div
-                className="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10 border-2 border-primary/20 cursor-pointer hover:border-primary transition-colors flex items-center justify-center text-primary font-bold bg-primary/10"
+                className="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-8 md:size-10 border-2 border-primary/20 cursor-pointer hover:border-primary transition-colors flex items-center justify-center text-primary font-bold bg-primary/10"
                 onClick={() => setIsProfileOpen(!isProfileOpen)}
               >
                 {userProfile?.full_name?.charAt(0).toUpperCase() || 'U'}
@@ -184,6 +200,63 @@ const Header: React.FC<HeaderProps> = ({ currentView, onViewChange, onNewRegistr
           </div>
         </div>
       </header>
+
+      {/* Mobile Drawer */}
+      <div
+        className={`fixed inset-y-0 right-0 z-[60] w-64 bg-white dark:bg-[#2d181e] shadow-2xl transform transition-transform duration-300 ease-in-out lg:hidden flex flex-col ${isMobileMenuOpen ? 'translate-x-0' : 'translate-x-full'}`}
+      >
+        <div className="p-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
+          <h3 className="font-bold text-lg text-[#1b0d11] dark:text-white">Menu</h3>
+          <button
+            onClick={() => setIsMobileMenuOpen(false)}
+            className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-white/10 text-gray-500"
+          >
+            <span className="material-symbols-outlined">close</span>
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto py-2">
+          <nav className="flex flex-col">
+            {[
+              { id: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
+              { id: 'agenda', label: 'Agenda', icon: 'calendar_today' },
+              { id: 'patients', label: 'Pacientes', icon: 'person' },
+              { id: 'procedures', label: 'Protocolos', icon: 'medical_services' },
+              { id: 'crm_kanban', label: 'CRM / Leads', icon: 'view_kanban' },
+              { id: 'sales_pipeline', label: 'Negócios', icon: 'monetization_on' },
+              { id: 'tasks', label: 'Tarefas', icon: 'check_circle' },
+              { id: 'ombudsman', label: 'Ouvidoria', icon: 'campaign' },
+              { id: 'budgets', label: 'Orçamentos', icon: 'request_quote' },
+            ].map(item => (
+              <button
+                key={item.id}
+                onClick={() => {
+                  onViewChange(item.id);
+                  setIsMobileMenuOpen(false);
+                }}
+                className={`w-full text-left px-6 py-4 flex items-center gap-4 transition-colors ${currentView === item.id
+                    ? 'bg-primary/10 text-primary font-bold border-r-4 border-primary'
+                    : 'text-[#1b0d11] dark:text-[#fcf8f9] hover:bg-gray-50 dark:hover:bg-white/5'
+                  }`}
+              >
+                <span className="material-symbols-outlined">{item.icon}</span>
+                {item.label}
+              </button>
+            ))}
+          </nav>
+        </div>
+        {/* Mobile Footer Info */}
+        <div className="p-4 border-t border-gray-100 dark:border-gray-800 text-xs text-gray-400">
+          <p>Jornada 360 v2.0.6</p>
+        </div>
+      </div>
+
+      {/* Mobile Backdrop */}
+      {isMobileMenuOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-[55] lg:hidden backdrop-blur-sm animate-in fade-in duration-200"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
 
       <TagManager isOpen={isTagManagerOpen} onClose={() => setIsTagManagerOpen(false)} />
     </>
