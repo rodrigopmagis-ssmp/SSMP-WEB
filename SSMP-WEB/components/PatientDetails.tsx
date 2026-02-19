@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import PatientMiniCalendar from './PatientMiniCalendar';
 import { Patient, SurveyStatus, Procedure, ScriptStage, StageData, ClinicalNote, TreatmentLog, PatientPhoto } from '../types';
 import { calculateDueDate, getSLAStatus, formatDueDate } from '../src/utils/sla';
 import { cleanAndFormatScript } from '../src/utils/scriptFormatter';
@@ -717,10 +718,11 @@ const PatientDetails: React.FC<PatientDetailsProps> = ({
       <section className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 p-6 mb-8">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
           <div className="flex gap-6 items-center">
-            <div
-              className="bg-center bg-no-repeat aspect-square bg-cover rounded-full h-24 w-24 border-4 border-primary/10 shadow-lg"
-              style={{ backgroundImage: `url(${patient.avatar || 'https://picsum.photos/200'})` }}
-            ></div>
+            <img
+              src={patient.avatar || 'https://picsum.photos/200'}
+              alt={`Avatar de ${patient.name}`}
+              className="bg-center bg-no-repeat aspect-square bg-cover rounded-full h-24 w-24 border-4 border-primary/10 shadow-lg object-cover"
+            />
             <div className="flex flex-col">
               <div className="flex items-center gap-3 mb-1">
                 <h1 className="text-[#1b0d11] dark:text-white text-2xl font-extrabold tracking-tight">{patient.name}</h1>
@@ -767,32 +769,31 @@ const PatientDetails: React.FC<PatientDetailsProps> = ({
             {/* Tags Display - Relocated */}
             <div className="flex flex-wrap gap-2 justify-start md:justify-end animate-in slide-in-from-right duration-500 delay-150">
               {patientTags.map(tag => (
-                <div
+                <button
+                  type="button"
                   key={tag.id}
                   title={tag.metadata?.complaint ? `Reclamação: ${tag.metadata.complaint}` : 'Clique para remover'}
-                  className="group relative pl-4 pr-3 py-1.5 bg-white rounded-lg border shadow-sm transition-all duration-300 cursor-pointer flex items-center gap-2 select-none overflow-hidden hover:shadow-md hover:border-red-200"
+                  className="group relative pl-4 pr-3 py-1.5 bg-white rounded-lg border shadow-sm transition-all duration-300 cursor-pointer flex items-center gap-2 select-none overflow-hidden hover:shadow-md hover:border-red-200 border-[color:var(--tag-color)] text-[color:var(--tag-color)]"
                   style={{
-                    borderColor: tag.color,
-                    color: tag.color
-                  }}
+                    '--tag-color': tag.color
+                  } as React.CSSProperties}
                   onClick={() => handleToggleTag(tag)}
                 >
-                  <div
-                    className="absolute left-0 top-0 bottom-0 w-1.5"
-                    style={{ backgroundColor: tag.color }}
-                  ></div>
+                  <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-[var(--tag-color)]" style={{ '--tag-color': tag.color } as React.CSSProperties}></div>
                   <span className="text-xs font-bold pl-1">
                     {tag.name}
                   </span>
 
-                  {tag.metadata?.complaint && (
-                    <span className="material-symbols-outlined text-[14px] text-red-500 bg-red-50 rounded-full p-0.5">warning</span>
-                  )}
+                  {
+                    tag.metadata?.complaint && (
+                      <span className="material-symbols-outlined text-[14px] text-red-500 bg-red-50 rounded-full p-0.5">warning</span>
+                    )
+                  }
 
                   <div className="absolute inset-0 bg-red-500/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[1px]">
                     <span className="material-symbols-outlined text-red-600 font-bold">close</span>
                   </div>
-                </div>
+                </button>
               ))}
 
               <div className="relative">
@@ -818,7 +819,7 @@ const PatientDetails: React.FC<PatientDetailsProps> = ({
                               onClick={() => handleToggleTag(tag)}
                               className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-all text-left group w-full"
                             >
-                              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: tag.color }}></div>
+                              <div className="w-2 h-2 rounded-full bg-[var(--tag-color)]" style={{ '--tag-color': tag.color } as React.CSSProperties}></div>
                               <span className="text-sm font-medium text-gray-700 dark:text-gray-200 flex-1">{tag.name}</span>
                               {isActive && <span className="material-symbols-outlined text-green-500 text-sm">check</span>}
                             </button>
@@ -906,460 +907,336 @@ const PatientDetails: React.FC<PatientDetailsProps> = ({
       }
 
 
-      {(activeTreatment?.totalTasks || patient.totalTasks) === 0 ? (
-        <div className="bg-white dark:bg-gray-900 rounded-xl border border-dashed border-gray-300 dark:border-gray-700 p-12 text-center flex flex-col items-center justify-center">
-          <div className="w-16 h-16 bg-gray-50 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4">
-            <span className="material-symbols-outlined text-gray-400 text-3xl">medical_services</span>
-          </div>
-          <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Nenhum Protocolo Ativo</h3>
-          <p className="text-gray-500 mb-6 max-w-md mx-auto">Este paciente ainda não possui um protocolo de acompanhamento definido. Inicie um novo tratamento para começar o monitoramento.</p>
-          <button
-            onClick={onNewProtocol}
-            className="flex items-center gap-2 bg-primary text-white px-6 py-3 rounded-xl font-bold hover:bg-primary/90 transition-all shadow-lg shadow-primary/20"
-          >
-            <span className="material-symbols-outlined">add_circle</span>
-            Iniciar Novo Protocolo
-          </button>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          <div className="lg:col-span-8">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-gray-900 dark:text-white text-xl font-bold flex items-center gap-2">
-                <span className="material-symbols-outlined text-primary">timeline</span>
-                Sequência de Acompanhamento
-                <button
-                  onClick={handleOpenLogs}
-                  className="ml-2 p-1.5 text-gray-400 hover:text-primary hover:bg-primary/5 rounded-lg transition-all flex items-center gap-1 text-xs font-bold uppercase tracking-wider tooltip-trigger"
-                  title="Ver Histórico"
-                >
-                  <span className="material-symbols-outlined text-lg">history</span>
-                  Log
-                </button>
-              </h2>
-              <div className="flex items-center gap-4">
-                <button
-                  onClick={handleRequestDelete}
-                  className="flex items-center gap-1 px-3 py-1.5 text-xs font-bold text-red-500 border border-red-200 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
-                  title="Excluir este protocolo"
-                >
-                  <span className="material-symbols-outlined text-base">delete</span>
-                  Excluir
-                </button>
-                <span className="text-sm font-medium text-gray-500">{tasksCompleted} de {activeTreatment?.totalTasks || patient.totalTasks} Tarefas Concluídas</span>
-              </div>
+      {
+        (activeTreatment?.totalTasks || patient.totalTasks) === 0 ? (
+          <div className="bg-white dark:bg-gray-900 rounded-xl border border-dashed border-gray-300 dark:border-gray-700 p-12 text-center flex flex-col items-center justify-center">
+            <div className="w-16 h-16 bg-gray-50 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4">
+              <span className="material-symbols-outlined text-gray-400 text-3xl">medical_services</span>
             </div>
+            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Nenhum Protocolo Ativo</h3>
+            <p className="text-gray-500 mb-6 max-w-md mx-auto">Este paciente ainda não possui um protocolo de acompanhamento definido. Inicie um novo tratamento para começar o monitoramento.</p>
+            <button
+              onClick={onNewProtocol}
+              className="flex items-center gap-2 bg-primary text-white px-6 py-3 rounded-xl font-bold hover:bg-primary/90 transition-all shadow-lg shadow-primary/20"
+            >
+              <span className="material-symbols-outlined">add_circle</span>
+              Iniciar Novo Protocolo
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            <div className="lg:col-span-8">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-gray-900 dark:text-white text-xl font-bold flex items-center gap-2">
+                  <span className="material-symbols-outlined text-primary">timeline</span>
+                  Sequência de Acompanhamento
+                  <button
+                    onClick={handleOpenLogs}
+                    className="ml-2 p-1.5 text-gray-400 hover:text-primary hover:bg-primary/5 rounded-lg transition-all flex items-center gap-1 text-xs font-bold uppercase tracking-wider tooltip-trigger"
+                    title="Ver Histórico"
+                  >
+                    <span className="material-symbols-outlined text-lg">history</span>
+                    Log
+                  </button>
+                </h2>
+                <div className="flex items-center gap-4">
+                  <button
+                    onClick={handleRequestDelete}
+                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-bold text-red-500 border border-red-200 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
+                    title="Excluir este protocolo"
+                  >
+                    <span className="material-symbols-outlined text-base">delete</span>
+                    Excluir
+                  </button>
+                  <span className="text-sm font-medium text-gray-500">{tasksCompleted} de {activeTreatment?.totalTasks || patient.totalTasks} Tarefas Concluídas</span>
+                </div>
+              </div>
 
-            <div className="space-y-6 relative before:content-[''] before:absolute before:left-[19px] before:top-4 before:bottom-4 before:w-[2px] before:bg-gray-200 dark:before:bg-gray-800">
-              {/* Render stages dynamically based on available scripts or totalTasks */}
-              {Array.from({ length: Math.max(0, activeTreatment?.totalTasks || patient.totalTasks || 0) }, (_, idx) => {
-                const stageNum = idx + 1;
-                const isCompleted = stageNum <= tasksCompleted;
-                const isActive = stageNum === tasksCompleted + 1;
-                const stageId = `stage${stageNum}`;
+              <div className="space-y-6 relative before:content-[''] before:absolute before:left-[19px] before:top-4 before:bottom-4 before:w-[2px] before:bg-gray-200 dark:before:bg-gray-800">
+                {/* Render stages dynamically based on available scripts or totalTasks */}
+                {Array.from({ length: Math.max(0, activeTreatment?.totalTasks || patient.totalTasks || 0) }, (_, idx) => {
+                  const stageNum = idx + 1;
+                  const isCompleted = stageNum <= tasksCompleted;
+                  const isActive = stageNum === tasksCompleted + 1;
+                  const stageId = `stage${stageNum}`;
 
-                // Check if stage was skipped
-                const isSkipped = activeTreatment?.stageData?.[stageId]?.skipped;
+                  // Check if stage was skipped
+                  const isSkipped = activeTreatment?.stageData?.[stageId]?.skipped;
 
-                // Get script info for this stage if available
-                const scriptInfo = scripts[idx];
+                  // Get script info for this stage if available
+                  const scriptInfo = scripts[idx];
 
-                // Calculate SLA if we have procedure date and script timing
-                let slaStatus = 'ontime';
-                let dueDateFormatted = '';
+                  // Calculate SLA if we have procedure date and script timing
+                  let slaStatus = 'ontime';
+                  let dueDateFormatted = '';
 
-                if (patient.procedureDate && scriptInfo?.timing) {
-                  try {
-                    // Assuming procedureDate is YYYY-MM-DD HH:MM
-                    const dueDate = calculateDueDate(patient.procedureDate, scriptInfo.timing);
-                    slaStatus = getSLAStatus(dueDate);
-                    dueDateFormatted = formatDueDate(dueDate);
-                  } catch (e) {
-                    console.error("Error calculating date", e);
-                    dueDateFormatted = "Data inválida";
+                  if (patient.procedureDate && scriptInfo?.timing) {
+                    try {
+                      // Assuming procedureDate is YYYY-MM-DD HH:MM
+                      const dueDate = calculateDueDate(patient.procedureDate, scriptInfo.timing);
+                      slaStatus = getSLAStatus(dueDate);
+                      dueDateFormatted = formatDueDate(dueDate);
+                    } catch (e) {
+                      console.error("Error calculating date", e);
+                      dueDateFormatted = "Data inválida";
+                    }
                   }
-                }
 
-                return (
-                  <div key={stageId} className="relative pl-12">
-                    {/* Stage Icon */}
-                    <div className={`absolute left-0 top-1 w-10 h-10 rounded-full flex items-center justify-center text-white border-4 border-background-light dark:border-background-dark z-10 ${isSkipped
-                      ? 'bg-amber-500 shadow-sm'
-                      : isCompleted
-                        ? 'bg-green-500 shadow-sm'
-                        : isActive
-                          ? 'bg-primary shadow-lg shadow-primary/30 ring-4 ring-primary/10'
-                          : 'bg-gray-300 dark:bg-gray-700'
-                      }`}>
-                      {isSkipped ? (
-                        <span className="material-symbols-outlined text-lg font-bold">fast_forward</span>
-                      ) : isCompleted ? (
-                        <span className="material-symbols-outlined text-lg font-bold">check</span>
-                      ) : (
-                        <span className="text-sm font-bold">{stageNum}</span>
-                      )}
-                    </div>
-
-                    {/* Unified Stage Card */}
-                    <div className={`bg-white dark:bg-gray-900 rounded-xl border-2 shadow-md overflow-hidden transition-all duration-300 ${isSkipped
-                      ? 'border-amber-200 dark:border-amber-900/30 opacity-75 hover:opacity-100'
-                      : isActive
-                        ? (slaStatus === 'late' ? 'border-red-400' : slaStatus === 'warning' ? 'border-orange-400' : 'border-primary/30')
+                  return (
+                    <div key={stageId} className="relative pl-12">
+                      {/* Stage Icon */}
+                      <div className={`absolute left-0 top-1 w-10 h-10 rounded-full flex items-center justify-center text-white border-4 border-background-light dark:border-background-dark z-10 ${isSkipped
+                        ? 'bg-amber-500 shadow-sm'
                         : isCompleted
-                          ? 'border-green-100 dark:border-green-900/30 opacity-75 hover:opacity-100'
-                          : 'border-gray-100 dark:border-gray-700 opacity-60 hover:opacity-100'
-                      }`}>
-                      <div
-                        className={`px-5 py-4 flex justify-between items-center border-b cursor-pointer transition-colors ${isSkipped
-                          ? 'bg-amber-50/50 dark:bg-amber-900/10 border-amber-100 dark:border-amber-800 hover:bg-amber-50 dark:hover:bg-amber-900/20'
+                          ? 'bg-green-500 shadow-sm'
                           : isActive
-                            ? 'bg-primary/5 dark:bg-primary/10 border-primary/10 hover:bg-primary/10'
-                            : isCompleted
-                              ? 'bg-green-50/50 dark:bg-green-900/10 border-green-100 dark:border-green-800 hover:bg-green-50 dark:hover:bg-green-900/20'
-                              : 'bg-gray-50/50 dark:bg-gray-800 border-gray-100 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700'
-                          }`}
-                        onClick={() => setExpandedStage(expandedStage === stageId ? null : stageId)}
-                      >
-                        <div>
-                          <div className="flex items-center gap-2 mb-1">
-                            <h3 className={`font-bold text-base leading-none ${isSkipped
-                              ? 'text-amber-700 dark:text-amber-400'
-                              : isActive
-                                ? 'text-primary'
-                                : isCompleted
-                                  ? 'text-green-700 dark:text-green-400'
-                                  : 'text-gray-500 dark:text-gray-400'
-                              }`}>
-                              {scriptInfo ? scriptInfo.title : `Acompanhamento ${stageNum}`}
-                            </h3>
-
-                            {/* SLA/Status Badge */}
-                            {isSkipped ? (
-                              <span className="text-[10px] px-2 py-0.5 rounded font-bold uppercase bg-amber-100 text-amber-600">
-                                ETAPA PULADA
-                              </span>
-                            ) : isCompleted ? (
-                              <span className="text-[10px] px-2 py-0.5 rounded font-bold uppercase bg-green-100 text-green-600">
-                                CONCLUÍDO
-                              </span>
-                            ) : isActive && dueDateFormatted ? (
-                              <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase ${slaStatus === 'late' ? 'bg-red-100 text-red-600' :
-                                slaStatus === 'warning' ? 'bg-orange-100 text-orange-600' :
-                                  'bg-green-100 text-green-600'
-                                }`}>
-                                {slaStatus === 'late' ? 'ATRASADO' :
-                                  slaStatus === 'warning' ? 'VENCE EM 15 MIN' :
-                                    'NO PRAZO'}
-                              </span>
-                            ) : !isActive && !isCompleted ? (
-                              <span className="text-[10px] px-2 py-0.5 rounded font-bold uppercase bg-gray-100 text-gray-500">
-                                AGUARDANDO
-                              </span>
-                            ) : null}
-                          </div>
-
-                          <div className="flex gap-2 text-xs">
-                            {isSkipped ? (
-                              <p className="text-amber-600/70 font-semibold uppercase tracking-wider">Ignorado</p>
-                            ) : isCompleted ? (
-                              <p className="text-green-600/70 font-semibold uppercase tracking-wider">Finalizado</p>
-                            ) : isActive ? (
-                              <p className="text-primary/70 font-semibold uppercase tracking-wider">Em Andamento</p>
-                            ) : (
-                              <p className="text-gray-400 font-semibold uppercase tracking-wider">Futuro</p>
-                            )}
-
-                            {dueDateFormatted && (isActive || !isCompleted) && (
-                              <span className="text-gray-500">• Vence: {dueDateFormatted}</span>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span className="flex items-center gap-2">
-                            {isActive && (
-                              <>
-                                <span className="text-xs font-bold text-gray-500">Status:</span>
-                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${isTaskOpen ? 'bg-gray-100 text-gray-500 border-gray-200' : 'bg-green-100 text-green-700 border-green-200'}`}>
-                                  {isTaskOpen ? 'ABERTO' : 'CONCLUÍDO'}
-                                </span>
-                              </>
-                            )}
-                          </span>
-                          <span className="material-symbols-outlined text-gray-400 transform transition-transform duration-200" style={{ transform: expandedStage === stageId ? 'rotate(180deg)' : 'rotate(0deg)' }}>expand_more</span>
-                        </div>
+                            ? 'bg-primary shadow-lg shadow-primary/30 ring-4 ring-primary/10'
+                            : 'bg-gray-300 dark:bg-gray-700'
+                        }`}>
+                        {isSkipped ? (
+                          <span className="material-symbols-outlined text-lg font-bold">fast_forward</span>
+                        ) : isCompleted ? (
+                          <span className="material-symbols-outlined text-lg font-bold">check</span>
+                        ) : (
+                          <span className="text-sm font-bold">{stageNum}</span>
+                        )}
                       </div>
 
-                      {expandedStage === stageId && (
-                        <div className="p-5 animate-in slide-in-from-top-2 duration-200 cursor-default">
+                      {/* Unified Stage Card */}
+                      <div className={`bg-white dark:bg-gray-900 rounded-xl border-2 shadow-md overflow-hidden transition-all duration-300 ${isSkipped
+                        ? 'border-amber-200 dark:border-amber-900/30 opacity-75 hover:opacity-100'
+                        : isActive
+                          ? (slaStatus === 'late' ? 'border-red-400' : slaStatus === 'warning' ? 'border-orange-400' : 'border-primary/30')
+                          : isCompleted
+                            ? 'border-green-100 dark:border-green-900/30 opacity-75 hover:opacity-100'
+                            : 'border-gray-100 dark:border-gray-700 opacity-60 hover:opacity-100'
+                        }`}>
+                        <button
+                          type="button"
+                          className={`w-full px-5 py-4 flex justify-between items-center border-b cursor-pointer transition-colors text-left ${isSkipped
+                            ? 'bg-amber-50/50 dark:bg-amber-900/10 border-amber-100 dark:border-amber-800 hover:bg-amber-50 dark:hover:bg-amber-900/20'
+                            : isActive
+                              ? 'bg-primary/5 dark:bg-primary/10 border-primary/10 hover:bg-primary/10'
+                              : isCompleted
+                                ? 'bg-green-50/50 dark:bg-green-900/10 border-green-100 dark:border-green-800 hover:bg-green-50 dark:hover:bg-green-900/20'
+                                : 'bg-gray-50/50 dark:bg-gray-800 border-gray-100 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700'
+                            }`}
+                          onClick={() => setExpandedStage(expandedStage === stageId ? null : stageId)}
+                          aria-expanded={expandedStage === stageId}
+                        >
+                          <div>
+                            <div className="flex items-center gap-2 mb-1">
+                              <h3 className={`font-bold text-base leading-none ${isSkipped
+                                ? 'text-amber-700 dark:text-amber-400'
+                                : isActive
+                                  ? 'text-primary'
+                                  : isCompleted
+                                    ? 'text-green-700 dark:text-green-400'
+                                    : 'text-gray-500 dark:text-gray-400'
+                                }`}>
+                                {scriptInfo ? scriptInfo.title : `Acompanhamento ${stageNum}`}
+                              </h3>
 
-                          {/* Script Section - High Contrast */}
-                          <div className="mb-6 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden shadow-sm">
-                            <div className="bg-[#fcf8f9] dark:bg-gray-800/80 px-4 py-3 flex justify-between items-center border-b border-gray-200 dark:border-gray-700">
-                              <label className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-widest flex items-center gap-1.5">
-                                <span className="material-symbols-outlined text-sm">chat_bubble</span>
-                                Script de WhatsApp
-                              </label>
-                              {isActive && (
-                                <div className="flex gap-2">
-                                  <button
-                                    onClick={() => {
-                                      const rawText = scriptInfo?.template || scriptText;
-                                      const cleanText = cleanAndFormatScript(rawText, patient.name.split(' ')[0]);
-                                      handleCopyScript(cleanText, stageId);
-                                    }}
-                                    className="flex items-center gap-1.5 text-gray-700 hover:text-primary hover:bg-white px-3 py-1.5 rounded-lg text-xs font-bold transition-all border border-transparent hover:border-gray-300 hover:shadow-sm"
-                                    title="Copiar texto"
-                                  >
-                                    <span className="material-symbols-outlined text-sm">{copyFeedback === stageId ? 'check' : 'content_copy'}</span>
-                                    <span>{copyFeedback === stageId ? 'Copiado' : 'Copiar'}</span>
-                                  </button>
-                                  <button
-                                    onClick={() => {
-                                      const rawText = scriptInfo?.template || scriptText;
-                                      const cleanText = cleanAndFormatScript(rawText, patient.name.split(' ')[0]);
-                                      handleSendWhatsapp(cleanText);
-                                    }}
-                                    className="flex items-center gap-1.5 bg-[#25D366] hover:bg-[#20bd5c] text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm transform hover:-translate-y-0.5"
-                                  >
-                                    <span className="material-symbols-outlined text-white text-sm">chat</span>
-                                    <span>Enviar</span>
-                                  </button>
-                                </div>
+                              {/* SLA/Status Badge */}
+                              {isSkipped ? (
+                                <span className="text-[10px] px-2 py-0.5 rounded font-bold uppercase bg-amber-100 text-amber-600">
+                                  ETAPA PULADA
+                                </span>
+                              ) : isCompleted ? (
+                                <span className="text-[10px] px-2 py-0.5 rounded font-bold uppercase bg-green-100 text-green-600">
+                                  CONCLUÍDO
+                                </span>
+                              ) : isActive && dueDateFormatted ? (
+                                <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase ${slaStatus === 'late' ? 'bg-red-100 text-red-600' :
+                                  slaStatus === 'warning' ? 'bg-orange-100 text-orange-600' :
+                                    'bg-green-100 text-green-600'
+                                  }`}>
+                                  {slaStatus === 'late' ? 'ATRASADO' :
+                                    slaStatus === 'warning' ? 'VENCE EM 15 MIN' :
+                                      'NO PRAZO'}
+                                </span>
+                              ) : !isActive && !isCompleted ? (
+                                <span className="text-[10px] px-2 py-0.5 rounded font-bold uppercase bg-gray-100 text-gray-500">
+                                  AGUARDANDO
+                                </span>
+                              ) : null}
+                            </div>
+
+                            <div className="flex gap-2 text-xs">
+                              {isSkipped ? (
+                                <p className="text-amber-600/70 font-semibold uppercase tracking-wider">Ignorado</p>
+                              ) : isCompleted ? (
+                                <p className="text-green-600/70 font-semibold uppercase tracking-wider">Finalizado</p>
+                              ) : isActive ? (
+                                <p className="text-primary/70 font-semibold uppercase tracking-wider">Em Andamento</p>
+                              ) : (
+                                <p className="text-gray-400 font-semibold uppercase tracking-wider">Futuro</p>
+                              )}
+
+                              {dueDateFormatted && (isActive || !isCompleted) && (
+                                <span className="text-gray-500">• Vence: {dueDateFormatted}</span>
                               )}
                             </div>
-
-                            <div className="p-5 bg-white dark:bg-gray-900/50">
-                              <p className="text-base text-gray-900 dark:text-gray-100 leading-relaxed font-medium whitespace-pre-line select-text">
-                                {cleanAndFormatScript(scriptInfo?.template || scriptText, patient.name.split(' ')[0])}
-                              </p>
-                            </div>
                           </div>
+                          <div className="flex items-center gap-3">
+                            <span className="flex items-center gap-2">
+                              {isActive && (
+                                <>
+                                  <span className="text-xs font-bold text-gray-500">Status:</span>
+                                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${isTaskOpen ? 'bg-gray-100 text-gray-500 border-gray-200' : 'bg-green-100 text-green-700 border-green-200'}`}>
+                                    {isTaskOpen ? 'ABERTO' : 'CONCLUÍDO'}
+                                  </span>
+                                </>
+                              )}
+                            </span>
+                            <span className={`material-symbols-outlined text-gray-400 transform transition-transform duration-200 ${expandedStage === stageId ? 'rotate-180' : 'rotate-0'}`}>expand_more</span>
+                          </div>
+                        </button>
 
-                          {/* Controle de Contato - High Contrast */}
-                          <div className={`mb-6 p-4 rounded-xl border ${isCompleted ? 'bg-gray-50 border-gray-200 opacity-75' : 'bg-[#f4f7fa] dark:bg-blue-900/10 border-blue-100 dark:border-blue-900/30'}`}>
-                            <div className="flex justify-between items-start">
-                              <div className="space-y-2 w-full">
-                                <h5 className="text-[10px] font-bold uppercase tracking-widest text-blue-700 dark:text-blue-300 flex items-center gap-1.5">
-                                  <span className="material-symbols-outlined text-sm">manage_accounts</span>
-                                  Controle de Contato
-                                </h5>
+                        {expandedStage === stageId && (
+                          <div className="p-5 animate-in slide-in-from-top-2 duration-200 cursor-default">
 
-                                {!messageSentAt ? (
-                                  <div className="flex flex-col gap-3">
-                                    <div className="flex items-center justify-between bg-white dark:bg-gray-800 p-3 rounded-lg border border-blue-200/50 shadow-sm">
-                                      <p className="text-sm font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2">
-                                        <span className="size-2 rounded-full bg-blue-500 animate-pulse"></span>
-                                        {isActive ? "Aguardando envio da mensagem..." : "Nenhum contato registrado."}
-                                      </p>
-                                      {isActive && (
-                                        <button
-                                          onClick={handleRegisterSent}
-                                          className="text-blue-700 hover:text-blue-900 text-xs font-bold flex items-center gap-1 hover:underline bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors"
-                                        >
-                                          Registrar Envio Manualmente
-                                        </button>
-                                      )}
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <div className="space-y-3">
-                                    <div className="bg-white dark:bg-gray-800 p-3 rounded-lg border border-green-200 dark:border-green-900/30 shadow-sm flex items-center gap-3">
-                                      <div className="size-8 rounded-full bg-green-100 dark:bg-green-900/50 flex items-center justify-center text-green-700">
-                                        <span className="material-symbols-outlined text-lg">check</span>
-                                      </div>
-                                      <div>
-                                        <p className="text-xs font-bold text-gray-500 uppercase">Status do Envio</p>
-                                        <p className="text-sm font-bold text-gray-900 dark:text-white">
-                                          Mensagem enviada em {messageSentAt}
-                                        </p>
-                                      </div>
-                                    </div>
-
-                                    {!messageRespondedAt ? (
-                                      !isRegisteringResponse ? (
-                                        <div className="flex items-center justify-between pl-2 border-l-2 border-dashed border-gray-300 ml-4 py-2">
-                                          <p className="text-xs font-bold text-gray-600 italic pl-2">Aguardando resposta do paciente...</p>
-                                          {isActive && (
-                                            <button
-                                              onClick={handleRegisterMessageResponse}
-                                              className="text-primary hover:text-primary-dark text-xs font-bold hover:underline flex items-center gap-1"
-                                            >
-                                              <span className="material-symbols-outlined text-sm">add_comment</span>
-                                              Registrar Resposta
-                                            </button>
-                                          )}
-                                        </div>
-                                      ) : (
-                                        <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-blue-200 dark:border-blue-900/30 shadow-md animate-in fade-in zoom-in duration-300">
-                                          {hasResponded === null || hasResponded === undefined ? (
-                                            <div>
-                                              <p className="text-sm font-bold text-gray-900 dark:text-gray-100 mb-4 text-center">O paciente respondeu?</p>
-                                              <div className="flex gap-3">
-                                                <button onClick={() => handleConfirmResponse(true)} className="flex-1 group bg-green-50 hover:bg-green-100 border border-green-200 text-green-800 py-3 rounded-xl text-xs font-bold flex flex-col items-center gap-1 transition-all">
-                                                  <span className="material-symbols-outlined text-xl group-hover:scale-110 transition-transform">thumb_up</span>
-                                                  Sim, respondeu
-                                                </button>
-                                                <button onClick={() => handleConfirmResponse(false)} className="flex-1 group bg-red-50 hover:bg-red-100 border border-red-200 text-red-800 py-3 rounded-xl text-xs font-bold flex flex-col items-center gap-1 transition-all">
-                                                  <span className="material-symbols-outlined text-xl group-hover:scale-110 transition-transform">thumb_down</span>
-                                                  Não respondeu
-                                                </button>
-                                              </div>
-                                            </div>
-                                          ) : (
-                                            <div className="space-y-3">
-                                              <label className="block text-xs font-bold text-gray-700 uppercase">Resumo da resposta</label>
-                                              <textarea
-                                                className="w-full text-sm font-medium text-gray-900 border-gray-300 rounded-lg focus:ring-primary focus:border-primary bg-gray-50 p-3 min-h-[80px]"
-                                                placeholder="Digite o que o paciente disse..."
-                                                value={tempResponse}
-                                                onChange={(e) => setTempResponse(e.target.value)}
-                                              ></textarea>
-                                              <div className="flex justify-end gap-2 pt-2">
-                                                <button onClick={() => { updateStage({ hasResponded: null }); setIsRegisteringResponse(false); }} className="text-xs text-gray-600 font-bold px-3 py-2 hover:bg-gray-100 rounded-lg transition-colors">Cancelar</button>
-                                                <button onClick={handleSaveResponseContent} className="text-xs bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded-lg font-bold shadow-sm transition-all">Salvar Resposta</button>
-                                              </div>
-                                            </div>
-                                          )}
-                                        </div>
-                                      )
-                                    ) : (
-                                      <div className={`p-4 rounded-xl border flex items-start gap-3 ${hasResponded ? 'bg-green-50/50 border-green-200' : 'bg-red-50/50 border-red-200'}`}>
-                                        <div className={`size-8 rounded-full flex items-center justify-center shrink-0 ${hasResponded ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                          <span className="material-symbols-outlined text-lg">{hasResponded ? 'forum' : 'unsubscribe'}</span>
-                                        </div>
-                                        <div>
-                                          <p className={`text-xs font-bold uppercase tracking-wider mb-1 ${hasResponded ? 'text-green-800' : 'text-red-800'}`}>
-                                            {hasResponded ? 'Paciente Respondeu' : 'Sem Resposta'}
-                                          </p>
-                                          {responseContent && <p className="text-sm text-gray-800 font-medium italic">"{responseContent}"</p>}
-                                          <p className="text-[10px] text-gray-500 mt-2 font-bold">{messageRespondedAt}</p>
-                                        </div>
-                                      </div>
-                                    )}
+                            {/* Script Section - High Contrast */}
+                            <div className="mb-6 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden shadow-sm">
+                              <div className="bg-[#fcf8f9] dark:bg-gray-800/80 px-4 py-3 flex justify-between items-center border-b border-gray-200 dark:border-gray-700">
+                                <label className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-widest flex items-center gap-1.5">
+                                  <span className="material-symbols-outlined text-sm">chat_bubble</span>
+                                  Script de WhatsApp
+                                </label>
+                                {isActive && (
+                                  <div className="flex gap-2">
+                                    <button
+                                      onClick={() => {
+                                        const rawText = scriptInfo?.template || scriptText;
+                                        const cleanText = cleanAndFormatScript(rawText, patient.name.split(' ')[0]);
+                                        handleCopyScript(cleanText, stageId);
+                                      }}
+                                      className="flex items-center gap-1.5 text-gray-700 hover:text-primary hover:bg-white px-3 py-1.5 rounded-lg text-xs font-bold transition-all border border-transparent hover:border-gray-300 hover:shadow-sm"
+                                      title="Copiar texto"
+                                    >
+                                      <span className="material-symbols-outlined text-sm">{copyFeedback === stageId ? 'check' : 'content_copy'}</span>
+                                      <span>{copyFeedback === stageId ? 'Copiado' : 'Copiar'}</span>
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        const rawText = scriptInfo?.template || scriptText;
+                                        const cleanText = cleanAndFormatScript(rawText, patient.name.split(' ')[0]);
+                                        handleSendWhatsapp(cleanText);
+                                      }}
+                                      className="flex items-center gap-1.5 bg-[#25D366] hover:bg-[#20bd5c] text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm transform hover:-translate-y-0.5"
+                                    >
+                                      <span className="material-symbols-outlined text-white text-sm">chat</span>
+                                      <span>Enviar</span>
+                                    </button>
                                   </div>
                                 )}
                               </div>
-                            </div>
-                          </div>
 
-                          {/* Photo Control Section */}
-                          {
-                            (currentScript?.requestMedia || currentScript?.actions?.some(a => a.type === 'photo_request')) && (
-                              <div className={`mb-6 p-4 rounded-xl border ${photoStatus === 'received' || photoStatus === 'refused' ? 'bg-gray-50 border-gray-200 opacity-75' : 'bg-orange-50 dark:bg-orange-900/10 border-orange-100 dark:border-orange-900/30'}`}>
-                                <div className="space-y-2">
-                                  <h5 className="text-[10px] font-bold uppercase tracking-widest text-orange-700 dark:text-orange-300 flex items-center gap-1.5">
-                                    <span className="material-symbols-outlined text-sm">photo_camera</span>
-                                    Solicitação de Fotos
+                              <div className="p-5 bg-white dark:bg-gray-900/50">
+                                <p className="text-base text-gray-900 dark:text-gray-100 leading-relaxed font-medium whitespace-pre-line select-text">
+                                  {cleanAndFormatScript(scriptInfo?.template || scriptText, patient.name.split(' ')[0])}
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* Controle de Contato - High Contrast */}
+                            <div className={`mb-6 p-4 rounded-xl border ${isCompleted ? 'bg-gray-50 border-gray-200 opacity-75' : 'bg-[#f4f7fa] dark:bg-blue-900/10 border-blue-100 dark:border-blue-900/30'}`}>
+                              <div className="flex justify-between items-start">
+                                <div className="space-y-2 w-full">
+                                  <h5 className="text-[10px] font-bold uppercase tracking-widest text-blue-700 dark:text-blue-300 flex items-center gap-1.5">
+                                    <span className="material-symbols-outlined text-sm">manage_accounts</span>
+                                    Controle de Contato
                                   </h5>
 
-                                  {!photoRequestSentAt ? (
-                                    <div className="flex items-center justify-between bg-white dark:bg-gray-800 p-3 rounded-lg border border-orange-200/50 shadow-sm">
-                                      <p className="text-sm font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2">
-                                        <span className="size-2 rounded-full bg-orange-500 animate-pulse"></span>
-                                        {isActive ? "Aguardando solicitação da foto..." : "Solicitação pendente."}
-                                      </p>
-                                      {isActive && (
-                                        <button
-                                          onClick={handleRegisterPhotoRequest}
-                                          className="text-orange-700 hover:text-orange-900 text-xs font-bold flex items-center gap-1 hover:underline bg-orange-50 hover:bg-orange-100 px-3 py-1.5 rounded-lg transition-colors"
-                                        >
-                                          Registrar Solicitação
-                                        </button>
-                                      )}
+                                  {!messageSentAt ? (
+                                    <div className="flex flex-col gap-3">
+                                      <div className="flex items-center justify-between bg-white dark:bg-gray-800 p-3 rounded-lg border border-blue-200/50 shadow-sm">
+                                        <p className="text-sm font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2">
+                                          <span className="size-2 rounded-full bg-blue-500 animate-pulse"></span>
+                                          {isActive ? "Aguardando envio da mensagem..." : "Nenhum contato registrado."}
+                                        </p>
+                                        {isActive && (
+                                          <button
+                                            onClick={handleRegisterSent}
+                                            className="text-blue-700 hover:text-blue-900 text-xs font-bold flex items-center gap-1 hover:underline bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors"
+                                          >
+                                            Registrar Envio Manualmente
+                                          </button>
+                                        )}
+                                      </div>
                                     </div>
                                   ) : (
                                     <div className="space-y-3">
-                                      {/* Sent Status */}
-                                      <div className="bg-white dark:bg-gray-800 p-3 rounded-lg border border-orange-200 dark:border-orange-900/30 shadow-sm flex items-center gap-3">
-                                        <div className="size-8 rounded-full bg-orange-100 dark:bg-orange-900/50 flex items-center justify-center text-orange-700">
+                                      <div className="bg-white dark:bg-gray-800 p-3 rounded-lg border border-green-200 dark:border-green-900/30 shadow-sm flex items-center gap-3">
+                                        <div className="size-8 rounded-full bg-green-100 dark:bg-green-900/50 flex items-center justify-center text-green-700">
                                           <span className="material-symbols-outlined text-lg">check</span>
                                         </div>
                                         <div>
-                                          <p className="text-xs font-bold text-gray-500 uppercase">Solicitação Enviada</p>
+                                          <p className="text-xs font-bold text-gray-500 uppercase">Status do Envio</p>
                                           <p className="text-sm font-bold text-gray-900 dark:text-white">
-                                            Solicitado em {photoRequestSentAt}
+                                            Mensagem enviada em {messageSentAt}
                                           </p>
                                         </div>
                                       </div>
 
-                                      {/* Response Status */}
-                                      {!photoStatus || photoStatus === 'pending' ? (
-                                        !isRegisteringPhotoResponse ? (
+                                      {!messageRespondedAt ? (
+                                        !isRegisteringResponse ? (
                                           <div className="flex items-center justify-between pl-2 border-l-2 border-dashed border-gray-300 ml-4 py-2">
-                                            <p className="text-xs font-bold text-gray-600 italic pl-2">Aguardando envio das fotos...</p>
+                                            <p className="text-xs font-bold text-gray-600 italic pl-2">Aguardando resposta do paciente...</p>
                                             {isActive && (
                                               <button
-                                                onClick={handleRegisterPhotoResponse}
+                                                onClick={handleRegisterMessageResponse}
                                                 className="text-primary hover:text-primary-dark text-xs font-bold hover:underline flex items-center gap-1"
                                               >
-                                                <span className="material-symbols-outlined text-sm">add_a_photo</span>
+                                                <span className="material-symbols-outlined text-sm">add_comment</span>
                                                 Registrar Resposta
                                               </button>
                                             )}
                                           </div>
                                         ) : (
-                                          <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-orange-200 dark:border-orange-900/30 shadow-md animate-in fade-in zoom-in duration-300">
-                                            <p className="text-sm font-bold text-gray-900 dark:text-gray-100 mb-4 text-center">As fotos foram enviadas?</p>
-                                            <div className="flex gap-3 mb-4">
-                                              <button onClick={() => { }} className="flex-1 group bg-green-50 hover:bg-green-100 border border-green-200 text-green-800 py-3 rounded-xl text-xs font-bold flex flex-col items-center gap-1 transition-all ring-2 ring-primary ring-offset-2">
-                                                <span className="material-symbols-outlined text-xl">check_circle</span>
-                                                Sim
-                                              </button>
-                                              <button onClick={() => handleConfirmPhotoResponse(false)} className="flex-1 group bg-red-50 hover:bg-red-100 border border-red-200 text-red-800 py-3 rounded-xl text-xs font-bold flex flex-col items-center gap-1 transition-all opacity-50 hover:opacity-100">
-                                                <span className="material-symbols-outlined text-xl">cancel</span>
-                                                Não
-                                              </button>
-                                            </div>
-
-                                            {/* Upload Area for YES */}
-                                            <div className="mt-4 border-t border-gray-100 pt-4">
-                                              <label className="block w-full cursor-pointer group">
-                                                <div className="border-2 border-dashed border-gray-300 group-hover:border-primary rounded-xl p-6 text-center transition-colors bg-gray-50 group-hover:bg-primary/5">
-                                                  {uploadingPhoto ? (
-                                                    <div className="flex flex-col items-center gap-2">
-                                                      <span className="material-symbols-outlined animate-spin text-primary text-3xl">sync</span>
-                                                      <span className="text-xs font-bold text-gray-500">Enviando foto...</span>
-                                                    </div>
-                                                  ) : (
-                                                    <>
-                                                      <span className="material-symbols-outlined text-gray-400 group-hover:text-primary text-3xl mb-2">cloud_upload</span>
-                                                      <p className="text-xs font-bold text-gray-600 group-hover:text-primary mb-1">Clique para fazer upload (JPEG)</p>
-                                                      <p className="text-[10px] text-gray-400">Máximo 5MB</p>
-                                                    </>
-                                                  )}
+                                          <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-blue-200 dark:border-blue-900/30 shadow-md animate-in fade-in zoom-in duration-300">
+                                            {hasResponded === null || hasResponded === undefined ? (
+                                              <div>
+                                                <p className="text-sm font-bold text-gray-900 dark:text-gray-100 mb-4 text-center">O paciente respondeu?</p>
+                                                <div className="flex gap-3">
+                                                  <button onClick={() => handleConfirmResponse(true)} className="flex-1 group bg-green-50 hover:bg-green-100 border border-green-200 text-green-800 py-3 rounded-xl text-xs font-bold flex flex-col items-center gap-1 transition-all">
+                                                    <span className="material-symbols-outlined text-xl group-hover:scale-110 transition-transform">thumb_up</span>
+                                                    Sim, respondeu
+                                                  </button>
+                                                  <button onClick={() => handleConfirmResponse(false)} className="flex-1 group bg-red-50 hover:bg-red-100 border border-red-200 text-red-800 py-3 rounded-xl text-xs font-bold flex flex-col items-center gap-1 transition-all">
+                                                    <span className="material-symbols-outlined text-xl group-hover:scale-110 transition-transform">thumb_down</span>
+                                                    Não respondeu
+                                                  </button>
                                                 </div>
-                                                <input
-                                                  type="file"
-                                                  className="hidden"
-                                                  accept="image/jpeg,image/png,image/jpg"
-                                                  onChange={handlePhotoUpload}
-                                                  disabled={uploadingPhoto}
-                                                />
-                                              </label>
-                                              <button onClick={() => setIsRegisteringPhotoResponse(false)} className="w-full mt-3 text-xs text-gray-500 hover:text-gray-700 font-bold">Cancelar</button>
-                                            </div>
+                                              </div>
+                                            ) : (
+                                              <div className="space-y-3">
+                                                <label className="block text-xs font-bold text-gray-700 uppercase">Resumo da resposta</label>
+                                                <textarea
+                                                  className="w-full text-sm font-medium text-gray-900 border-gray-300 rounded-lg focus:ring-primary focus:border-primary bg-gray-50 p-3 min-h-[80px]"
+                                                  placeholder="Digite o que o paciente disse..."
+                                                  value={tempResponse}
+                                                  onChange={(e) => setTempResponse(e.target.value)}
+                                                ></textarea>
+                                                <div className="flex justify-end gap-2 pt-2">
+                                                  <button onClick={() => { updateStage({ hasResponded: null }); setIsRegisteringResponse(false); }} className="text-xs text-gray-600 font-bold px-3 py-2 hover:bg-gray-100 rounded-lg transition-colors">Cancelar</button>
+                                                  <button onClick={handleSaveResponseContent} className="text-xs bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded-lg font-bold shadow-sm transition-all">Salvar Resposta</button>
+                                                </div>
+                                              </div>
+                                            )}
                                           </div>
                                         )
                                       ) : (
-                                        <div className={`p-4 rounded-xl border flex items-start gap-3 ${photoStatus === 'received' ? 'bg-green-50/50 border-green-200' : 'bg-red-50/50 border-red-200'}`}>
-                                          <div className={`size-8 rounded-full flex items-center justify-center shrink-0 ${photoStatus === 'received' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                            <span className="material-symbols-outlined text-lg">{photoStatus === 'received' ? 'collections' : 'broken_image'}</span>
+                                        <div className={`p-4 rounded-xl border flex items-start gap-3 ${hasResponded ? 'bg-green-50/50 border-green-200' : 'bg-red-50/50 border-red-200'}`}>
+                                          <div className={`size-8 rounded-full flex items-center justify-center shrink-0 ${hasResponded ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                            <span className="material-symbols-outlined text-lg">{hasResponded ? 'forum' : 'unsubscribe'}</span>
                                           </div>
-                                          <div className="w-full">
-                                            <p className={`text-xs font-bold uppercase tracking-wider mb-1 ${photoStatus === 'received' ? 'text-green-800' : 'text-red-800'}`}>
-                                              {photoStatus === 'received' ? 'Fotos Recebidas' : 'Paciente não enviou'}
+                                          <div>
+                                            <p className={`text-xs font-bold uppercase tracking-wider mb-1 ${hasResponded ? 'text-green-800' : 'text-red-800'}`}>
+                                              {hasResponded ? 'Paciente Respondeu' : 'Sem Resposta'}
                                             </p>
-
-                                            {photoUrl && (
-                                              <div className="mt-2 relative group w-fit">
-                                                <div className="h-24 w-24 bg-cover bg-center rounded-lg border border-gray-200 shadow-sm" style={{ backgroundImage: `url(${photoUrl})` }}></div>
-                                                <a href={photoUrl} target="_blank" rel="noreferrer" className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white rounded-lg transition-opacity">
-                                                  <span className="material-symbols-outlined">visibility</span>
-                                                </a>
-                                              </div>
-                                            )}
-
-                                            <p className="text-[10px] text-gray-500 mt-2 font-bold">{photoReceivedAt}</p>
+                                            {responseContent && <p className="text-sm text-gray-800 font-medium italic">"{responseContent}"</p>}
+                                            <p className="text-[10px] text-gray-500 mt-2 font-bold">{messageRespondedAt}</p>
                                           </div>
                                         </div>
                                       )}
@@ -1367,304 +1244,434 @@ const PatientDetails: React.FC<PatientDetailsProps> = ({
                                   )}
                                 </div>
                               </div>
-                            )
-                          }
+                            </div>
 
-                          <div className="grid md:grid-cols-2 gap-6 border-t border-gray-200 dark:border-gray-700 pt-5 mt-2">
-                            {scriptInfo?.actions && Array.isArray(scriptInfo.actions) && scriptInfo.actions.length > 0 && (
-                              <div className="space-y-3">
-                                <h4 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-1.5">
-                                  <span className="material-symbols-outlined text-sm">checklist</span>
-                                  Checklist
-                                </h4>
-                                {scriptInfo.actions.filter(a => a.type !== 'message' && a.type !== 'photo_request').map(action => (
-                                  <div key={action.id} onClick={() => isActive && handleToggleAction(action.id, !currentChecklist[action.id])} className={`flex items-center gap-3 p-2 rounded-lg transition-colors border border-transparent ${isActive ? 'cursor-pointer hover:bg-gray-50 hover:border-gray-200' : 'cursor-default'}`}>
-                                    <div className={`size-5 rounded border flex items-center justify-center transition-all ${currentChecklist[action.id] ? 'bg-primary border-primary text-white' : 'border-gray-400 bg-white'}`}>
-                                      {currentChecklist[action.id] && <span className="material-symbols-outlined text-sm font-bold">check</span>}
-                                    </div>
-                                    <span className="text-sm font-bold text-gray-800">
-                                      {action.description}
-                                    </span>
+                            {/* Photo Control Section */}
+                            {
+                              (currentScript?.requestMedia || currentScript?.actions?.some(a => a.type === 'photo_request')) && (
+                                <div className={`mb-6 p-4 rounded-xl border ${photoStatus === 'received' || photoStatus === 'refused' ? 'bg-gray-50 border-gray-200 opacity-75' : 'bg-orange-50 dark:bg-orange-900/10 border-orange-100 dark:border-orange-900/30'}`}>
+                                  <div className="space-y-2">
+                                    <h5 className="text-[10px] font-bold uppercase tracking-widest text-orange-700 dark:text-orange-300 flex items-center gap-1.5">
+                                      <span className="material-symbols-outlined text-sm">photo_camera</span>
+                                      Solicitação de Fotos
+                                    </h5>
+
+                                    {!photoRequestSentAt ? (
+                                      <div className="flex items-center justify-between bg-white dark:bg-gray-800 p-3 rounded-lg border border-orange-200/50 shadow-sm">
+                                        <p className="text-sm font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2">
+                                          <span className="size-2 rounded-full bg-orange-500 animate-pulse"></span>
+                                          {isActive ? "Aguardando solicitação da foto..." : "Solicitação pendente."}
+                                        </p>
+                                        {isActive && (
+                                          <button
+                                            onClick={handleRegisterPhotoRequest}
+                                            className="text-orange-700 hover:text-orange-900 text-xs font-bold flex items-center gap-1 hover:underline bg-orange-50 hover:bg-orange-100 px-3 py-1.5 rounded-lg transition-colors"
+                                          >
+                                            Registrar Solicitação
+                                          </button>
+                                        )}
+                                      </div>
+                                    ) : (
+                                      <div className="space-y-3">
+                                        {/* Sent Status */}
+                                        <div className="bg-white dark:bg-gray-800 p-3 rounded-lg border border-orange-200 dark:border-orange-900/30 shadow-sm flex items-center gap-3">
+                                          <div className="size-8 rounded-full bg-orange-100 dark:bg-orange-900/50 flex items-center justify-center text-orange-700">
+                                            <span className="material-symbols-outlined text-lg">check</span>
+                                          </div>
+                                          <div>
+                                            <p className="text-xs font-bold text-gray-500 uppercase">Solicitação Enviada</p>
+                                            <p className="text-sm font-bold text-gray-900 dark:text-white">
+                                              Solicitado em {photoRequestSentAt}
+                                            </p>
+                                          </div>
+                                        </div>
+
+                                        {/* Response Status */}
+                                        {!photoStatus || photoStatus === 'pending' ? (
+                                          !isRegisteringPhotoResponse ? (
+                                            <div className="flex items-center justify-between pl-2 border-l-2 border-dashed border-gray-300 ml-4 py-2">
+                                              <p className="text-xs font-bold text-gray-600 italic pl-2">Aguardando envio das fotos...</p>
+                                              {isActive && (
+                                                <button
+                                                  onClick={handleRegisterPhotoResponse}
+                                                  className="text-primary hover:text-primary-dark text-xs font-bold hover:underline flex items-center gap-1"
+                                                >
+                                                  <span className="material-symbols-outlined text-sm">add_a_photo</span>
+                                                  Registrar Resposta
+                                                </button>
+                                              )}
+                                            </div>
+                                          ) : (
+                                            <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-orange-200 dark:border-orange-900/30 shadow-md animate-in fade-in zoom-in duration-300">
+                                              <p className="text-sm font-bold text-gray-900 dark:text-gray-100 mb-4 text-center">As fotos foram enviadas?</p>
+                                              <div className="flex gap-3 mb-4">
+                                                <button onClick={() => { }} className="flex-1 group bg-green-50 hover:bg-green-100 border border-green-200 text-green-800 py-3 rounded-xl text-xs font-bold flex flex-col items-center gap-1 transition-all ring-2 ring-primary ring-offset-2">
+                                                  <span className="material-symbols-outlined text-xl">check_circle</span>
+                                                  Sim
+                                                </button>
+                                                <button onClick={() => handleConfirmPhotoResponse(false)} className="flex-1 group bg-red-50 hover:bg-red-100 border border-red-200 text-red-800 py-3 rounded-xl text-xs font-bold flex flex-col items-center gap-1 transition-all opacity-50 hover:opacity-100">
+                                                  <span className="material-symbols-outlined text-xl">cancel</span>
+                                                  Não
+                                                </button>
+                                              </div>
+
+                                              {/* Upload Area for YES */}
+                                              <div className="mt-4 border-t border-gray-100 pt-4">
+                                                <label className="block w-full cursor-pointer group">
+                                                  <div className="border-2 border-dashed border-gray-300 group-hover:border-primary rounded-xl p-6 text-center transition-colors bg-gray-50 group-hover:bg-primary/5">
+                                                    {uploadingPhoto ? (
+                                                      <div className="flex flex-col items-center gap-2">
+                                                        <span className="material-symbols-outlined animate-spin text-primary text-3xl">sync</span>
+                                                        <span className="text-xs font-bold text-gray-500">Enviando foto...</span>
+                                                      </div>
+                                                    ) : (
+                                                      <>
+                                                        <span className="material-symbols-outlined text-gray-400 group-hover:text-primary text-3xl mb-2">cloud_upload</span>
+                                                        <p className="text-xs font-bold text-gray-600 group-hover:text-primary mb-1">Clique para fazer upload (JPEG)</p>
+                                                        <p className="text-[10px] text-gray-400">Máximo 5MB</p>
+                                                      </>
+                                                    )}
+                                                  </div>
+                                                  <input
+                                                    type="file"
+                                                    className="hidden"
+                                                    accept="image/jpeg,image/png,image/jpg"
+                                                    onChange={handlePhotoUpload}
+                                                    disabled={uploadingPhoto}
+                                                  />
+                                                </label>
+                                                <button onClick={() => setIsRegisteringPhotoResponse(false)} className="w-full mt-3 text-xs text-gray-500 hover:text-gray-700 font-bold">Cancelar</button>
+                                              </div>
+                                            </div>
+                                          )
+                                        ) : (
+                                          <div className={`p-4 rounded-xl border flex items-start gap-3 ${photoStatus === 'received' ? 'bg-green-50/50 border-green-200' : 'bg-red-50/50 border-red-200'}`}>
+                                            <div className={`size-8 rounded-full flex items-center justify-center shrink-0 ${photoStatus === 'received' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                              <span className="material-symbols-outlined text-lg">{photoStatus === 'received' ? 'collections' : 'broken_image'}</span>
+                                            </div>
+                                            <div className="w-full">
+                                              <p className={`text-xs font-bold uppercase tracking-wider mb-1 ${photoStatus === 'received' ? 'text-green-800' : 'text-red-800'}`}>
+                                                {photoStatus === 'received' ? 'Fotos Recebidas' : 'Paciente não enviou'}
+                                              </p>
+
+                                              {photoUrl && (
+                                                <div className="mt-2 relative group w-fit">
+                                                  <img src={photoUrl} alt="Foto da resposta" className="h-24 w-24 bg-cover bg-center rounded-lg border border-gray-200 shadow-sm object-cover" />
+                                                  <a href={photoUrl} target="_blank" rel="noreferrer" className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white rounded-lg transition-opacity">
+                                                    <span className="material-symbols-outlined">visibility</span>
+                                                  </a>
+                                                </div>
+                                              )}
+
+                                              <p className="text-[10px] text-gray-500 mt-2 font-bold">{photoReceivedAt}</p>
+                                            </div>
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
                                   </div>
-                                ))}
-                                {scriptInfo.actions.filter(a => a.type !== 'message').length === 0 && (
-                                  <p className="text-xs text-gray-400 italic pl-2">Nenhuma ação extra necessária.</p>
-                                )}
+                                </div>
+                              )
+                            }
+
+                            <div className="grid md:grid-cols-2 gap-6 border-t border-gray-200 dark:border-gray-700 pt-5 mt-2">
+                              {scriptInfo?.actions && Array.isArray(scriptInfo.actions) && scriptInfo.actions.length > 0 && (
+                                <div className="space-y-3">
+                                  <h4 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-1.5">
+                                    <span className="material-symbols-outlined text-sm">checklist</span>
+                                    Checklist
+                                  </h4>
+                                  {scriptInfo.actions.filter(a => a.type !== 'message' && a.type !== 'photo_request').map(action => (
+                                    <div key={action.id} onClick={() => isActive && handleToggleAction(action.id, !currentChecklist[action.id])} className={`flex items-center gap-3 p-2 rounded-lg transition-colors border border-transparent ${isActive ? 'cursor-pointer hover:bg-gray-50 hover:border-gray-200' : 'cursor-default'}`}>
+                                      <div className={`size-5 rounded border flex items-center justify-center transition-all ${currentChecklist[action.id] ? 'bg-primary border-primary text-white' : 'border-gray-400 bg-white'}`}>
+                                        {currentChecklist[action.id] && <span className="material-symbols-outlined text-sm font-bold">check</span>}
+                                      </div>
+                                      <span className="text-sm font-bold text-gray-800">
+                                        {action.description}
+                                      </span>
+                                    </div>
+                                  ))}
+                                  {scriptInfo.actions.filter(a => a.type !== 'message').length === 0 && (
+                                    <p className="text-xs text-gray-400 italic pl-2">Nenhuma ação extra necessária.</p>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Action Buttons - Only for Active Stage */}
+                              {isActive && (
+                                <div className="flex items-end justify-end gap-2">
+                                  {!isAllTasksCompleted && (
+                                    isSkipping ? (
+                                      <div className="flex-1 bg-red-50 p-4 rounded-lg border border-red-100 animate-in fade-in slide-in-from-bottom-2 w-full">
+                                        <h5 className="text-sm font-bold text-red-700 mb-2 flex items-center gap-2">
+                                          <span className="material-symbols-outlined">warning</span>
+                                          Pular Etapa?
+                                        </h5>
+                                        <p className="text-xs text-red-600 mb-3">
+                                          Deseja realmente pular esta etapa? Isso ficará registrado no histórico.
+                                        </p>
+                                        <textarea
+                                          value={skipJustification}
+                                          onChange={(e) => setSkipJustification(e.target.value)}
+                                          placeholder="Justificativa (mínimo 10 caracteres)..."
+                                          className="w-full text-sm p-3 border border-red-200 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 mb-3 bg-white text-gray-800"
+                                          rows={2}
+                                          autoFocus
+                                        />
+                                        <div className="flex justify-end gap-2">
+                                          <button
+                                            onClick={() => {
+                                              setIsSkipping(false);
+                                              setSkipJustification('');
+                                            }}
+                                            className="px-3 py-1.5 text-xs text-gray-600 hover:bg-white rounded border border-transparent hover:border-gray-200 transition-colors"
+                                          >
+                                            Cancelar
+                                          </button>
+                                          <button
+                                            onClick={handleSkipTask}
+                                            disabled={skipJustification.length < 10}
+                                            className="px-3 py-1.5 text-xs bg-red-600 text-white rounded hover:bg-red-700 transition-colors font-medium flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                                          >
+                                            <span className="material-symbols-outlined text-sm">skip_next</span>
+                                            Confirmar Pulo
+                                          </button>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <>
+                                        <button
+                                          onClick={() => setIsSkipping(true)}
+                                          className="px-4 py-3 text-sm text-red-600 hover:bg-red-50 rounded-xl border border-red-200 transition-colors flex items-center gap-2 font-medium"
+                                        >
+                                          <span className="material-symbols-outlined">skip_next</span>
+                                          Pular Etapa
+                                        </button>
+                                        <button
+                                          onClick={handleCompleteTask}
+                                          disabled={!isTaskOpen || !isChecklistComplete || !messageRespondedAt}
+                                          className={`px-6 py-3 rounded-xl text-xs font-bold shadow-md transition-all flex items-center gap-2 transform active:scale-95 ${isTaskOpen && isChecklistComplete && messageRespondedAt
+                                            ? 'bg-gradient-to-r from-green-600 to-green-700 text-white hover:from-green-700 hover:to-green-800 hover:shadow-green-600/30'
+                                            : 'bg-gray-100 text-gray-400 cursor-not-allowed shadow-none'
+                                            }`}
+                                        >
+                                          <span className="material-symbols-outlined text-lg">check_circle</span>
+                                          {isTaskOpen ? 'Concluir Etapa' : 'Concluído'}
+                                        </button>
+                                      </>
+                                    )
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+
+
+                {/* Pesquisa de Satisfação (Módulo Separado) */}
+                {
+                  currentProcedureDef?.hasSurvey && ((activeTreatment?.totalTasks || 0) >= scripts.length) && (
+                    <div className={`relative pl-12 transition-all duration-500 ${isAllTasksCompleted ? 'opacity-100' : 'opacity-50 grayscale'}`}>
+                      <div className={`absolute left-0 top-1 w-10 h-10 rounded-full flex items-center justify-center text-white border-4 border-background-light dark:border-background-dark z-10 shadow-lg ${surveyStatus === SurveyStatus.RESPONDED ? 'bg-green-500' : 'bg-purple-600'}`}>
+                        <span className="material-symbols-outlined text-lg">star</span>
+                      </div>
+
+                      <div className={`rounded-xl border-2 shadow-md overflow-hidden ${surveyStatus === SurveyStatus.RESPONDED ? 'bg-white dark:bg-gray-900 border-green-200' : 'bg-white dark:bg-gray-900 border-purple-100'}`}>
+                        <div className={`px-5 py-4 flex justify-between items-center border-b ${surveyStatus === SurveyStatus.RESPONDED ? 'bg-green-50/50 border-green-100' : 'bg-purple-50/50 border-purple-100'}`}>
+                          <div>
+                            <h3 className={`${surveyStatus === SurveyStatus.RESPONDED ? 'text-green-700' : 'text-purple-700'} font-bold text-base leading-none mb-1`}>Pesquisa de Satisfação</h3>
+                            <p className={`${surveyStatus === SurveyStatus.RESPONDED ? 'text-green-600' : 'text-purple-600'} text-xs font-semibold uppercase tracking-wider`}>
+                              {surveyStatus === SurveyStatus.PENDING && 'Aguardando Finalização do Tratamento'}
+                              {surveyStatus === SurveyStatus.SENT && `Enviado em ${surveySentAt}`}
+                              {surveyStatus === SurveyStatus.RESPONDED && `Respondido em ${surveyRespondedAt}`}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className={`text-[10px] font-bold px-2 py-1 rounded ${surveyStatus === SurveyStatus.PENDING ? 'bg-gray-100 text-gray-500' :
+                              surveyStatus === SurveyStatus.SENT ? 'bg-purple-100 text-purple-700' :
+                                'bg-green-100 text-green-700'
+                              }`}>
+                              {surveyStatus === SurveyStatus.PENDING ? 'BLOQUEADO' :
+                                surveyStatus === SurveyStatus.SENT ? 'AGUARDANDO' : 'CONCLUÍDO'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {isAllTasksCompleted && (
+                          <div className="p-5">
+                            {surveyStatus === SurveyStatus.PENDING && (
+                              <div className="flex flex-col gap-4">
+                                <p className="text-sm text-gray-600 dark:text-gray-300">
+                                  Todos os acompanhamentos foram concluídos! Agora é hora de enviar a pesquisa de satisfação para o paciente avaliar o tratamento.
+                                </p>
+                                <button
+                                  onClick={handleSendSurvey}
+                                  className="flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-3 rounded-xl font-bold text-sm transition-all shadow-lg shadow-purple-600/20"
+                                >
+                                  <span className="material-symbols-outlined">send</span>
+                                  <span>Enviar Pesquisa via WhatsApp</span>
+                                </button>
                               </div>
                             )}
 
-                            {/* Action Buttons - Only for Active Stage */}
-                            {isActive && (
-                              <div className="flex items-end justify-end gap-2">
-                                {!isAllTasksCompleted && (
-                                  isSkipping ? (
-                                    <div className="flex-1 bg-red-50 p-4 rounded-lg border border-red-100 animate-in fade-in slide-in-from-bottom-2 w-full">
-                                      <h5 className="text-sm font-bold text-red-700 mb-2 flex items-center gap-2">
-                                        <span className="material-symbols-outlined">warning</span>
-                                        Pular Etapa?
-                                      </h5>
-                                      <p className="text-xs text-red-600 mb-3">
-                                        Deseja realmente pular esta etapa? Isso ficará registrado no histórico.
-                                      </p>
-                                      <textarea
-                                        value={skipJustification}
-                                        onChange={(e) => setSkipJustification(e.target.value)}
-                                        placeholder="Justificativa (mínimo 10 caracteres)..."
-                                        className="w-full text-sm p-3 border border-red-200 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 mb-3 bg-white text-gray-800"
-                                        rows={2}
-                                        autoFocus
-                                      />
-                                      <div className="flex justify-end gap-2">
-                                        <button
-                                          onClick={() => {
-                                            setIsSkipping(false);
-                                            setSkipJustification('');
-                                          }}
-                                          className="px-3 py-1.5 text-xs text-gray-600 hover:bg-white rounded border border-transparent hover:border-gray-200 transition-colors"
-                                        >
-                                          Cancelar
-                                        </button>
-                                        <button
-                                          onClick={handleSkipTask}
-                                          disabled={skipJustification.length < 10}
-                                          className="px-3 py-1.5 text-xs bg-red-600 text-white rounded hover:bg-red-700 transition-colors font-medium flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
-                                        >
-                                          <span className="material-symbols-outlined text-sm">skip_next</span>
-                                          Confirmar Pulo
-                                        </button>
-                                      </div>
-                                    </div>
-                                  ) : (
-                                    <>
-                                      <button
-                                        onClick={() => setIsSkipping(true)}
-                                        className="px-4 py-3 text-sm text-red-600 hover:bg-red-50 rounded-xl border border-red-200 transition-colors flex items-center gap-2 font-medium"
-                                      >
-                                        <span className="material-symbols-outlined">skip_next</span>
-                                        Pular Etapa
-                                      </button>
-                                      <button
-                                        onClick={handleCompleteTask}
-                                        disabled={!isTaskOpen || !isChecklistComplete || !messageRespondedAt}
-                                        className={`px-6 py-3 rounded-xl text-xs font-bold shadow-md transition-all flex items-center gap-2 transform active:scale-95 ${isTaskOpen && isChecklistComplete && messageRespondedAt
-                                          ? 'bg-gradient-to-r from-green-600 to-green-700 text-white hover:from-green-700 hover:to-green-800 hover:shadow-green-600/30'
-                                          : 'bg-gray-100 text-gray-400 cursor-not-allowed shadow-none'
-                                          }`}
-                                      >
-                                        <span className="material-symbols-outlined text-lg">check_circle</span>
-                                        {isTaskOpen ? 'Concluir Etapa' : 'Concluído'}
-                                      </button>
-                                    </>
-                                  )
-                                )}
+                            {surveyStatus === SurveyStatus.SENT && (
+                              <div className="flex flex-col gap-4">
+                                <div className="bg-purple-50 dark:bg-purple-900/10 rounded-lg p-4 border border-purple-100 dark:border-purple-900/30">
+                                  <p className="text-sm text-purple-800 dark:text-purple-200 flex items-center gap-2">
+                                    <span className="material-symbols-outlined animate-pulse">mark_email_unread</span>
+                                    Link da pesquisa enviado. Aguardando resposta do paciente...
+                                  </p>
+                                </div>
+                                <button
+                                  onClick={handleRegisterResponse}
+                                  className="self-end text-purple-600 hover:text-purple-800 text-xs font-bold underline cursor-pointer"
+                                >
+                                  Simular: Registrar Resposta Agora
+                                </button>
+                              </div>
+                            )}
+
+                            {surveyStatus === SurveyStatus.RESPONDED && (
+                              <div className="flex flex-col gap-3">
+                                <div className="flex items-center justify-between bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
+                                  <span className="text-sm font-bold text-gray-700 dark:text-gray-300">Nota Geral</span>
+                                  <div className="flex gap-1 text-amber-400">
+                                    {[1, 2, 3, 4, 5].map(star => (
+                                      <span key={star} className="material-symbols-outlined text-xl fill-current">star</span>
+                                    ))}
+                                  </div>
+                                </div>
+                                <p className="text-sm text-gray-600 dark:text-gray-400 italic bg-white dark:bg-gray-900 p-3 rounded border border-gray-100 dark:border-gray-800">
+                                  "O atendimento foi excelente! Adorei o resultado e a atenção da equipe durante todo o processo."
+                                </p>
                               </div>
                             )}
                           </div>
-                        </div >
-                      )}
-                    </div >
-                  </div >
-                );
-              })}
-
-
-              {/* Pesquisa de Satisfação (Módulo Separado) */}
-              {
-                currentProcedureDef?.hasSurvey && ((activeTreatment?.totalTasks || 0) >= scripts.length) && (
-                  <div className={`relative pl-12 transition-all duration-500 ${isAllTasksCompleted ? 'opacity-100' : 'opacity-50 grayscale'}`}>
-                    <div className={`absolute left-0 top-1 w-10 h-10 rounded-full flex items-center justify-center text-white border-4 border-background-light dark:border-background-dark z-10 shadow-lg ${surveyStatus === SurveyStatus.RESPONDED ? 'bg-green-500' : 'bg-purple-600'}`}>
-                      <span className="material-symbols-outlined text-lg">star</span>
-                    </div>
-
-                    <div className={`rounded-xl border-2 shadow-md overflow-hidden ${surveyStatus === SurveyStatus.RESPONDED ? 'bg-white dark:bg-gray-900 border-green-200' : 'bg-white dark:bg-gray-900 border-purple-100'}`}>
-                      <div className={`px-5 py-4 flex justify-between items-center border-b ${surveyStatus === SurveyStatus.RESPONDED ? 'bg-green-50/50 border-green-100' : 'bg-purple-50/50 border-purple-100'}`}>
-                        <div>
-                          <h3 className={`${surveyStatus === SurveyStatus.RESPONDED ? 'text-green-700' : 'text-purple-700'} font-bold text-base leading-none mb-1`}>Pesquisa de Satisfação</h3>
-                          <p className={`${surveyStatus === SurveyStatus.RESPONDED ? 'text-green-600' : 'text-purple-600'} text-xs font-semibold uppercase tracking-wider`}>
-                            {surveyStatus === SurveyStatus.PENDING && 'Aguardando Finalização do Tratamento'}
-                            {surveyStatus === SurveyStatus.SENT && `Enviado em ${surveySentAt}`}
-                            {surveyStatus === SurveyStatus.RESPONDED && `Respondido em ${surveyRespondedAt}`}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className={`text-[10px] font-bold px-2 py-1 rounded ${surveyStatus === SurveyStatus.PENDING ? 'bg-gray-100 text-gray-500' :
-                            surveyStatus === SurveyStatus.SENT ? 'bg-purple-100 text-purple-700' :
-                              'bg-green-100 text-green-700'
-                            }`}>
-                            {surveyStatus === SurveyStatus.PENDING ? 'BLOQUEADO' :
-                              surveyStatus === SurveyStatus.SENT ? 'AGUARDANDO' : 'CONCLUÍDO'}
-                          </span>
-                        </div>
+                        )}
                       </div>
-
-                      {isAllTasksCompleted && (
-                        <div className="p-5">
-                          {surveyStatus === SurveyStatus.PENDING && (
-                            <div className="flex flex-col gap-4">
-                              <p className="text-sm text-gray-600 dark:text-gray-300">
-                                Todos os acompanhamentos foram concluídos! Agora é hora de enviar a pesquisa de satisfação para o paciente avaliar o tratamento.
-                              </p>
-                              <button
-                                onClick={handleSendSurvey}
-                                className="flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-3 rounded-xl font-bold text-sm transition-all shadow-lg shadow-purple-600/20"
-                              >
-                                <span className="material-symbols-outlined">send</span>
-                                <span>Enviar Pesquisa via WhatsApp</span>
-                              </button>
-                            </div>
-                          )}
-
-                          {surveyStatus === SurveyStatus.SENT && (
-                            <div className="flex flex-col gap-4">
-                              <div className="bg-purple-50 dark:bg-purple-900/10 rounded-lg p-4 border border-purple-100 dark:border-purple-900/30">
-                                <p className="text-sm text-purple-800 dark:text-purple-200 flex items-center gap-2">
-                                  <span className="material-symbols-outlined animate-pulse">mark_email_unread</span>
-                                  Link da pesquisa enviado. Aguardando resposta do paciente...
-                                </p>
-                              </div>
-                              <button
-                                onClick={handleRegisterResponse}
-                                className="self-end text-purple-600 hover:text-purple-800 text-xs font-bold underline cursor-pointer"
-                              >
-                                Simular: Registrar Resposta Agora
-                              </button>
-                            </div>
-                          )}
-
-                          {surveyStatus === SurveyStatus.RESPONDED && (
-                            <div className="flex flex-col gap-3">
-                              <div className="flex items-center justify-between bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
-                                <span className="text-sm font-bold text-gray-700 dark:text-gray-300">Nota Geral</span>
-                                <div className="flex gap-1 text-amber-400">
-                                  {[1, 2, 3, 4, 5].map(star => (
-                                    <span key={star} className="material-symbols-outlined text-xl fill-current">star</span>
-                                  ))}
-                                </div>
-                              </div>
-                              <p className="text-sm text-gray-600 dark:text-gray-400 italic bg-white dark:bg-gray-900 p-3 rounded border border-gray-100 dark:border-gray-800">
-                                "O atendimento foi excelente! Adorei o resultado e a atenção da equipe durante todo o processo."
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      )}
                     </div>
-                  </div>
-                )
-              }
+                  )
+                }
+              </div >
             </div >
-          </div >
 
-          <div className="lg:col-span-4 space-y-6">
-            <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 shadow-sm p-6">
-              <h3 className="text-gray-900 dark:text-white font-bold text-lg mb-4">Informações do Paciente</h3>
-              <div className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-green-50 dark:bg-green-900/20 flex items-center justify-center text-green-600">
-                    <span className="material-symbols-outlined">call</span>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none mb-1">WhatsApp</p>
-                    <a className="text-gray-900 dark:text-white font-bold text-sm hover:text-primary" href={`tel:${patient.phone}`}>{patient.phone}</a>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center text-blue-600">
-                    <span className="material-symbols-outlined">mail</span>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none mb-1">E-mail</p>
-                    <p className="text-gray-900 dark:text-white font-bold text-sm">{patient.email}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-amber-50 dark:bg-amber-900/20 flex items-center justify-center text-amber-600">
-                    <span className="material-symbols-outlined">cake</span>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none mb-1">Data de Nascimento</p>
-                    <p className="text-gray-900 dark:text-white font-bold text-sm">{patient.dob}</p>
-                  </div>
-                </div>
-              </div>
-              <div className="mt-6 pt-6 border-t border-gray-100 dark:border-gray-800">
-                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Fotos Recentes</h4>
-                <div className="grid grid-cols-3 gap-2">
-                  {patient.photos?.map((photo, i) => (
-                    <div
-                      key={i}
-                      className="aspect-square rounded-lg bg-center bg-cover border border-gray-100 cursor-pointer hover:opacity-80 transition-opacity"
-                      style={{ backgroundImage: `url(${photo})` }}
-                    ></div>
-                  ))}
-                  <div className="aspect-square rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-400 cursor-pointer hover:bg-gray-200 transition-colors">
-                    <span className="material-symbols-outlined">add</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-primary/5 dark:bg-primary/10 rounded-xl border border-primary/10 shadow-sm p-6 max-h-[500px] overflow-y-auto custom-scrollbar">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-primary font-bold text-lg">Notas da Equipe</h3>
-                <span className="material-symbols-outlined text-primary text-xl">sticky_note_2</span>
-              </div>
-
-              <div className="space-y-3 mb-4">
-                {(!notes || notes.length === 0) ? (
-                  <p className="text-sm text-gray-500 italic text-center py-4">Nenhuma nota registrada.</p>
-                ) : (
-                  notes?.map((note) => (
-                    <div key={note.id} className="bg-white dark:bg-gray-800 p-3 rounded-lg border border-primary/10 shadow-sm">
-                      <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed mb-2">
-                        "{note.content}"
-                      </p>
-                      <div className="flex justify-between items-center">
-                        <span className="text-[10px] font-bold text-primary/60 uppercase">{note.created_by || 'Equipe'}</span>
-                        <span className="text-[10px] text-gray-400">{new Date(note.created_at).toLocaleDateString()} {new Date(note.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                      </div>
+            <div className="lg:col-span-4 space-y-6">
+              <PatientMiniCalendar patientId={patient.id} patientName={patient.name} />
+              <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 shadow-sm p-6">
+                <h3 className="text-gray-900 dark:text-white font-bold text-lg mb-4">Informações do Paciente</h3>
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-green-50 dark:bg-green-900/20 flex items-center justify-center text-green-600">
+                      <span className="material-symbols-outlined">call</span>
                     </div>
-                  ))
+                    <div>
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none mb-1">WhatsApp</p>
+                      <a className="text-gray-900 dark:text-white font-bold text-sm hover:text-primary" href={`tel:${patient.phone}`}>{patient.phone}</a>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center text-blue-600">
+                      <span className="material-symbols-outlined">mail</span>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none mb-1">E-mail</p>
+                      <p className="text-gray-900 dark:text-white font-bold text-sm">{patient.email}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-amber-50 dark:bg-amber-900/20 flex items-center justify-center text-amber-600">
+                      <span className="material-symbols-outlined">cake</span>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none mb-1">Data de Nascimento</p>
+                      <p className="text-gray-900 dark:text-white font-bold text-sm">{patient.dob}</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-6 pt-6 border-t border-gray-100 dark:border-gray-800">
+                  <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Fotos Recentes</h4>
+                  <div className="grid grid-cols-3 gap-2">
+                    {photos?.map((photo, i) => (
+                      <img
+                        key={photo.id || i}
+                        src={photo.photoUrl}
+                        alt="Foto recente"
+                        className="aspect-square rounded-lg bg-center bg-cover border border-gray-100 cursor-pointer hover:opacity-80 transition-opacity object-cover w-full h-full"
+                      />
+                    ))}
+                    <button type="button" className="aspect-square rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-400 cursor-pointer hover:bg-gray-200 transition-colors w-full">
+                      <span className="material-symbols-outlined">add</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-primary/5 dark:bg-primary/10 rounded-xl border border-primary/10 shadow-sm p-6 max-h-[500px] overflow-y-auto custom-scrollbar">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-primary font-bold text-lg">Notas da Equipe</h3>
+                  <span className="material-symbols-outlined text-primary text-xl">sticky_note_2</span>
+                </div>
+
+                <div className="space-y-3 mb-4">
+                  {(!notes || notes.length === 0) ? (
+                    <p className="text-sm text-gray-500 italic text-center py-4">Nenhuma nota registrada.</p>
+                  ) : (
+                    notes?.map((note) => (
+                      <div key={note.id} className="bg-white dark:bg-gray-800 p-3 rounded-lg border border-primary/10 shadow-sm">
+                        <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed mb-2">
+                          "{note.content}"
+                        </p>
+                        <div className="flex justify-between items-center">
+                          <span className="text-[10px] font-bold text-primary/60 uppercase">{note.created_by || 'Equipe'}</span>
+                          <span className="text-[10px] text-gray-400">{new Date(note.created_at).toLocaleDateString()} {new Date(note.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {isAddingNote ? (
+                  <div className="space-y-2 animate-in fade-in slide-in-from-bottom-2">
+                    <textarea
+                      className="w-full text-sm p-3 rounded-lg border-2 border-primary/20 focus:border-primary outline-none bg-white dark:bg-gray-800 min-h-[80px]"
+                      placeholder="Digite a nota..."
+                      value={newNote}
+                      onChange={(e) => setNewNote(e.target.value)}
+                      autoFocus
+                    ></textarea>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setIsAddingNote(false)}
+                        className="flex-1 py-2 bg-gray-100 text-gray-600 text-xs font-bold rounded-lg hover:bg-gray-200 transition-colors"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        onClick={handleAddNote}
+                        disabled={!newNote.trim()}
+                        className="flex-1 py-2 bg-primary text-white text-xs font-bold rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50"
+                      >
+                        Salvar Nota
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setIsAddingNote(true)}
+                    className="w-full py-2 bg-white dark:bg-gray-800 border border-primary/20 text-primary text-xs font-bold rounded-lg hover:bg-primary/5 transition-colors"
+                  >
+                    ADICIONAR NOVA NOTA
+                  </button>
                 )}
               </div>
-
-              {isAddingNote ? (
-                <div className="space-y-2 animate-in fade-in slide-in-from-bottom-2">
-                  <textarea
-                    className="w-full text-sm p-3 rounded-lg border-2 border-primary/20 focus:border-primary outline-none bg-white dark:bg-gray-800 min-h-[80px]"
-                    placeholder="Digite a nota..."
-                    value={newNote}
-                    onChange={(e) => setNewNote(e.target.value)}
-                    autoFocus
-                  ></textarea>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setIsAddingNote(false)}
-                      className="flex-1 py-2 bg-gray-100 text-gray-600 text-xs font-bold rounded-lg hover:bg-gray-200 transition-colors"
-                    >
-                      Cancelar
-                    </button>
-                    <button
-                      onClick={handleAddNote}
-                      disabled={!newNote.trim()}
-                      className="flex-1 py-2 bg-primary text-white text-xs font-bold rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50"
-                    >
-                      Salvar Nota
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <button
-                  onClick={() => setIsAddingNote(true)}
-                  className="w-full py-2 bg-white dark:bg-gray-800 border border-primary/20 text-primary text-xs font-bold rounded-lg hover:bg-primary/5 transition-colors"
-                >
-                  ADICIONAR NOVA NOTA
-                </button>
-              )}
             </div>
           </div>
-        </div >
-      )}
+        )
+      }
 
 
 
@@ -1720,119 +1727,125 @@ const PatientDetails: React.FC<PatientDetailsProps> = ({
 
       {/* Audit Log Modal */}
 
-      {showLogs && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden">
-            <div className="p-4 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center bg-gray-50/50 dark:bg-gray-900/50">
-              <h3 className="font-bold text-lg text-gray-800 dark:text-gray-100 flex items-center gap-2">
-                <span className="material-symbols-outlined text-primary">history</span>
-                Histórico de Ações
-              </h3>
-              <button
-                onClick={() => setShowLogs(false)}
-                className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors"
-              >
-                <span className="material-symbols-outlined text-gray-500">close</span>
-              </button>
-            </div>
+      {
+        showLogs && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden">
+              <div className="p-4 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center bg-gray-50/50 dark:bg-gray-900/50">
+                <h3 className="font-bold text-lg text-gray-800 dark:text-gray-100 flex items-center gap-2">
+                  <span className="material-symbols-outlined text-primary">history</span>
+                  Histórico de Ações
+                </h3>
+                <button
+                  onClick={() => setShowLogs(false)}
+                  className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors"
+                >
+                  <span className="material-symbols-outlined text-gray-500">close</span>
+                </button>
+              </div>
 
-            <div className="flex-1 overflow-y-auto p-0">
-              {loadingLogs ? (
-                <div className="p-8 text-center text-gray-500 flex flex-col items-center gap-2">
-                  <span className="material-symbols-outlined animate-spin text-2xl">sync</span>
-                  Carregando histórico...
-                </div>
-              ) : (!treatmentLogs || treatmentLogs.length === 0) ? (
-                <div className="p-12 text-center text-gray-400 flex flex-col items-center gap-3">
-                  <span className="material-symbols-outlined text-4xl opacity-50">history_toggle_off</span>
-                  <p>Nenhuma ação registrada neste tratamento.</p>
-                </div>
-              ) : (
-                <div className="divide-y divide-gray-100 dark:divide-gray-700">
-                  {treatmentLogs?.map((log) => (
-                    <div key={log.id} className="p-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors flex gap-3 items-start">
-                      <div className={`mt-0.5 size-8 rounded-full flex items-center justify-center shrink-0 ${log.action.includes('completed') ? 'bg-green-100 text-green-600' :
-                        log.action.includes('message') ? 'bg-blue-100 text-blue-600' :
-                          log.action.includes('response') ? 'bg-purple-100 text-purple-600' :
-                            'bg-gray-100 text-gray-600'
-                        }`}>
-                        <span className="material-symbols-outlined text-sm">
-                          {log.action.includes('completed') ? 'check_circle' :
-                            log.action.includes('message') ? 'chat' :
-                              log.action.includes('response') ? 'forum' : 'info'}
-                        </span>
-                      </div>
-                      <div className="flex-1 space-y-1">
-                        <p className="text-sm text-gray-800 dark:text-gray-200 font-medium leading-tight">
-                          {log.description}
-                        </p>
-                        <div className="flex items-center gap-2 text-xs text-gray-500">
-                          <span className="flex items-center gap-1">
-                            <span className="material-symbols-outlined text-[10px]">calendar_today</span>
-                            {new Date(log.created_at).toLocaleString()}
+              <div className="flex-1 overflow-y-auto p-0">
+                {loadingLogs ? (
+                  <div className="p-8 text-center text-gray-500 flex flex-col items-center gap-2">
+                    <span className="material-symbols-outlined animate-spin text-2xl">sync</span>
+                    Carregando histórico...
+                  </div>
+                ) : (!treatmentLogs || treatmentLogs.length === 0) ? (
+                  <div className="p-12 text-center text-gray-400 flex flex-col items-center gap-3">
+                    <span className="material-symbols-outlined text-4xl opacity-50">history_toggle_off</span>
+                    <p>Nenhuma ação registrada neste tratamento.</p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-gray-100 dark:divide-gray-700">
+                    {treatmentLogs?.map((log) => (
+                      <div key={log.id} className="p-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors flex gap-3 items-start">
+                        <div className={`mt-0.5 size-8 rounded-full flex items-center justify-center shrink-0 ${log.action.includes('completed') ? 'bg-green-100 text-green-600' :
+                          log.action.includes('message') ? 'bg-blue-100 text-blue-600' :
+                            log.action.includes('response') ? 'bg-purple-100 text-purple-600' :
+                              'bg-gray-100 text-gray-600'
+                          }`}>
+                          <span className="material-symbols-outlined text-sm">
+                            {log.action.includes('completed') ? 'check_circle' :
+                              log.action.includes('message') ? 'chat' :
+                                log.action.includes('response') ? 'forum' : 'info'}
                           </span>
-                          {log.metadata?.user_email && (
-                            <>
-                              <span>•</span>
-                              <span className="flex items-center gap-1" title={log.metadata.user_email}>
-                                <span className="material-symbols-outlined text-[10px]">person</span>
-                                {log.metadata.user_email.split('@')[0]}
-                              </span>
-                            </>
-                          )}
+                        </div>
+                        <div className="flex-1 space-y-1">
+                          <p className="text-sm text-gray-800 dark:text-gray-200 font-medium leading-tight">
+                            {log.description}
+                          </p>
+                          <div className="flex items-center gap-2 text-xs text-gray-500">
+                            <span className="flex items-center gap-1">
+                              <span className="material-symbols-outlined text-[10px]">calendar_today</span>
+                              {new Date(log.created_at).toLocaleString()}
+                            </span>
+                            {log.metadata?.user_email && (
+                              <>
+                                <span>•</span>
+                                <span className="flex items-center gap-1" title={log.metadata.user_email}>
+                                  <span className="material-symbols-outlined text-[10px]">person</span>
+                                  {log.metadata.user_email.split('@')[0]}
+                                </span>
+                              </>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      }
 
       {/* Remove Tag Confirmation Modal */}
-      {isRemoveTagModalOpen && activeTagToRemove && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white dark:bg-[#2d181e] rounded-2xl shadow-2xl max-w-sm w-full p-6 border border-[#f3e7ea] dark:border-[#3d242a]">
-            {/* ... modal content ... */}
-            <div className="flex flex-col items-center text-center gap-4">
-              <div className="size-14 rounded-full bg-red-100 text-red-500 flex items-center justify-center mb-1">
-                <span className="material-symbols-outlined text-3xl">delete</span>
-              </div>
-              <h3 className="text-xl font-bold text-[#1b0d11] dark:text-white">Remover Etiqueta?</h3>
-              <p className="text-gray-600 dark:text-gray-300 text-sm">
-                Deseja remover a etiqueta <span className="font-bold" style={{ color: activeTagToRemove.color }}>"{activeTagToRemove.name}"</span> deste paciente?
-              </p>
+      {
+        isRemoveTagModalOpen && activeTagToRemove && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in">
+            <div className="bg-white dark:bg-[#2d181e] rounded-2xl shadow-2xl max-w-sm w-full p-6 border border-[#f3e7ea] dark:border-[#3d242a]">
+              {/* ... modal content ... */}
+              <div className="flex flex-col items-center text-center gap-4">
+                <div className="size-14 rounded-full bg-red-100 text-red-500 flex items-center justify-center mb-1">
+                  <span className="material-symbols-outlined text-3xl">delete</span>
+                </div>
+                <h3 className="text-xl font-bold text-[#1b0d11] dark:text-white">Remover Etiqueta?</h3>
+                <p className="text-gray-600 dark:text-gray-300 text-sm">
+                  Deseja remover a etiqueta <span className="font-bold text-[color:var(--tag-color)]" style={{ '--tag-color': activeTagToRemove.color } as React.CSSProperties}>"{activeTagToRemove.name}"</span> deste paciente?
+                </p>
 
-              <div className="flex w-full gap-3 mt-4">
-                <button
-                  onClick={() => setIsRemoveTagModalOpen(false)}
-                  className="flex-1 py-2.5 font-bold text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-[#3d242a] rounded-xl transition-colors text-sm"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={handleConfirmRemoveTag}
-                  className="flex-1 py-2.5 font-bold text-white bg-red-500 hover:bg-red-600 rounded-xl shadow-lg shadow-red-500/20 transition-all text-sm"
-                >
-                  Remover
-                </button>
+                <div className="flex w-full gap-3 mt-4">
+                  <button
+                    onClick={() => setIsRemoveTagModalOpen(false)}
+                    className="flex-1 py-2.5 font-bold text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-[#3d242a] rounded-xl transition-colors text-sm"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={handleConfirmRemoveTag}
+                    className="flex-1 py-2.5 font-bold text-white bg-red-500 hover:bg-red-600 rounded-xl shadow-lg shadow-red-500/20 transition-all text-sm"
+                  >
+                    Remover
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      }
 
       {/* Toast Notification */}
-      {toast && (
-        <Toast
-          message={toast.message}
-          type={toast.type}
-          onClose={() => setToast(null)}
-        />
-      )}
-    </div>
+      {
+        toast && (
+          <Toast
+            message={toast.message}
+            type={toast.type}
+            onClose={() => setToast(null)}
+          />
+        )
+      }
+    </div >
   );
 };
 

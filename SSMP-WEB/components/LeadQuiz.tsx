@@ -54,12 +54,18 @@ const LeadQuiz: React.FC<LeadQuizProps> = ({ onBackendComplete }) => {
 
     const [questions, setQuestions] = useState<any[]>([]);
     const [clinicId, setClinicId] = useState<string | null>(null);
+    const [campaignId, setCampaignId] = useState<string | null>(null);
 
-    // Read clinic slug from URL and lookup clinic ID
+    // Read clinic slug and campaign from URL
     useEffect(() => {
-        const loadClinicFromUrl = async () => {
+        const loadContextFromUrl = async () => {
             const urlParams = new URLSearchParams(window.location.search);
             const clinicSlug = urlParams.get('clinic');
+            const campaignParam = urlParams.get('campaign');
+
+            if (campaignParam) {
+                setCampaignId(campaignParam);
+            }
 
             if (clinicSlug) {
                 try {
@@ -78,12 +84,12 @@ const LeadQuiz: React.FC<LeadQuizProps> = ({ onBackendComplete }) => {
                 }
             }
         };
-        loadClinicFromUrl();
+        loadContextFromUrl();
     }, []);
 
     useEffect(() => {
         loadQuestions();
-    }, []);
+    }, [campaignId]); // Reload if campaignId is set (after initial mount)
 
     const loadQuestions = async () => {
         const INITIAL_QUESTIONS = [
@@ -199,7 +205,42 @@ const LeadQuiz: React.FC<LeadQuizProps> = ({ onBackendComplete }) => {
 
         try {
             setLoading(true);
-            const config = await supabaseService.getQuizConfig();
+            let config = null;
+
+            if (campaignId) {
+                console.log('LeadQuiz: Fetching campaign config for:', campaignId);
+                const { data: campaign, error } = await supabase
+                    .from('campaigns')
+                    .select('quiz_config, external_quiz_url, clinic_id') // Added clinic_id
+                    .eq('id', campaignId)
+                    .single();
+
+                if (error) {
+                    console.error('LeadQuiz: Error fetching campaign', error);
+                } else if (campaign) {
+                    // Set clinic ID from campaign if available
+                    if (campaign.clinic_id) {
+                        setClinicId(campaign.clinic_id);
+                        console.log('LeadQuiz: Set clinicId from campaign:', campaign.clinic_id);
+                    }
+
+                    if (campaign.external_quiz_url) {
+                        console.log('LeadQuiz: Redirecting to external URL:', campaign.external_quiz_url);
+                        window.location.href = campaign.external_quiz_url;
+                        return; // Stop loading logic
+                    }
+                    if (campaign.quiz_config) {
+                        config = campaign.quiz_config;
+                    }
+                }
+            }
+
+            // Fallback to global config if no campaign config
+            if (!config) {
+                console.log('LeadQuiz: Fetching global config');
+                config = await supabaseService.getQuizConfig();
+            }
+
             console.log('LeadQuiz - Config loaded:', config);
 
             if (config) {
@@ -310,10 +351,10 @@ const LeadQuiz: React.FC<LeadQuizProps> = ({ onBackendComplete }) => {
     const submitQuiz = async () => {
         setLoading(true);
         try {
-            console.log('Submitting Quiz...', data, 'clinicId:', clinicId);
+            console.log('Submitting Quiz...', data, 'clinicId:', clinicId, 'campaignId:', campaignId);
 
             const { data: result, error } = await supabase.functions.invoke('new-lead', {
-                body: { ...data, clinic_id: clinicId }
+                body: { ...data, clinic_id: clinicId, campaign_id: campaignId }
             });
 
             if (error) throw error;
@@ -366,6 +407,35 @@ const LeadQuiz: React.FC<LeadQuizProps> = ({ onBackendComplete }) => {
             } else {
                 console.warn('LeadQuiz: Could not identify lead ID in result to apply fix.', result);
             }
+
+            // --- Campaign Attribution Fallback ---
+            // Explicitly update campaign_id if present using SECURITY DEFINER RPC
+            if (campaignId && leadData && leadData.id) {
+                try {
+                    console.log('LeadQuiz: Applying Campaign Attribution Fallback (RPC) ->', campaignId);
+                    await supabaseService.assignLeadToCampaign(leadData.id, campaignId);
+
+                    // --- Ensure Deal (Negocio) Exists & Linked (Security RPC) ---
+                    // Using RPC to bypass RLS and ensure deal creation
+                    try {
+                        console.log('LeadQuiz: Ensuring Deal Exists via RPC...');
+                        await supabaseService.ensureDealForLead(
+                            leadData.id,
+                            clinicId,
+                            campaignId,
+                            leadData.name || 'Lead sem nome'
+                        );
+                        console.log('LeadQuiz: Deal ensured successfully.');
+                    } catch (dealError) {
+                        console.error('LeadQuiz: Error ensuring deal via RPC', dealError);
+                    }
+                    // ---------------------------------------------
+
+                } catch (campaignError) {
+                    console.error('LeadQuiz: Error applying campaign attribution fallback', campaignError);
+                }
+            }
+            // -------------------------------------
             // -----------------------------------------------------------------------
 
             console.log('Lead created successfully:', result);
@@ -388,8 +458,6 @@ const LeadQuiz: React.FC<LeadQuizProps> = ({ onBackendComplete }) => {
             window.location.href = finalScreenConfig.buttonUrl;
         } else {
             // 'none' or default fallback if no URL
-            // Do nothing, or maybe show a toast?
-            // "Finalizar" might mean just let the user leave the page manually.
         }
     };
 

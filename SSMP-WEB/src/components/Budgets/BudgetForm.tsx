@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { supabaseService } from '../../services/supabaseService';
 import { Patient, Procedure, Budget } from '../../../types';
+import { CurrencyInput } from '../ui/CurrencyInput';
 import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { toast } from 'react-hot-toast';
 
@@ -25,6 +26,7 @@ interface BudgetFormData {
         sessions: number;
         unit?: string;
         discount?: number;
+        discount_percent?: number;
         total_price: number;
         allows_sessions: boolean;
     }[];
@@ -34,6 +36,7 @@ interface BudgetFormData {
         installments?: number;
         card_fee_percent?: number;
         discount?: number;
+        discount_percent?: number;
     }[];
 }
 
@@ -43,33 +46,85 @@ export const BudgetForm: React.FC<BudgetFormProps> = ({ initialData, onSave, onC
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
 
+    // Patient Search State
+    const [patientSearchTerm, setPatientSearchTerm] = useState('');
+    const [isPatientDropdownOpen, setIsPatientDropdownOpen] = useState(false);
+    const searchContainerRef = useRef<HTMLDivElement>(null);
+
+    const filteredPatients = useMemo(() => {
+        if (!patientSearchTerm) return patients;
+        return patients.filter(p => p.name.toLowerCase().includes(patientSearchTerm.toLowerCase()));
+    }, [patients, patientSearchTerm]);
+
+    // Close dropdown when clicking outside
+    useEffect(() => {
+        function handleClickOutside(event: MouseEvent) {
+            if (searchContainerRef.current && !searchContainerRef.current.contains(event.target as Node)) {
+                setIsPatientDropdownOpen(false);
+            }
+        }
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => {
+            document.removeEventListener("mousedown", handleClickOutside);
+        };
+    }, []);
+
+    // Set initial patient name if editing
+    useEffect(() => {
+        if (initialData?.patient_id && patients.length > 0) {
+            const p = patients.find(p => p.id === initialData.patient_id);
+            if (p) {
+                setPatientSearchTerm(p.name);
+            }
+        }
+    }, [initialData, patients]);
+
     // Computed totals
     const [subtotal, setSubtotal] = useState(0);
     const [totalWithFee, setTotalWithFee] = useState(0);
     const [remainingBalance, setRemainingBalance] = useState(0);
 
-    const { control, register, handleSubmit, watch, setValue, formState: { errors } } = useForm<BudgetFormData>({
+    // Confirmation Modal State
+    const [showDiscountConfirm, setShowDiscountConfirm] = useState(false);
+    const [pendingDiscount, setPendingDiscount] = useState<{ index: number, percent: number } | null>(null);
+
+    // Validation Error Modal State
+    const [errorModal, setErrorModal] = useState<{ visible: boolean; message: string }>({ visible: false, message: '' });
+
+    const { control, register, handleSubmit, watch, setValue, getValues, formState: { errors } } = useForm<BudgetFormData>({
         defaultValues: {
             patient_id: initialData?.patient_id || '',
             status: initialData?.status || 'draft',
             payment_method: initialData?.payment_method || 'pix',
             installments: initialData?.installments || 1,
             card_fee_percent: initialData?.card_fee_percent || 0,
-            valid_until: initialData?.valid_until || new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 15 days default
-            items: initialData?.items?.map(i => ({
-                procedure_id: i.procedure_id || '',
-                procedure_name_snapshot: i.procedure_name_snapshot,
-                description_snapshot: i.description_snapshot,
-                unit_price: i.unit_price,
-                sessions: i.sessions,
-                unit: i.unit || 'sessions', // Default to 'sessions'
-                discount: i.discount || 0,
-                total_price: i.total_price,
-                allows_sessions: true // We'll update this when loading procedures, default true to avoid hiding
-            })) || [],
+            valid_until: initialData?.valid_until || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 days default
+            items: initialData?.items?.map(i => {
+                const totalBase = (i.unit_price * i.sessions);
+
+                // Robust calculation: If discount is missing but total_price is lower than base, calculate it.
+                let currentDiscount = i.discount || 0;
+                if (currentDiscount === 0 && i.total_price && i.total_price < totalBase) {
+                    currentDiscount = totalBase - i.total_price;
+                }
+
+                return {
+                    procedure_id: i.procedure_id || '',
+                    procedure_name_snapshot: i.procedure_name_snapshot,
+                    description_snapshot: i.description_snapshot,
+                    unit_price: i.unit_price,
+                    sessions: i.sessions,
+                    unit: i.unit || 'sessions', // Default to 'sessions'
+                    discount: currentDiscount,
+                    discount_percent: totalBase > 0 ? (currentDiscount / totalBase) * 100 : 0,
+                    total_price: i.total_price,
+                    allows_sessions: true // We'll update this when loading procedures, default true to avoid hiding
+                };
+            }) || [],
             payment_methods: initialData?.payment_methods?.map(pm => ({
                 ...pm,
-                discount: pm.discount || 0
+                discount: pm.discount || 0,
+                discount_percent: (pm.amount || 0) > 0 ? ((pm.discount || 0) / (pm.amount || 0)) * 100 : 0
             })) || []
         }
     });
@@ -117,15 +172,29 @@ export const BudgetForm: React.FC<BudgetFormProps> = ({ initialData, onSave, onC
         setSubtotal(sub);
 
         let totalFee = 0;
+        let totalPaymentDiscounts = 0;
         const totalPayments = watchedPaymentMethods.reduce((acc, pm) => {
+            let paymentValue = Number(pm.amount) || 0;
+            const discount = Number(pm.discount) || 0;
+            totalPaymentDiscounts += discount;
+
             if (pm.method === 'credit_card' && (pm.card_fee_percent || 0) > 0) {
-                totalFee += (pm.amount || 0) * ((pm.card_fee_percent || 0) / 100);
+                // Fee is calculated on NET value (Amount - Discount)
+                const netValue = Math.max(0, paymentValue - discount);
+                const fee = netValue * ((pm.card_fee_percent || 0) / 100);
+                totalFee += fee;
+                // Add fee to the payment value for balancing purposes
+                paymentValue += fee;
             }
-            return acc + (Number(pm.amount) || 0);
+            // Subtract discount to get the actual Net Payment Value contributing to the debt
+            paymentValue -= discount;
+
+            return acc + paymentValue;
         }, 0);
 
-        const currentTotal = sub + totalFee;
+        const currentTotal = sub + totalFee - totalPaymentDiscounts;
         setTotalWithFee(currentTotal);
+        // Use a small epsilon for floating point comparison if needed, but Math.max(0, ...) handles negative
         setRemainingBalance(Math.max(0, currentTotal - totalPayments));
     };
 
@@ -147,6 +216,7 @@ export const BudgetForm: React.FC<BudgetFormProps> = ({ initialData, onSave, onC
             sessions: sessions,
             unit: 'sessions', // Default unit
             discount: discount,
+            discount_percent: 0,
             total_price: totalPrice,
             allows_sessions: procedure.allows_sessions || false
         });
@@ -166,53 +236,71 @@ export const BudgetForm: React.FC<BudgetFormProps> = ({ initialData, onSave, onC
         const item = watchedItems[index];
         if (!item) return;
         const safePrice = Math.max(0, price);
-        let totalPrice = 0;
 
-        if (item) {
-            totalPrice = (safePrice * item.sessions) - (item.discount || 0);
-            if (totalPrice < 0) totalPrice = 0;
-        }
+        const sessions = item.sessions || 1;
+        const discountPercent = item.discount_percent || 0;
 
-        updateItem(index, {
-            ...item,
-            unit_price: safePrice,
-            total_price: totalPrice
-        });
+        const totalBase = safePrice * sessions;
+        const discountValue = totalBase * (discountPercent / 100);
+        const totalPrice = Math.max(0, totalBase - discountValue);
+
+        setValue(`items.${index}.discount`, discountValue);
+        setValue(`items.${index}.total_price`, totalPrice);
     };
 
     const onSessionsChange = (index: number, sessions: number) => {
         const item = watchedItems[index];
         if (!item) return;
 
-        // Ensure sessions is at least 1
         const safeSessions = Math.max(1, sessions);
+        const unitPrice = item.unit_price || 0;
+        const discountPercent = item.discount_percent || 0;
 
-        let totalPrice = 0;
-        if (item) {
-            totalPrice = (item.unit_price * safeSessions) - (item.discount || 0);
-            if (totalPrice < 0) totalPrice = 0;
-        }
+        const totalBase = unitPrice * safeSessions;
+        const discountValue = totalBase * (discountPercent / 100);
+        const totalPrice = Math.max(0, totalBase - discountValue);
 
-        updateItem(index, {
-            ...item,
-            sessions: safeSessions,
-            total_price: totalPrice
-        });
+        setValue(`items.${index}.discount`, discountValue);
+        setValue(`items.${index}.total_price`, totalPrice);
     };
 
-    const onDiscountChange = (index: number, discount: number) => {
+    const applyDiscount = (index: number, percent: number) => {
         const item = watchedItems[index];
         if (!item) return;
 
-        const safeDiscount = Math.max(0, discount);
-        let totalPrice = (item.unit_price * item.sessions) - safeDiscount;
-        if (totalPrice < 0) totalPrice = 0;
+        const safePercent = Math.max(0, percent);
+        const unitPrice = item.unit_price || 0;
+        const sessions = item.sessions || 1;
 
-        updateItem(index, {
-            ...item,
-            discount: safeDiscount,
-            total_price: totalPrice
-        });
+        const totalBase = unitPrice * sessions;
+        const discountValue = totalBase * (safePercent / 100);
+        const totalPrice = Math.max(0, totalBase - discountValue);
+
+        setValue(`items.${index}.discount`, discountValue);
+        setValue(`items.${index}.total_price`, totalPrice);
+    };
+
+    const onDiscountChange = (index: number, percent: number) => {
+        if (watchedPaymentMethods.length > 0) {
+            setPendingDiscount({ index, percent });
+            setShowDiscountConfirm(true);
+        } else {
+            applyDiscount(index, percent);
+        }
+    };
+
+    const confirmDiscountChange = () => {
+        if (!pendingDiscount) return;
+
+        // Clear payment methods
+        setValue('payment_methods', []);
+
+        // Apply the pending discount
+        applyDiscount(pendingDiscount.index, pendingDiscount.percent);
+
+        // Reset state
+        setShowDiscountConfirm(false);
+        setPendingDiscount(null);
     };
 
     const onSubmit = async (data: BudgetFormData) => {
@@ -221,10 +309,36 @@ export const BudgetForm: React.FC<BudgetFormProps> = ({ initialData, onSave, onC
             return;
         }
 
+        // Calculate expected totals based on current data
+        const subTotal = data.items.reduce((acc, item) => acc + (Number(item.total_price) || 0), 0);
+        const totalPaymentDiscounts = data.payment_methods.reduce((acc, pm) => acc + (Number(pm.discount) || 0), 0);
+
+        let totalFees = 0;
+        const totalPayments = data.payment_methods.reduce((acc, pm) => {
+            let paymentValue = Number(pm.amount) || 0;
+            const discount = Number(pm.discount) || 0;
+
+            if (pm.method === 'credit_card' && (pm.card_fee_percent || 0) > 0) {
+                // Fee is calculated on NET value (Amount - Discount)
+                const netValue = Math.max(0, paymentValue - discount);
+                const fee = netValue * ((Number(pm.card_fee_percent) || 0) / 100);
+                totalFees += fee;
+                paymentValue += fee;
+            }
+            // Subtract discount to get the actual Net Payment Value contributing to the debt
+            paymentValue -= discount;
+
+            return acc + paymentValue;
+        }, 0);
+
+        const expectedTotal = subTotal + totalFees - totalPaymentDiscounts;
+
         if (data.payment_methods.length > 0) {
-            const totalPayments = data.payment_methods.reduce((acc, pm) => acc + (Number(pm.amount) || 0), 0);
-            if (Math.abs(totalPayments - totalWithFee) > 0.05) {
-                toast.error(`A soma dos pagamentos (R$ ${totalPayments.toFixed(2)}) deve ser igual ao total (R$ ${totalWithFee.toFixed(2)}).`);
+            if (Math.abs(totalPayments - expectedTotal) > 0.05) {
+                setErrorModal({
+                    visible: true,
+                    message: `A soma dos pagamentos (comp. taxas) (R$ ${totalPayments.toFixed(2)}) deve ser igual ao total (R$ ${expectedTotal.toFixed(2)}).`
+                });
                 return;
             }
         }
@@ -239,8 +353,8 @@ export const BudgetForm: React.FC<BudgetFormProps> = ({ initialData, onSave, onC
                 installments: data.payment_methods[0]?.installments || 1,
                 card_fee_percent: data.payment_methods[0]?.card_fee_percent || 0,
 
-                subtotal: subtotal,
-                total_with_fee: totalWithFee,
+                subtotal: subTotal,
+                total_with_fee: expectedTotal,
                 valid_until: data.valid_until,
                 payment_methods: data.payment_methods // New JSONB field
             };
@@ -287,27 +401,82 @@ export const BudgetForm: React.FC<BudgetFormProps> = ({ initialData, onSave, onC
                 </button>
             </div>
 
-            <form onSubmit={handleSubmit(onSubmit)} className="p-6 flex-1 overflow-y-auto custom-scrollbar">
+            <form onSubmit={handleSubmit(onSubmit, (errors) => {
+                console.error('Validation Errors:', errors);
+                setErrorModal({
+                    visible: true,
+                    message: 'Verifique os campos obrigatórios destacados em vermelho.'
+                });
+            })} className="p-6 flex-1 overflow-y-auto custom-scrollbar">
                 {/* Helper to debug */}
                 {/* <pre>{JSON.stringify(watchedItems, null, 2)}</pre> */}
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                     <div className="col-span-1">
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Paciente</label>
+                        <label htmlFor="patient_search_budget" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Paciente</label>
                         <Controller
                             control={control}
                             name="patient_id"
                             rules={{ required: 'Selecione um paciente' }}
                             render={({ field }) => (
-                                <select
-                                    {...field}
-                                    className="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:ring-primary focus:border-primary"
-                                >
-                                    <option value="">Selecione...</option>
-                                    {patients.map(p => (
-                                        <option key={p.id} value={p.id}>{p.name}</option>
-                                    ))}
-                                </select>
+                                <div className="relative" ref={searchContainerRef}>
+                                    <div className="relative">
+                                        <input
+                                            id="patient_search_budget"
+                                            type="text"
+                                            value={patientSearchTerm}
+                                            onChange={(e) => {
+                                                setPatientSearchTerm(e.target.value);
+                                                setIsPatientDropdownOpen(true);
+                                                if (e.target.value === '') {
+                                                    field.onChange(''); // Clear form value
+                                                }
+                                            }}
+                                            onFocus={() => setIsPatientDropdownOpen(true)}
+                                            onClick={() => setIsPatientDropdownOpen(true)}
+                                            placeholder="Digite para buscar paciente..."
+                                            className="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:ring-primary focus:border-primary pr-10"
+                                            autoComplete="off"
+                                        />
+                                        <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                                            <span className="material-symbols-outlined text-gray-400">search</span>
+                                        </div>
+
+                                        {/* Dropdown Results */}
+                                        {isPatientDropdownOpen && (
+                                            <ul className="absolute z-[70] w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-auto focus:outline-none animate-in fade-in zoom-in-95 duration-100">
+                                                {filteredPatients.length > 0 ? (
+                                                    filteredPatients.map(p => (
+                                                        <li
+                                                            key={p.id}
+                                                            className="text-gray-900 dark:text-white cursor-pointer select-none relative py-2 pl-3 pr-9 hover:bg-primary/10 dark:hover:bg-primary/20 transition-colors"
+                                                            onClick={() => {
+                                                                field.onChange(p.id); // Update form value
+                                                                setPatientSearchTerm(p.name);
+                                                                setIsPatientDropdownOpen(false);
+                                                            }}
+                                                        >
+                                                            <div className="flex items-center">
+                                                                <span className="font-medium block truncate">
+                                                                    {p.name}
+                                                                </span>
+                                                            </div>
+                                                            {field.value === p.id && (
+                                                                <span className="text-primary absolute inset-y-0 right-0 flex items-center pr-4">
+                                                                    <span className="material-symbols-outlined text-sm">check</span>
+                                                                </span>
+                                                            )}
+                                                        </li>
+                                                    ))
+                                                ) : (
+                                                    <li className="text-gray-500 dark:text-gray-400 cursor-default select-none py-2 pl-3 pr-9 text-center text-sm">
+                                                        Nenhum paciente encontrado
+                                                    </li>
+                                                )}
+                                            </ul>
+                                        )}
+                                    </div>
+                                </div>
                             )}
                         />
                         {errors.patient_id && <p className="text-red-500 text-xs mt-1">{errors.patient_id.message}</p>}
@@ -408,8 +577,10 @@ export const BudgetForm: React.FC<BudgetFormProps> = ({ initialData, onSave, onC
                                                 type="number"
                                                 min="0"
                                                 step="0.01"
-                                                value={watchedItems[index]?.unit_price || 0}
-                                                onChange={(e) => onUnitPriceChange(index, parseFloat(e.target.value) || 0)}
+                                                {...register(`items.${index}.unit_price`, {
+                                                    valueAsNumber: true,
+                                                    onChange: (e) => onUnitPriceChange(index, parseFloat(e.target.value) || 0)
+                                                })}
                                                 className="w-full text-sm pl-8 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:ring-primary focus:border-primary"
                                                 aria-label="Valor Unitário"
                                                 title="Valor Unitário"
@@ -422,8 +593,10 @@ export const BudgetForm: React.FC<BudgetFormProps> = ({ initialData, onSave, onC
                                         <input
                                             type="number"
                                             min="1"
-                                            value={watchedItems[index]?.sessions || 1}
-                                            onChange={(e) => onSessionsChange(index, parseInt(e.target.value) || 1)}
+                                            {...register(`items.${index}.sessions`, {
+                                                valueAsNumber: true,
+                                                onChange: (e) => onSessionsChange(index, parseInt(e.target.value) || 1)
+                                            })}
                                             className="w-full text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:ring-primary focus:border-primary px-2"
                                             aria-label="Quantidade"
                                             title="Quantidade"
@@ -431,18 +604,20 @@ export const BudgetForm: React.FC<BudgetFormProps> = ({ initialData, onSave, onC
                                     </div>
 
                                     <div className="col-span-1">
-                                        <label className="block text-xs font-medium text-gray-500 mb-1">Desc. Item</label>
+                                        <label className="block text-xs font-medium text-gray-500 mb-1">Desc. (%)</label>
                                         <div className="relative">
-                                            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500 text-xs text-[10px]">R$</span>
+                                            {/* <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500 text-xs text-[10px]">%</span> */}
                                             <input
                                                 type="number"
                                                 min="0"
-                                                step="0.01"
-                                                value={watchedItems[index]?.discount || 0}
-                                                onChange={(e) => onDiscountChange(index, parseFloat(e.target.value) || 0)}
-                                                className="w-full text-sm pl-6 rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:ring-primary focus:border-primary" // reduced padding
-                                                aria-label="Desconto do Item"
-                                                title="Desconto do Item"
+                                                step="0.1"
+                                                {...register(`items.${index}.discount_percent`, {
+                                                    valueAsNumber: true,
+                                                    onChange: (e) => onDiscountChange(index, parseFloat(e.target.value) || 0)
+                                                })}
+                                                className="w-full text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:ring-primary focus:border-primary [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none px-2"
+                                                aria-label="Desconto do Item (%)"
+                                                title="Desconto do Item (%)"
                                             />
                                         </div>
                                     </div>
@@ -477,13 +652,28 @@ export const BudgetForm: React.FC<BudgetFormProps> = ({ initialData, onSave, onC
                         <button
                             type="button"
                             disabled={watchedItems.length === 0 || subtotal <= 0}
-                            onClick={() => appendPayment({
-                                method: 'pix',
-                                amount: remainingBalance,
-                                installments: 1,
-                                card_fee_percent: 0,
-                                discount: 0
-                            })}
+                            onClick={() => {
+                                const currentItems = getValues('items') || [];
+                                const currentPayments = getValues('payment_methods') || [];
+
+                                const sub = currentItems.reduce((acc, item) => acc + (Number(item.total_price) || 0), 0);
+
+                                // Sum of Gross Payments (ignoring discounts/fees for next payment suggestion)
+                                const paymentsSum = currentPayments.reduce((acc, pm) => {
+                                    return acc + (Number(pm.amount) || 0);
+                                }, 0);
+
+                                const balance = Math.max(0, sub - paymentsSum);
+
+                                appendPayment({
+                                    method: 'pix',
+                                    amount: balance,
+                                    installments: 1,
+                                    card_fee_percent: 0,
+                                    discount: 0,
+                                    discount_percent: 0
+                                });
+                            }}
                             className="text-primary hover:text-primary-dark font-medium text-sm flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
                             title={watchedItems.length === 0 ? 'Adicione procedimentos primeiro' : ''}
                         >
@@ -505,53 +695,89 @@ export const BudgetForm: React.FC<BudgetFormProps> = ({ initialData, onSave, onC
                                     </button>
 
                                     <div className="grid grid-cols-12 gap-3 mb-3">
-                                        <div className="col-span-4">
+                                        <div className="col-span-3">
                                             <label className="block text-xs font-medium text-gray-500 mb-1">Método</label>
                                             <select
-                                                {...register(`payment_methods.${index}.method` as const)}
+                                                {...register(`payment_methods.${index}.method` as const, {
+                                                    onChange: () => {
+                                                        // Reset fields when method changes
+                                                        setValue(`payment_methods.${index}.discount`, 0);
+                                                        setValue(`payment_methods.${index}.discount_percent`, 0);
+                                                        setValue(`payment_methods.${index}.card_fee_percent`, 0);
+                                                        setValue(`payment_methods.${index}.installments`, 1);
+                                                    }
+                                                })}
                                                 className="w-full text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                                                 aria-label="Método de Pagamento"
                                                 title="Método de Pagamento"
                                             >
                                                 <option value="pix">PIX</option>
-                                                <option value="credit_card">Cartão de Crédito</option>
+                                                <option value="credit_card">Cartão</option>
                                                 <option value="boleto">Boleto</option>
                                                 <option value="cash">Dinheiro</option>
                                             </select>
                                         </div>
-                                        <div className="col-span-4">
+                                        <div className="col-span-3">
                                             <label className="block text-xs font-medium text-gray-500 mb-1">Valor</label>
-                                            <input
-                                                type="number"
-                                                step="0.01"
-                                                {...register(`payment_methods.${index}.amount` as const, { valueAsNumber: true })}
-                                                className="w-full text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                                                placeholder="0,00"
-                                                aria-label="Valor do Pagamento"
-                                                title="Valor do Pagamento"
+                                            <Controller
+                                                control={control}
+                                                name={`payment_methods.${index}.amount`}
+                                                render={({ field }) => (
+                                                    <CurrencyInput
+                                                        value={field.value}
+                                                        onChange={(val) => {
+                                                            field.onChange(val);
+                                                            const pm = watchedPaymentMethods[index];
+                                                            const discountPercent = pm.discount_percent || 0;
+                                                            const discountValue = val * (discountPercent / 100);
+                                                            setValue(`payment_methods.${index}.discount`, discountValue);
+                                                        }}
+                                                        className="w-full text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                                        placeholder="R$ 0,00"
+                                                    />
+                                                )}
                                             />
                                         </div>
-                                        <div className="col-span-4">
-                                            <label className="block text-xs font-medium text-gray-500 mb-1">Desconto</label>
-                                            <div className="relative">
-                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">R$</span>
-                                                <input
-                                                    type="number"
-                                                    step="0.01"
-                                                    value={watchedPaymentMethods[index]?.discount || 0}
-                                                    onChange={(e) => {
+                                        <div className="col-span-2">
+                                            <label className="block text-xs font-medium text-gray-500 mb-1">Desc. (%)</label>
+                                            <input
+                                                type="number"
+                                                step="0.1"
+                                                {...register(`payment_methods.${index}.discount_percent` as const, {
+                                                    valueAsNumber: true,
+                                                    onChange: (e) => {
                                                         const val = parseFloat(e.target.value) || 0;
-                                                        const newPaymentMethods = [...watchedPaymentMethods];
-                                                        newPaymentMethods[index].discount = val;
-                                                        setValue('payment_methods', newPaymentMethods);
-                                                    }}
-                                                    className="w-full text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white pl-8"
-                                                    placeholder="0,00"
-                                                    aria-label="Desconto do Pagamento"
-                                                    title="Desconto do Pagamento"
-                                                />
-                                            </div>
+                                                        const pm = watchedPaymentMethods[index];
+                                                        const amount = pm.amount || 0;
+                                                        const discountValue = amount * (val / 100);
+                                                        setValue(`payment_methods.${index}.discount`, discountValue);
+                                                    }
+                                                })}
+                                                className="w-full text-sm rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none px-2"
+                                                placeholder="0"
+                                                aria-label="Desconto do Pagamento (%)"
+                                                title="Desconto do Pagamento (%)"
+                                            />
                                         </div>
+                                        {watchedPaymentMethods[index]?.method !== 'credit_card' && (
+                                            <div className="col-span-4">
+                                                <label className="block text-xs font-medium text-gray-500 mb-1">Valor c/ Desc.</label>
+                                                <div className="w-full text-sm py-2 px-3 bg-gray-100 dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-600 font-bold text-gray-900 dark:text-white h-[38px]">
+                                                    {(() => {
+                                                        const amount = watchedPaymentMethods[index]?.amount || 0;
+                                                        const discount = watchedPaymentMethods[index]?.discount || 0;
+
+                                                        // For non-credit card methods, there are no fees
+                                                        const finalValue = Math.max(0, amount - discount);
+
+                                                        if (discount > 0) {
+                                                            return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(finalValue);
+                                                        }
+                                                        return null;
+                                                    })()}
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
 
                                     {watchedPaymentMethods[index]?.method === 'credit_card' && (
@@ -564,7 +790,7 @@ export const BudgetForm: React.FC<BudgetFormProps> = ({ initialData, onSave, onC
                                                     aria-label="Número de Parcelas"
                                                     title="Número de Parcelas"
                                                 >
-                                                    {[1, 2, 3, 4, 5, 6, 10, 12].map(n => (
+                                                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(n => (
                                                         <option key={n} value={n}>{n}x</option>
                                                     ))}
                                                 </select>
@@ -583,6 +809,37 @@ export const BudgetForm: React.FC<BudgetFormProps> = ({ initialData, onSave, onC
                                             </div>
                                         </div>
                                     )}
+
+                                    {/* Discount and Fee Values Display */}
+                                    <div className="grid grid-cols-2 gap-4 mt-2">
+                                        {/* Value with Discount - Only for Credit Card */}
+                                        {watchedPaymentMethods[index]?.method === 'credit_card' && (watchedPaymentMethods[index]?.discount || 0) > 0 && (
+                                            <div className="col-span-1">
+                                                <label className="block text-xs font-medium text-gray-500 mb-1">Valor com Desconto</label>
+                                                <div className="w-full text-sm py-2 px-3 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-100 dark:border-red-800 font-bold text-red-600 dark:text-red-400">
+                                                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+                                                        Math.max(0, (watchedPaymentMethods[index]?.amount || 0) - (watchedPaymentMethods[index]?.discount || 0))
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Value with Fee - Only for Credit Card */}
+                                        {watchedPaymentMethods[index]?.method === 'credit_card' && (watchedPaymentMethods[index]?.card_fee_percent || 0) > 0 && (
+                                            <div className="col-span-1">
+                                                <label className="block text-xs font-medium text-gray-500 mb-1">Valor com Taxa</label>
+                                                <div className="w-full text-sm py-2 px-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-100 dark:border-amber-800 font-bold text-amber-600 dark:text-amber-500">
+                                                    {(() => {
+                                                        const amount = watchedPaymentMethods[index]?.amount || 0;
+                                                        const discount = watchedPaymentMethods[index]?.discount || 0;
+                                                        const netValue = Math.max(0, amount - discount);
+                                                        const fee = netValue * ((watchedPaymentMethods[index]?.card_fee_percent || 0) / 100);
+                                                        return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(amount + fee);
+                                                    })()}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             ))}
 
@@ -601,11 +858,32 @@ export const BudgetForm: React.FC<BudgetFormProps> = ({ initialData, onSave, onC
                                 const totalPaymentDiscounts = watchedPaymentMethods.reduce((acc, pm) => acc + (pm.discount || 0), 0);
                                 const totalFees = watchedPaymentMethods.reduce((acc, pm) => {
                                     if (pm.method === 'credit_card' && (pm.card_fee_percent || 0) > 0) {
-                                        return acc + ((pm.amount || 0) * ((pm.card_fee_percent || 0) / 100));
+                                        const amount = pm.amount || 0;
+                                        const discount = pm.discount || 0;
+                                        const netValue = Math.max(0, amount - discount);
+                                        return acc + (netValue * ((pm.card_fee_percent || 0) / 100));
                                     }
                                     return acc;
                                 }, 0);
                                 const finalTotal = grossTotal - totalItemDiscounts - totalPaymentDiscounts + totalFees;
+
+                                const totalPaidWithFees = watchedPaymentMethods.reduce((acc, pm) => {
+                                    let paymentValue = (pm.amount || 0);
+                                    if (pm.method === 'credit_card' && (pm.card_fee_percent || 0) > 0) {
+                                        const amount = pm.amount || 0;
+                                        const discount = pm.discount || 0;
+                                        const netValue = Math.max(0, amount - discount);
+                                        paymentValue += netValue * ((pm.card_fee_percent || 0) / 100);
+                                    }
+
+                                    // Subtract discount
+                                    const discount = pm.discount || 0;
+                                    paymentValue -= discount;
+
+                                    return acc + paymentValue;
+                                }, 0);
+
+                                const remaining = Math.max(0, finalTotal - totalPaidWithFees);
 
                                 return (
                                     <>
@@ -662,27 +940,62 @@ export const BudgetForm: React.FC<BudgetFormProps> = ({ initialData, onSave, onC
                                         {/* Remaining Balance */}
                                         <div className="text-right mt-2">
                                             <span className="text-sm text-gray-500 dark:text-gray-400">Restante a Pagar:</span>
-                                            <span className={`ml-2 text-sm font-medium ${(finalTotal - watchedPaymentMethods.reduce((acc, pm) => acc + (pm.amount || 0), 0)) > 0.01 ? 'text-red-500' : 'text-green-500'}`}>
-                                                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Math.max(0, finalTotal - watchedPaymentMethods.reduce((acc, pm) => acc + (pm.amount || 0), 0)))}
+                                            <span className={`ml-2 text-sm font-medium ${remaining > 0.01 ? 'text-red-500' : 'text-green-500'}`}>
+                                                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(remaining)}
                                             </span>
                                         </div>
 
                                         {/* Warning if remaining balance */}
-                                        {(finalTotal - watchedPaymentMethods.reduce((acc, pm) => acc + (pm.amount || 0), 0)) > 0.01 && watchedPaymentMethods.length > 0 && (
+                                        {remaining > 0.01 && watchedPaymentMethods.length > 0 && (
                                             <div className="mt-3 flex justify-between text-xs font-medium text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 p-2 rounded-lg border border-amber-100 dark:border-amber-800">
                                                 <span className="flex items-center gap-1"><span className="material-symbols-outlined text-sm">warning</span> Falta distribuir:</span>
-                                                <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(finalTotal - watchedPaymentMethods.reduce((acc, pm) => acc + (pm.amount || 0), 0))}</span>
+                                                <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(remaining)}</span>
                                             </div>
                                         )}
 
                                         <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
                                             <p className="text-xs text-center text-gray-500 mb-2 font-medium">Resumo dos Pagamentos</p>
-                                            {watchedPaymentMethods.map((pm, idx) => (
-                                                <div key={idx} className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mb-1">
-                                                    <span className="capitalize">{pm.method === 'credit_card' ? `${pm.installments}x Cartão` : pm.method}:</span>
-                                                    <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(pm.amount || 0)}</span>
+                                            {watchedPaymentMethods.map((pm, idx) => {
+                                                let finalAmount = Number(pm.amount) || 0;
+                                                const discount = Number(pm.discount) || 0;
+                                                let label: string = pm.method;
+
+                                                if (pm.method === 'credit_card') {
+                                                    // Add fee to total (based on Net Value)
+                                                    if ((pm.card_fee_percent || 0) > 0) {
+                                                        const netValue = Math.max(0, finalAmount - discount);
+                                                        finalAmount += netValue * (pm.card_fee_percent / 100);
+                                                    }
+
+                                                    // Calculate installment value based on the final amount (Post-discount + Fee)
+                                                    // Wait, finalAmount here is Gross + Fee. We need to subtract discount for distinct display? 
+                                                    // No, "finalAmount" variable name implies the final transaction value.
+                                                    // If we want consistency, this should be (Amount - Discount + Fee).
+                                                    // Let's apply discount subtraction to finalAmount variable.
+                                                    finalAmount -= discount;
+
+                                                    const installmentValue = finalAmount / (pm.installments || 1);
+                                                    label = `${pm.installments}x Cartão (R$ ${new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(installmentValue)})`;
+                                                } else {
+                                                    // For Pix/Cash, just subtract discount
+                                                    finalAmount -= discount;
+                                                }
+
+                                                return (
+                                                    <div key={idx} className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mb-1">
+                                                        <span className="capitalize">{label}:</span>
+                                                        <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(finalAmount)}</span>
+                                                    </div>
+                                                );
+                                            })}
+
+                                            {/* Total Payments Line */}
+                                            {watchedPaymentMethods.length > 0 && (
+                                                <div className="flex justify-between text-xs font-bold text-gray-700 dark:text-gray-300 mt-2 pt-2 border-t border-gray-100 dark:border-gray-700 border-dashed">
+                                                    <span>Total Pago:</span>
+                                                    <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalPaidWithFees)}</span>
                                                 </div>
-                                            ))}
+                                            )}
                                         </div>
                                     </>
                                 );
@@ -709,6 +1022,94 @@ export const BudgetForm: React.FC<BudgetFormProps> = ({ initialData, onSave, onC
                     </button>
                 </div>
             </form>
+
+            {/* Discount Confirmation Modal */}
+            {showDiscountConfirm && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+                    {/* Backdrop */}
+                    <div
+                        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                        onClick={() => {
+                            setShowDiscountConfirm(false);
+                            setPendingDiscount(null);
+                        }}
+                    />
+
+                    {/* Dialog card */}
+                    <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm p-6 flex flex-col items-center gap-4 border border-gray-100 dark:border-gray-800 animate-in fade-in zoom-in duration-200">
+                        {/* Warning icon */}
+                        <div className="w-14 h-14 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center mb-2">
+                            <span className="material-symbols-outlined text-3xl text-amber-600 dark:text-amber-400">warning</span>
+                        </div>
+
+                        <div className="text-center">
+                            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">Alterar desconto?</h3>
+                            <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
+                                Ao alterar o desconto após definir os pagamentos, <strong>todas as formas de pagamento serão removidas</strong> para garantir a consistência dos valores.
+                            </p>
+                            <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 font-medium">
+                                Deseja continuar?
+                            </p>
+                        </div>
+
+                        <div className="flex gap-3 w-full mt-4">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setShowDiscountConfirm(false);
+                                    setPendingDiscount(null);
+                                }}
+                                className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-xl transition-colors"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="button"
+                                onClick={confirmDiscountChange}
+                                className="flex-1 px-4 py-2.5 text-sm font-semibold bg-primary hover:bg-primary-dark text-white rounded-xl shadow-lg shadow-primary/20 transition-all"
+                            >
+                                Sim, continuar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Validation Error Modal */}
+            {errorModal.visible && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    {/* Backdrop */}
+                    <div
+                        className="absolute inset-0 bg-black/30 backdrop-blur-sm"
+                        onClick={() => setErrorModal({ visible: false, message: '' })}
+                    />
+
+                    {/* Dialog card */}
+                    <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm p-6 flex flex-col items-center gap-4 border border-gray-100 dark:border-gray-800 animate-in fade-in zoom-in duration-200">
+                        {/* Error icon */}
+                        <div className="w-14 h-14 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mb-2">
+                            <span className="material-symbols-outlined text-3xl text-red-600 dark:text-red-400">error</span>
+                        </div>
+
+                        <div className="text-center">
+                            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">Atenção aos valores</h3>
+                            <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed text-center">
+                                {errorModal.message}
+                            </p>
+                        </div>
+
+                        <div className="w-full mt-4">
+                            <button
+                                type="button"
+                                onClick={() => setErrorModal({ visible: false, message: '' })}
+                                className="w-full px-4 py-2.5 text-sm font-semibold bg-gray-900 hover:bg-black dark:bg-gray-700 dark:hover:bg-gray-600 text-white rounded-xl shadow-lg transition-all"
+                            >
+                                Entendi, vou corrigir
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

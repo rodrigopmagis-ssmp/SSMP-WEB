@@ -10,6 +10,20 @@ interface ActiveConsultationViewProps {
     onComplete: (consultationId: string) => void;
 }
 
+interface TranscriptSegment {
+    id: number;
+    timestamp: string;
+    text: string;
+}
+
+// Add SpeechRecognition types
+declare global {
+    interface Window {
+        SpeechRecognition: any;
+        webkitSpeechRecognition: any;
+    }
+}
+
 export const ActiveConsultationView: React.FC<ActiveConsultationViewProps> = ({ patientId, onCancel, onComplete }) => {
     // Recording State
     const [isRecording, setIsRecording] = useState(false);
@@ -22,9 +36,23 @@ export const ActiveConsultationView: React.FC<ActiveConsultationViewProps> = ({ 
 
     // Audio Refs
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+    const recognitionRef = useRef<any>(null);
     const chunksRef = useRef<Blob[]>([]);
     const timerRef = useRef<NodeJS.Timeout | null>(null);
     const [stream, setStream] = useState<MediaStream | null>(null);
+
+    // Transcription State
+    const [transcriptSegments, setTranscriptSegments] = useState<TranscriptSegment[]>([]);
+    const [interimResult, setInterimResult] = useState<string>('');
+    const transcriptEndRef = useRef<HTMLDivElement>(null);
+    const durationRef = useRef(0);
+
+    // Auto-scroll logic
+    useEffect(() => {
+        if (transcriptEndRef.current) {
+            transcriptEndRef.current.scrollIntoView({ behavior: 'smooth' });
+        }
+    }, [transcriptSegments, interimResult]);
 
     // Load Patient
     useEffect(() => {
@@ -53,6 +81,9 @@ export const ActiveConsultationView: React.FC<ActiveConsultationViewProps> = ({ 
         if (stream) {
             stream.getTracks().forEach(track => track.stop());
         }
+        if (recognitionRef.current) {
+            recognitionRef.current.stop();
+        }
     };
 
     const startRecording = async () => {
@@ -75,8 +106,54 @@ export const ActiveConsultationView: React.FC<ActiveConsultationViewProps> = ({ 
             setIsPaused(false);
 
             timerRef.current = setInterval(() => {
-                setDuration(prev => prev + 1);
+                setDuration(prev => {
+                    const newDuration = prev + 1;
+                    durationRef.current = newDuration;
+                    return newDuration;
+                });
             }, 1000);
+
+            // Initialize Speech Recognition
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (SpeechRecognition) {
+                const recognition = new SpeechRecognition();
+                recognition.continuous = true;
+                recognition.interimResults = true;
+                recognition.lang = 'pt-BR';
+
+                recognition.onresult = (event: any) => {
+                    let interim = '';
+                    let final = '';
+
+                    for (let i = event.resultIndex; i < event.results.length; ++i) {
+                        if (event.results[i].isFinal) {
+                            final += event.results[i][0].transcript;
+                        } else {
+                            interim += event.results[i][0].transcript;
+                        }
+                    }
+
+                    if (final) {
+                        const timestamp = formatTranscriptTime(durationRef.current);
+                        setTranscriptSegments(prev => [...prev, {
+                            id: Date.now(),
+                            timestamp: timestamp,
+                            text: final.trim()
+                        }]);
+                    }
+                    setInterimResult(interim);
+                };
+
+                recognition.onerror = (event: any) => {
+                    console.error('Speech recognition error', event.error);
+                };
+
+                recognition.start();
+                recognitionRef.current = recognition;
+            } else {
+                console.warn('Browser does not support Speech Recognition');
+                toast.error('Seu navegador não suporta transcrição em tempo real.');
+            }
 
         } catch (error) {
             console.error('Error accessing microphone:', error);
@@ -89,13 +166,21 @@ export const ActiveConsultationView: React.FC<ActiveConsultationViewProps> = ({ 
         if (mediaRecorderRef.current && isRecording) {
             if (!isPaused) {
                 mediaRecorderRef.current.pause();
+                if (recognitionRef.current) recognitionRef.current.stop();
                 setIsPaused(true);
                 if (timerRef.current) clearInterval(timerRef.current);
             } else {
                 mediaRecorderRef.current.resume();
+                if (recognitionRef.current) {
+                    try { recognitionRef.current.start(); } catch (e) { console.error(e); }
+                }
                 setIsPaused(false);
                 timerRef.current = setInterval(() => {
-                    setDuration(prev => prev + 1);
+                    setDuration(prev => {
+                        const newDuration = prev + 1;
+                        durationRef.current = newDuration;
+                        return newDuration;
+                    });
                 }, 1000);
             }
         }
@@ -155,6 +240,12 @@ export const ActiveConsultationView: React.FC<ActiveConsultationViewProps> = ({ 
         const mins = Math.floor(seconds / 60);
         const secs = seconds % 60;
         return `${mins.toString().padStart(2, '0')} : ${secs.toString().padStart(2, '0')}`;
+    };
+
+    const formatTranscriptTime = (seconds: number) => {
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return `${mins.toString().padStart(2, '0')}m ${secs.toString().padStart(2, '0')}s`;
     };
 
     return (
@@ -270,15 +361,49 @@ export const ActiveConsultationView: React.FC<ActiveConsultationViewProps> = ({ 
 
                 </div>
 
-                {/* Live Transcript Placeholder */}
-                <div className="mt-8 text-center max-w-2xl">
-                    <p className="text-gray-400 italic text-lg leading-relaxed animate-pulse">
-                        "...então, doutor, eu sinto uma pressão no peito quando subo escadas, dura cerca de 5 minutos e melhora com repouso..."
-                    </p>
-                    <div className="flex items-center justify-center gap-2 mt-4">
-                        <span className="px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-[10px] font-bold uppercase tracking-wider">Sintoma Detectado</span>
-                        <span className="px-3 py-1 rounded-full bg-purple-100 text-purple-700 text-[10px] font-bold uppercase tracking-wider">Contexto Clínico</span>
-                    </div>
+                {/* Live Transcript View */}
+                <div className="mt-8 w-full max-w-3xl bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-200 dark:border-gray-700 p-6 shadow-inner min-h-[300px] max-h-[500px] overflow-y-auto relative">
+
+                    {transcriptSegments.length > 0 || interimResult ? (
+                        <div className="space-y-6">
+                            {transcriptSegments.map((segment) => (
+                                <div key={segment.id} className="animate-in fade-in slide-in-from-bottom-2 duration-500">
+                                    <span className="text-xs font-mono text-gray-400 block mb-1">
+                                        {segment.timestamp}
+                                    </span>
+                                    <p className="text-gray-700 dark:text-gray-300 text-lg leading-relaxed">
+                                        {segment.text}
+                                    </p>
+                                </div>
+                            ))}
+
+                            {interimResult && (
+                                <div className="animate-pulse">
+                                    <span className="text-xs font-mono text-gray-400 block mb-1">
+                                        {formatTime(duration)}
+                                    </span>
+                                    <p className="text-gray-500 dark:text-gray-400 text-lg leading-relaxed italic">
+                                        {interimResult}
+                                    </p>
+                                </div>
+                            )}
+                            <div ref={transcriptEndRef} />
+                        </div>
+                    ) : (
+                        <div className="flex flex-col items-center justify-center h-full text-gray-400 gap-2 min-h-[200px]">
+                            <span className="material-symbols-outlined text-3xl opacity-50">graphic_eq</span>
+                            <p className="text-sm italic">Detectando fala... Fale claramente.</p>
+                        </div>
+                    )}
+
+                    {/* Floating Indicators */}
+                    {(transcriptSegments.length > 0 || interimResult) && (
+                        <div className="absolute top-4 right-4 flex gap-2">
+                            <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-[10px] font-bold uppercase tracking-wider animate-in fade-in">
+                                Transcrevendo
+                            </span>
+                        </div>
+                    )}
                 </div>
 
             </div>

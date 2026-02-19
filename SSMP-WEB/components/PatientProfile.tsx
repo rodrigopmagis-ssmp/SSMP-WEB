@@ -3,6 +3,7 @@ import { supabaseService } from '../src/services/supabaseService';
 import { Patient, Procedure, PatientTreatment } from '../types';
 import Button from './ui/Button';
 import { CopilotView } from '../src/components/Copilot/CopilotView';
+import PatientMiniCalendar from './PatientMiniCalendar';
 
 interface PatientProfileProps {
     patient: Patient;
@@ -131,6 +132,7 @@ const PatientProfile: React.FC<PatientProfileProps> = ({ patient, onBack, onEdit
                 onChange={handleFileChange}
                 className="hidden"
                 accept="image/*"
+                aria-label="Alterar foto de perfil"
             />
             <div className="flex flex-wrap gap-2 items-center mb-6">
                 <button onClick={onBack} className="text-primary/70 dark:text-primary/50 text-sm font-medium hover:underline">Pacientes</button>
@@ -142,12 +144,12 @@ const PatientProfile: React.FC<PatientProfileProps> = ({ patient, onBack, onEdit
             <section className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 p-6 mb-8">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                     <div className="flex gap-6 items-center">
-                        <div
-                            className="bg-center bg-no-repeat aspect-square bg-cover rounded-full h-24 w-24 border-4 border-primary/10 shadow-lg cursor-pointer hover:opacity-80 transition-opacity relative group"
-                            style={{ backgroundImage: `url(${patient.avatar || 'https://picsum.photos/200'})` }}
-                            onClick={() => fileInputRef.current?.click()}
-                            title="Clique para alterar a foto"
-                        >
+                        <div className="relative group h-24 w-24 rounded-full border-4 border-primary/10 shadow-lg cursor-pointer hover:opacity-80 transition-opacity" onClick={() => fileInputRef.current?.click()} title="Clique para alterar a foto">
+                            <img
+                                src={patient.avatar || 'https://picsum.photos/200'}
+                                alt={`Foto de ${patient.name}`}
+                                className="w-full h-full rounded-full object-cover bg-center"
+                            />
                             <div className="absolute inset-0 rounded-full bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                                 <span className="material-symbols-outlined text-white">cloud_upload</span>
                             </div>
@@ -175,19 +177,19 @@ const PatientProfile: React.FC<PatientProfileProps> = ({ patient, onBack, onEdit
                         {/* Tags Display - Relocated */}
                         <div className="flex flex-wrap gap-2 justify-start md:justify-end animate-in slide-in-from-right duration-500 delay-150">
                             {patientTags.map(tag => (
-                                <div
+                                <button
+                                    type="button"
                                     key={tag.id}
                                     title={tag.metadata?.complaint ? `Reclamação: ${tag.metadata.complaint}` : 'Clique para remover'}
-                                    className="group relative pl-4 pr-3 py-1.5 bg-white rounded-lg border shadow-sm transition-all duration-300 cursor-pointer flex items-center gap-2 select-none overflow-hidden hover:shadow-md hover:border-red-200"
+                                    className="group relative pl-4 pr-3 py-1.5 bg-white rounded-lg border shadow-sm transition-all duration-300 cursor-pointer flex items-center gap-2 select-none overflow-hidden hover:shadow-md hover:border-red-200 border-[color:var(--tag-color)] text-[color:var(--tag-color)]"
                                     style={{
-                                        borderColor: tag.color,
-                                        color: tag.color
-                                    }}
+                                        '--tag-color': tag.color
+                                    } as React.CSSProperties}
                                     onClick={() => handleToggleTag(tag)}
                                 >
                                     <div
                                         className="absolute left-0 top-0 bottom-0 w-1.5"
-                                        style={{ backgroundColor: tag.color }}
+                                        style={{ '--tag-color': tag.color } as React.CSSProperties}
                                     ></div>
                                     <span className="text-xs font-bold pl-1">
                                         {tag.name}
@@ -200,7 +202,7 @@ const PatientProfile: React.FC<PatientProfileProps> = ({ patient, onBack, onEdit
                                     <div className="absolute inset-0 bg-red-500/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[1px]">
                                         <span className="material-symbols-outlined text-red-600 font-bold">close</span>
                                     </div>
-                                </div>
+                                </button>
                             ))}
 
                             <div className="relative">
@@ -226,7 +228,7 @@ const PatientProfile: React.FC<PatientProfileProps> = ({ patient, onBack, onEdit
                                                             onClick={() => handleToggleTag(tag)}
                                                             className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-all text-left group w-full"
                                                         >
-                                                            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: tag.color }}></div>
+                                                            <div className="w-2 h-2 rounded-full bg-[var(--tag-color)]" style={{ '--tag-color': tag.color } as React.CSSProperties}></div>
                                                             <span className="text-sm font-medium text-gray-700 dark:text-gray-200 flex-1">{tag.name}</span>
                                                             {isActive && <span className="material-symbols-outlined text-green-500 text-sm">check</span>}
                                                         </button>
@@ -243,8 +245,7 @@ const PatientProfile: React.FC<PatientProfileProps> = ({ patient, onBack, onEdit
                         <div className="flex w-full md:w-auto gap-3">
                             <button
                                 onClick={() => setShowCopilot(true)}
-                                className="flex-1 md:flex-none flex items-center justify-center gap-2 rounded-lg h-10 px-6 bg-purple-600 text-white text-sm font-bold shadow-lg shadow-purple-500/20 hover:bg-purple-700 transition-all"
-                                style={{ backgroundColor: '#7e22ce', color: '#ffffff' }}
+                                className="flex-1 md:flex-none flex items-center justify-center gap-2 rounded-lg h-10 px-6 bg-purple-700 text-white text-sm font-bold shadow-lg shadow-purple-500/20 hover:bg-purple-800 transition-all"
                             >
                                 <span className="material-symbols-outlined text-xl">psychology</span>
                                 <span>Copiloto IA</span>
@@ -279,6 +280,7 @@ const PatientProfile: React.FC<PatientProfileProps> = ({ patient, onBack, onEdit
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                         {/* Left Col: Registration Info */}
                         <div className="lg:col-span-1 space-y-6">
+                            <PatientMiniCalendar patientId={patient.id} patientName={patient.name} />
                             <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 shadow-sm p-6">
                                 <h3 className="text-gray-900 dark:text-white font-bold text-lg mb-4 flex items-center gap-2">
                                     <span className="material-symbols-outlined text-primary">person</span>
@@ -520,7 +522,7 @@ const PatientProfile: React.FC<PatientProfileProps> = ({ patient, onBack, onEdit
                     </div>
                 )
             }
-        </div >
+        </div>
     );
 };
 

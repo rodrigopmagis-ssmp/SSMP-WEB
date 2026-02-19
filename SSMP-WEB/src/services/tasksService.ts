@@ -34,6 +34,7 @@ export const taskService = {
         endDate?: string;
         clinicId?: string;
         userId?: string;
+        userRole?: string; // New: role check
     }) {
         let query = supabase
             .from('tasks')
@@ -44,8 +45,8 @@ export const taskService = {
             `)
             .order('due_at', { ascending: true }); // Ordenação secundária no js se precisar
 
-        // Filtro por Clínica (Fundamental)
-        if (filters?.clinicId) {
+        // Filtro por Clínica (Fundamental) - exceto se for Master
+        if (filters?.clinicId && filters.userRole !== 'master') {
             query = query.eq('clinic_id', filters.clinicId);
         }
 
@@ -124,7 +125,12 @@ export const taskService = {
         // Filtrar VISIBILIDADE (Client-side filtering for simplicity and security if RLS not perfect)
         if (filters?.userId) {
             const currentUserId = filters.userId;
+            const isMaster = filters.userRole === 'master';
+
             tasks = tasks.filter(task => {
+                // Master vê tudo
+                if (isMaster) return true;
+
                 // Criador sempre vê
                 if (task.createdBy === currentUserId) return true;
 

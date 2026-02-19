@@ -4,7 +4,7 @@ import Button from './ui/Button';
 import CategoryManager from './CategoryManager';
 
 interface SidebarProps {
-  setView: (view: any) => void;
+  onViewChange: (view: any) => void;
   procedures: Procedure[];
   categories: ProcedureCategory[];
   onUpdateCategories: () => void;
@@ -16,7 +16,7 @@ interface SidebarProps {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
-  setView,
+  onViewChange,
   procedures,
   categories,
   onUpdateCategories,
@@ -168,7 +168,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 
                       {isExpanded(cat.id) && (
                         <div className="ml-2 flex flex-col gap-1">
-                          {catProcedures.map(proc => renderProcedureItem(proc, selectedProcedureId, onSelectProcedure, setView, setIsMobileOpen))}
+                          {catProcedures.map(proc => renderProcedureItem(proc, selectedProcedureId, onSelectProcedure, onViewChange, setIsMobileOpen))}
                         </div>
                       )}
                     </div>
@@ -194,7 +194,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 
                       {isExpanded('uncategorized') && (
                         <div className="ml-2 flex flex-col gap-1">
-                          {uncategorizedProcedures.map(proc => renderProcedureItem(proc, selectedProcedureId, onSelectProcedure, setView, setIsMobileOpen))}
+                          {uncategorizedProcedures.map(proc => renderProcedureItem(proc, selectedProcedureId, onSelectProcedure, onViewChange, setIsMobileOpen))}
                         </div>
                       )}
                     </div>
@@ -233,7 +233,7 @@ const renderProcedureItem = (
   proc: Procedure,
   selectedProcedureId: string | undefined,
   onSelectProcedure: ((id: string) => void) | undefined,
-  setView: (view: any) => void,
+  onViewChange: (view: any) => void,
   setIsMobileOpen: (isOpen: boolean) => void
 ) => {
   const isSelected = selectedProcedureId === proc.id;
@@ -247,7 +247,7 @@ const renderProcedureItem = (
         if (onSelectProcedure) {
           onSelectProcedure(proc.id);
         }
-        setView('procedures');
+        onViewChange('procedures');
         setIsMobileOpen(false);
       }}
       className={`flex items-center justify-between gap-3 px-3 py-3 rounded-lg cursor-pointer transition-colors ${isSelected

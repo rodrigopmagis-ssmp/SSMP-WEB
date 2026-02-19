@@ -29,7 +29,10 @@ export function useNegocios() {
                 const novo = await negociosService.criarNegocioDeLead(
                     negocioData.id_lead,
                     negocioData.estagio || 'lead_quiz',
-                    negocioData.id_vendedor
+                    negocioData.id_vendedor,
+                    negocioData.id_clinica,
+                    negocioData.campaign_id,
+                    negocioData.stage_id
                 );
                 setNegocios((prev) => [novo, ...prev]);
                 return novo;

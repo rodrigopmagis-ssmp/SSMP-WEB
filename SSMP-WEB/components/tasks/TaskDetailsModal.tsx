@@ -188,8 +188,8 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task: initia
             <div className="bg-white dark:bg-[#2d181e] rounded-xl shadow-2xl w-full max-w-4xl h-[85vh] flex flex-col overflow-hidden border border-gray-100 dark:border-primary/10">
 
                 {/* Header */}
-                <div className="flex items-center justify-between p-6 pb-2 border-b border-gray-100 dark:border-gray-800 shrink-0">
-                    <div className="flex flex-col gap-1 w-full mr-8">
+                <div className="flex items-start justify-between p-6 pb-2 border-b border-gray-100 dark:border-gray-800 shrink-0">
+                    <div className="flex flex-col gap-1 flex-1 mr-4">
                         <div className="flex items-center justify-between w-full">
                             <div className="flex items-center gap-3">
                                 <h2 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white line-clamp-1">
@@ -230,9 +230,10 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task: initia
                     </div>
                     <button
                         onClick={onClose}
-                        className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-white/5 rounded-full transition-colors absolute top-4 right-4"
+                        className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-white/10 rounded-full transition-colors shrink-0"
+                        title="Fechar"
                     >
-                        <span className="material-symbols-outlined text-xl">close</span>
+                        <span className="material-symbols-outlined text-2xl">close</span>
                     </button>
                 </div>
 

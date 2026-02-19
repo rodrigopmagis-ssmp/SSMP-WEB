@@ -45,7 +45,7 @@ export const TasksDashboard: React.FC = () => {
     // Set default filter to PENDING on first load only
     useEffect(() => {
         if (isFirstLoad) {
-            setStatusFilter(TaskStatusEnum.PENDING);
+            setStatusFilter('all'); // WAS: TaskStatusEnum.PENDING. Changed to 'all' to help debug visibility.
             setIsFirstLoad(false);
         }
     }, []);
@@ -125,8 +125,18 @@ export const TasksDashboard: React.FC = () => {
             const { data: { user } } = await supabase.auth.getUser();
             if (user) {
                 setCurrentUserId(user.id);
-                setCurrentUserRole(user.user_metadata?.role || null);
-                setClinicId(user.user_metadata?.clinic_id || null);
+                // Attempt to fetch profile for authoritative role
+                const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('role, clinic_id')
+                    .eq('id', user.id)
+                    .single();
+
+                const role = profile?.role || user.user_metadata?.role || null;
+                const userClinicId = profile?.clinic_id || user.user_metadata?.clinic_id || null;
+
+                setCurrentUserRole(role);
+                setClinicId(userClinicId);
             }
         } catch (error) {
             console.error('Error fetching user info:', error);
@@ -155,9 +165,24 @@ export const TasksDashboard: React.FC = () => {
             const clinicId = user.user_metadata?.clinic_id;
 
             // Fetch ALL tasks first (for stats)
+            // Fetch ALL tasks first (for stats)
+            // Fix: Use correct role from profile or metadata (prefer profile if available from fetchUserInfo, but we can't depend on state here as it might be stale)
+            // So we re-fetch briefly or check if we can reuse logic.
+            // For now, let's fetch profile lightly or trust metadata if we updated it?
+            // Actually, best is to query profile here too or use the state if set.
+            // Let's use the same logic as fetchUserInfo
+            const { data: profile } = await supabase
+                .from('profiles')
+                .select('role')
+                .eq('id', user.id)
+                .single();
+
+            const effectiveRole = profile?.role || user.user_metadata?.role;
+
             const allTasksParams: any = {
                 userId: user.id,
-                clinicId: clinicId
+                clinicId: clinicId,
+                userRole: effectiveRole
             };
             const fetchedAllTasks = await taskService.getTasks(allTasksParams);
             setAllTasks(fetchedAllTasks);
@@ -166,9 +191,11 @@ export const TasksDashboard: React.FC = () => {
             let fetchedTasks: Task[] = [];
 
             // Base params
+            // Base params
             const params: any = {
                 userId: user.id,
-                clinicId: clinicId
+                clinicId: clinicId,
+                userRole: effectiveRole
             };
 
             // Map 'overdue' virtual filter to actual fetch params
@@ -650,6 +677,7 @@ export const TasksDashboard: React.FC = () => {
                     }}
                 />
             )}
+
         </div>
     );
 };

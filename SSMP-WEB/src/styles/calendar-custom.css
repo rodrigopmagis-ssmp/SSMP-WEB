@@ -1,0 +1,115 @@
+/* Custom styles for react-big-calendar events */
+.rbc-event-custom {
+  border-radius: 0.375rem;
+  overflow: visible !important;
+}
+
+.rbc-event-custom .rbc-event-content {
+  padding: 0 !important;
+  height: 100%;
+  width: 100%;
+}
+
+/* Ensure our custom component takes full space */
+.rbc-event-custom>div {
+  height: 100%;
+  width: 100%;
+}
+
+/* ── Fix misaligned divider & bloated all-day row ─────────────────────── */
+
+/* Collapse the all-day section to its content height */
+.rbc-allday-cell {
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: 60px;
+  overflow-y: auto;
+}
+
+/* Remove the extra gap/padding inside the all-day row */
+.rbc-row-bg,
+.rbc-row-content {
+  min-height: 0 !important;
+}
+
+/* Align the time-header bottom border cleanly with the time grid */
+.rbc-time-header {
+  border-bottom: 1px solid #e5e7eb !important;
+}
+
+.rbc-time-header-content {
+  border-left: 1px solid #e5e7eb;
+}
+
+/* Tighten the day column header row (date labels) */
+.rbc-header {
+  padding: 4px 6px !important;
+  font-size: 0.75rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+/* Remove double border between header and all-day row */
+.rbc-time-header.rbc-overflowing {
+  border-right: none;
+}
+
+/* Ensure the gutter column aligns with the time grid gutter */
+.rbc-time-header-gutter {
+  border-bottom: 1px solid #e5e7eb !important;
+}
+
+/* ────────────────────────────────────────────────────────────────────────── */
+/* Custom Current Time Indicator for Agenda */
+/* ────────────────────────────────────────────────────────────────────────── */
+
+.rbc-current-time-indicator {
+  background-color: #ef4444 !important;
+  /* red-500 */
+  height: 2px !important;
+  /* Thicker line */
+  opacity: 1 !important;
+  /* Ensure visibility */
+  z-index: 50 !important;
+  /* Above slots */
+  pointer-events: none;
+  /* Don't block clicks */
+}
+
+/* Clock Icon on the left */
+/* Clock Emoji on the left */
+.rbc-current-time-indicator::before {
+  content: '⏱️';
+  /* Use exact emoji, native color */
+  position: absolute;
+  left: -20px;
+  /* Adjust left for emoji width */
+  top: -9px;
+  /* Center relative to 2px line */
+  font-size: 18px;
+  line-height: 1;
+  background-color: transparent;
+  z-index: 100;
+
+  /* Reset font properties to ensure emoji renders correctly */
+  font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif;
+  font-weight: normal;
+  font-style: normal;
+  color: initial;
+  /* Let emoji use its own color (usually black/grey-ish) */
+}
+
+/* Extend line to full width */
+.rbc-current-time-indicator::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100vw;
+  /* Start far left */
+  width: 300vw;
+  /* Span huge width */
+  height: 100%;
+  /* Matches parent 2px */
+  background-color: #ef4444;
+  z-index: 49;
+  pointer-events: none;
+}

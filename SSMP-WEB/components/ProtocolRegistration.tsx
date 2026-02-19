@@ -109,7 +109,6 @@ const ProtocolRegistration: React.FC<ProtocolRegistrationProps> = ({ patient, on
                 tasksCompleted: 0,
                 totalTasks: totalTasks,
                 progress: 0,
-                progress: 0,
                 stageData: {},
                 surveyStatus: SurveyStatus.PENDING,
                 scripts: selectedProtocol?.scripts || [] // Snapshot dos scripts

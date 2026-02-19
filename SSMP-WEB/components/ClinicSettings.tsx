@@ -3,6 +3,8 @@ import { supabaseService } from '../src/services/supabaseService';
 import { Clinic } from '../types';
 import { formatCPF, formatPhone, formatCNPJ, formatZipCode, validateCPF, validateCNPJ, validateEmail } from '../src/utils/validators';
 import Toast from './ui/Toast';
+import BusinessHoursSettings from './settings/BusinessHoursSettings';
+import HolidaysSettings from './settings/HolidaysSettings';
 
 interface ClinicSettingsProps {
     onBack: () => void;
@@ -289,10 +291,11 @@ const ClinicSettings: React.FC<ClinicSettingsProps> = ({ onBack }) => {
                             </div>
 
                             <div>
-                                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">
+                                <label htmlFor="clinic-cpf-cnpj" className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">
                                     {clinic.type === 'juridica' ? 'CNPJ*' : 'CPF*'}
                                 </label>
                                 <input
+                                    id="clinic-cpf-cnpj"
                                     type="text"
                                     value={clinic.cpf_cnpj}
                                     onChange={(e) => setClinic({
@@ -306,10 +309,11 @@ const ClinicSettings: React.FC<ClinicSettingsProps> = ({ onBack }) => {
                             </div>
 
                             <div>
-                                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">
+                                <label htmlFor="clinic-fantasy-name" className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">
                                     Nome fantasia*
                                 </label>
                                 <input
+                                    id="clinic-fantasy-name"
                                     type="text"
                                     value={clinic.fantasy_name}
                                     onChange={(e) => setClinic({ ...clinic, fantasy_name: e.target.value })}
@@ -319,10 +323,11 @@ const ClinicSettings: React.FC<ClinicSettingsProps> = ({ onBack }) => {
                             </div>
 
                             <div>
-                                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">
+                                <label htmlFor="clinic-business-name" className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">
                                     Razão Social {clinic.type === 'juridica' ? '*' : '(Opcional)'}
                                 </label>
                                 <input
+                                    id="clinic-business-name"
                                     type="text"
                                     value={clinic.business_name}
                                     onChange={(e) => setClinic({ ...clinic, business_name: e.target.value })}
@@ -332,10 +337,11 @@ const ClinicSettings: React.FC<ClinicSettingsProps> = ({ onBack }) => {
                             </div>
 
                             <div>
-                                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">
+                                <label htmlFor="clinic-owner-name" className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">
                                     Nome do responsável*
                                 </label>
                                 <input
+                                    id="clinic-owner-name"
                                     type="text"
                                     value={clinic.owner_name}
                                     onChange={(e) => setClinic({ ...clinic, owner_name: e.target.value })}
@@ -400,6 +406,8 @@ const ClinicSettings: React.FC<ClinicSettingsProps> = ({ onBack }) => {
                         <div className="flex flex-col sm:flex-row gap-3">
                             <div className="flex-1 relative">
                                 <input
+                                    id="quiz-link-input"
+                                    aria-label="Link do Quiz"
                                     type="text"
                                     readOnly
                                     value={`https://ssmp-web.vercel.app/?view=quiz&clinic=${clinic.slug}`}
@@ -458,10 +466,11 @@ const ClinicSettings: React.FC<ClinicSettingsProps> = ({ onBack }) => {
 
                     <div className="grid md:grid-cols-2 gap-5 mb-5">
                         <div>
-                            <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">
+                            <label htmlFor="clinic-phone" className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">
                                 Telefone*
                             </label>
                             <input
+                                id="clinic-phone"
                                 type="text"
                                 value={clinic.phone}
                                 onChange={(e) => setClinic({ ...clinic, phone: formatPhone(e.target.value) })}
@@ -472,10 +481,11 @@ const ClinicSettings: React.FC<ClinicSettingsProps> = ({ onBack }) => {
                         </div>
 
                         <div>
-                            <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">
+                            <label htmlFor="clinic-email" className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">
                                 E-mail*
                             </label>
                             <input
+                                id="clinic-email"
                                 type="email"
                                 value={clinic.email}
                                 onChange={(e) => setClinic({ ...clinic, email: e.target.value })}
@@ -489,10 +499,12 @@ const ClinicSettings: React.FC<ClinicSettingsProps> = ({ onBack }) => {
                     {clinic.has_address && (
                         <div className="grid md:grid-cols-2 gap-5 animate-in fade-in slide-in-from-top-2">
                             <div>
-                                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">
+                                <label htmlFor="clinic-country" className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">
                                     País*
                                 </label>
                                 <select
+                                    id="clinic-country"
+                                    aria-label="País"
                                     value={clinic.country}
                                     onChange={(e) => setClinic({ ...clinic, country: e.target.value })}
                                     className="w-full p-3 rounded-lg border-2 border-gray-200 dark:border-gray-700 outline-none bg-gray-50 dark:bg-gray-800 focus:border-primary appearance-none cursor-pointer"
@@ -503,10 +515,11 @@ const ClinicSettings: React.FC<ClinicSettingsProps> = ({ onBack }) => {
                             </div>
 
                             <div>
-                                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">
+                                <label htmlFor="clinic-zip-code" className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">
                                     Código postal (CEP)*
                                 </label>
                                 <input
+                                    id="clinic-zip-code"
                                     type="text"
                                     value={clinic.zip_code}
                                     onChange={(e) => setClinic({ ...clinic, zip_code: formatZipCode(e.target.value) })}
@@ -518,10 +531,11 @@ const ClinicSettings: React.FC<ClinicSettingsProps> = ({ onBack }) => {
                             </div>
 
                             <div>
-                                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">
+                                <label htmlFor="clinic-state" className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">
                                     Estado*
                                 </label>
                                 <input
+                                    id="clinic-state"
                                     type="text"
                                     value={clinic.state}
                                     onChange={(e) => setClinic({ ...clinic, state: e.target.value.toUpperCase().slice(0, 2) })}
@@ -532,10 +546,11 @@ const ClinicSettings: React.FC<ClinicSettingsProps> = ({ onBack }) => {
                             </div>
 
                             <div>
-                                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">
+                                <label htmlFor="clinic-city" className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">
                                     Cidade*
                                 </label>
                                 <input
+                                    id="clinic-city"
                                     type="text"
                                     value={clinic.city}
                                     onChange={(e) => setClinic({ ...clinic, city: e.target.value })}
@@ -546,10 +561,11 @@ const ClinicSettings: React.FC<ClinicSettingsProps> = ({ onBack }) => {
 
                             <div className="md:col-span-2 grid md:grid-cols-2 gap-5">
                                 <div>
-                                    <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">
+                                    <label htmlFor="clinic-neighborhood" className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">
                                         Bairro*
                                     </label>
                                     <input
+                                        id="clinic-neighborhood"
                                         type="text"
                                         value={clinic.neighborhood}
                                         onChange={(e) => setClinic({ ...clinic, neighborhood: e.target.value })}
@@ -559,10 +575,11 @@ const ClinicSettings: React.FC<ClinicSettingsProps> = ({ onBack }) => {
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">
+                                    <label htmlFor="clinic-street" className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">
                                         Rua*
                                     </label>
                                     <input
+                                        id="clinic-street"
                                         type="text"
                                         value={clinic.street}
                                         onChange={(e) => setClinic({ ...clinic, street: e.target.value })}
@@ -574,10 +591,11 @@ const ClinicSettings: React.FC<ClinicSettingsProps> = ({ onBack }) => {
 
                             <div className="md:col-span-2 grid md:grid-cols-2 gap-5">
                                 <div>
-                                    <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">
+                                    <label htmlFor="clinic-number" className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">
                                         Número*
                                     </label>
                                     <input
+                                        id="clinic-number"
                                         type="text"
                                         value={clinic.number}
                                         onChange={(e) => setClinic({ ...clinic, number: e.target.value })}
@@ -587,10 +605,11 @@ const ClinicSettings: React.FC<ClinicSettingsProps> = ({ onBack }) => {
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">
+                                    <label htmlFor="clinic-complement" className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">
                                         Complemento
                                     </label>
                                     <input
+                                        id="clinic-complement"
                                         type="text"
                                         value={clinic.complement}
                                         onChange={(e) => setClinic({ ...clinic, complement: e.target.value })}
@@ -601,6 +620,24 @@ const ClinicSettings: React.FC<ClinicSettingsProps> = ({ onBack }) => {
                         </div>
                     )}
                 </div>
+
+                <div className="h-px bg-gray-100 dark:bg-gray-800 my-4"></div>
+
+                {/* Business Hours Section */}
+                {clinic.id && (
+                    <div>
+                        <BusinessHoursSettings clinicId={clinic.id} />
+                    </div>
+                )}
+
+                <div className="h-px bg-gray-100 dark:bg-gray-800 my-4"></div>
+
+                {/* Holidays Section */}
+                {clinic.id && (
+                    <div>
+                        <HolidaysSettings clinicId={clinic.id} />
+                    </div>
+                )}
 
                 <div className="h-px bg-gray-100 dark:bg-gray-800 my-4"></div>
 
@@ -628,10 +665,12 @@ const ClinicSettings: React.FC<ClinicSettingsProps> = ({ onBack }) => {
                     {!clinic.same_address_for_billing && (
                         <div className="grid md:grid-cols-2 gap-5 animate-in fade-in slide-in-from-top-2">
                             <div>
-                                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">
+                                <label htmlFor="billing-country" className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">
                                     País*
                                 </label>
                                 <select
+                                    id="billing-country"
+                                    aria-label="País de cobrança"
                                     value={clinic.billing_country}
                                     onChange={(e) => setClinic({ ...clinic, billing_country: e.target.value })}
                                     className="w-full p-3 rounded-lg border-2 border-gray-200 dark:border-gray-700 outline-none bg-gray-50 dark:bg-gray-800 focus:border-primary appearance-none cursor-pointer"
@@ -642,10 +681,11 @@ const ClinicSettings: React.FC<ClinicSettingsProps> = ({ onBack }) => {
                             </div>
 
                             <div>
-                                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">
+                                <label htmlFor="billing-zip-code" className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">
                                     Código postal (CEP)*
                                 </label>
                                 <input
+                                    id="billing-zip-code"
                                     type="text"
                                     value={clinic.billing_zip_code}
                                     onChange={(e) => setClinic({ ...clinic, billing_zip_code: formatZipCode(e.target.value) })}
@@ -657,10 +697,11 @@ const ClinicSettings: React.FC<ClinicSettingsProps> = ({ onBack }) => {
                             </div>
 
                             <div>
-                                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">
+                                <label htmlFor="billing-state" className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">
                                     Estado*
                                 </label>
                                 <input
+                                    id="billing-state"
                                     type="text"
                                     value={clinic.billing_state}
                                     onChange={(e) => setClinic({ ...clinic, billing_state: e.target.value.toUpperCase().slice(0, 2) })}
@@ -671,10 +712,11 @@ const ClinicSettings: React.FC<ClinicSettingsProps> = ({ onBack }) => {
                             </div>
 
                             <div>
-                                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">
+                                <label htmlFor="billing-city" className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">
                                     Cidade*
                                 </label>
                                 <input
+                                    id="billing-city"
                                     type="text"
                                     value={clinic.billing_city}
                                     onChange={(e) => setClinic({ ...clinic, billing_city: e.target.value })}
@@ -685,10 +727,11 @@ const ClinicSettings: React.FC<ClinicSettingsProps> = ({ onBack }) => {
 
                             <div className="md:col-span-2 grid md:grid-cols-2 gap-5">
                                 <div>
-                                    <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">
+                                    <label htmlFor="billing-neighborhood" className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">
                                         Bairro*
                                     </label>
                                     <input
+                                        id="billing-neighborhood"
                                         type="text"
                                         value={clinic.billing_neighborhood}
                                         onChange={(e) => setClinic({ ...clinic, billing_neighborhood: e.target.value })}
@@ -698,10 +741,11 @@ const ClinicSettings: React.FC<ClinicSettingsProps> = ({ onBack }) => {
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">
+                                    <label htmlFor="billing-street" className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">
                                         Rua*
                                     </label>
                                     <input
+                                        id="billing-street"
                                         type="text"
                                         value={clinic.billing_street}
                                         onChange={(e) => setClinic({ ...clinic, billing_street: e.target.value })}
@@ -713,10 +757,11 @@ const ClinicSettings: React.FC<ClinicSettingsProps> = ({ onBack }) => {
 
                             <div className="md:col-span-2 grid md:grid-cols-2 gap-5">
                                 <div>
-                                    <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">
+                                    <label htmlFor="billing-number" className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">
                                         Número*
                                     </label>
                                     <input
+                                        id="billing-number"
                                         type="text"
                                         value={clinic.billing_number}
                                         onChange={(e) => setClinic({ ...clinic, billing_number: e.target.value })}
@@ -726,10 +771,11 @@ const ClinicSettings: React.FC<ClinicSettingsProps> = ({ onBack }) => {
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">
+                                    <label htmlFor="billing-complement" className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">
                                         Complemento
                                     </label>
                                     <input
+                                        id="billing-complement"
                                         type="text"
                                         value={clinic.billing_complement}
                                         onChange={(e) => setClinic({ ...clinic, billing_complement: e.target.value })}

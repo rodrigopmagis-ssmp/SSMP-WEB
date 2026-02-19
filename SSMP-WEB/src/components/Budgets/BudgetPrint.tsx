@@ -54,23 +54,24 @@ export const BudgetPrint: React.FC<BudgetPrintProps> = ({ budgetId, onClose }) =
             <div className="max-w-[210mm] mx-auto bg-white p-[20mm] pt-[30mm] min-h-screen text-gray-900 print:p-0 print:pt-0">
 
                 {/* Header */}
-                <div className="flex justify-between items-start mb-12 border-b border-gray-200 pb-8">
+                <div className="flex justify-between items-start mb-6 border-b border-gray-200 pb-4">
                     <div className="flex items-center gap-4">
                         {/* Logo Placeholder - In a real app this would be a real logo URL */}
-                        <div className="w-24 h-24 flex items-center justify-center">
+                        <div className="flex items-center justify-start max-w-[300px]">
                             {budget.clinic?.logo_url ? (
                                 <img
                                     src={budget.clinic.logo_url}
                                     alt={budget.clinic.fantasy_name || 'Logo da Clínica'}
-                                    className="max-w-full max-h-full object-contain"
+                                    className="max-h-[160px] w-auto object-contain"
+                                    style={{ backgroundColor: 'transparent', imageRendering: 'auto', mixBlendMode: 'multiply' }}
                                     onError={(e) => {
                                         e.currentTarget.style.display = 'none';
-                                        e.currentTarget.parentElement?.classList.add('bg-primary/10', 'rounded-xl');
+                                        e.currentTarget.parentElement?.classList.add('bg-primary/10', 'rounded-xl', 'w-24', 'h-24', 'justify-center');
                                         e.currentTarget.parentElement!.innerHTML = '<span class="material-symbols-outlined text-3xl text-primary">spa</span>';
                                     }}
                                 />
                             ) : (
-                                <div className="w-full h-full bg-primary/10 rounded-xl flex items-center justify-center text-primary">
+                                <div className="w-24 h-24 bg-primary/10 rounded-xl flex items-center justify-center text-primary">
                                     <span className="material-symbols-outlined text-3xl">spa</span>
                                 </div>
                             )}
@@ -121,34 +122,46 @@ export const BudgetPrint: React.FC<BudgetPrintProps> = ({ budgetId, onClose }) =
                     <table className="w-full text-sm">
                         <thead>
                             <tr className="border-b-2 border-gray-100 text-left text-gray-500">
-                                <th className="py-2 pl-2">Descrição</th>
-                                <th className="py-2 text-center">Sessões</th>
-                                <th className="py-2 text-right">Valor Unit.</th>
-                                <th className="py-2 text-right pr-2">Total</th>
+                                <th className="py-2 pl-2 w-[40%]">Descrição</th>
+                                <th className="py-2 text-center w-[10%]">Qtd.</th>
+                                <th className="py-2 text-right w-[15%]">Valor Unit.</th>
+                                <th className="py-2 text-right w-[15%]">Valor c/ Desc.</th>
+                                <th className="py-2 text-right pr-2 w-[20%]">Total</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
                             {budget.items?.map((item, idx) => (
-                                <tr key={idx}>
-                                    <td className="py-3 pl-2">
-                                        <p className="font-bold text-gray-900">{item.procedure_name_snapshot}</p>
-                                        {item.description_snapshot && (
-                                            <p className="text-sm text-gray-600 mt-1 whitespace-pre-wrap">{item.description_snapshot}</p>
-                                        )}
-                                    </td>
-                                    <td className="py-3 text-center">{item.sessions}</td>
-                                    <td className="py-3 text-right">
-                                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.unit_price)}
-                                    </td>
-                                    <td className="py-3 text-right font-medium pr-2">
-                                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.total_price)}
-                                    </td>
-                                </tr>
+                                <React.Fragment key={idx}>
+                                    {/* Main Row: Name and Values */}
+                                    <tr className="border-b-0 border-gray-100">
+                                        <td className="py-2 pl-2 font-bold text-gray-900">
+                                            {item.procedure_name_snapshot}
+                                        </td>
+                                        <td className="py-2 text-center text-gray-900">{item.sessions}</td>
+                                        <td className="py-2 text-right text-gray-900">
+                                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.unit_price)}
+                                        </td>
+                                        <td className="py-2 text-right text-gray-900 font-medium">
+                                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format((item.total_price / (item.sessions || 1)))}
+                                        </td>
+                                        <td className="py-2 text-right font-bold pr-2 text-gray-900">
+                                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.total_price)}
+                                        </td>
+                                    </tr>
+                                    {/* Description Row */}
+                                    {item.description_snapshot && (
+                                        <tr className="border-b border-gray-100">
+                                            <td colSpan={5} className="pb-4 pl-2 text-sm text-gray-600 text-justify leading-relaxed">
+                                                {item.description_snapshot}
+                                            </td>
+                                        </tr>
+                                    )}
+                                </React.Fragment>
                             ))}
                         </tbody>
                         <tfoot>
                             <tr className="border-t-2 border-gray-200">
-                                <td colSpan={3} className="pt-4 text-right font-bold text-gray-900">Subtotal:</td>
+                                <td colSpan={4} className="pt-4 text-right font-bold text-gray-900">Subtotal:</td>
                                 <td className="pt-4 text-right font-bold text-gray-900 pr-2">
                                     {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(budget.subtotal)}
                                 </td>
@@ -159,55 +172,83 @@ export const BudgetPrint: React.FC<BudgetPrintProps> = ({ budgetId, onClose }) =
 
                 {/* Payment & Totals */}
                 <div className="flex justify-end mb-12">
-                    <div className="w-2/3 bg-gray-50 rounded-xl p-6 border border-gray-100">
+                    <div className="w-full md:w-2/3 bg-gray-50 rounded-xl p-6 border border-gray-100">
                         <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4 border-b border-gray-200 pb-2">Detalhes do Pagamento</h3>
 
-                        <div className="space-y-3 text-sm">
+                        <div className="space-y-4 text-sm">
                             {budget.payment_methods && budget.payment_methods.length > 0 ? (
-                                <div className="space-y-2 mb-4 pb-4 border-b border-gray-200">
-                                    {budget.payment_methods.map((pm, idx) => (
-                                        <div key={idx} className="flex justify-between items-start">
-                                            <div>
-                                                <div className="font-medium text-gray-900 capitalize">
-                                                    {pm.method === 'credit_card' ? 'Cartão de Crédito' : pm.method === 'cash' ? 'Dinheiro' : pm.method === 'boleto' ? 'Boleto' : 'PIX'}
+                                <>
+                                    {budget.payment_methods.map((pm, idx) => {
+                                        // Calculate exact values for display
+                                        const originalAmount = pm.amount || 0;
+                                        const discount = pm.discount || 0;
+                                        const feePercent = pm.card_fee_percent || 0;
+
+                                        // Reconstruct the calculation flow
+                                        const amountAfterDiscount = Math.max(0, originalAmount - discount);
+                                        const feeValue = feePercent > 0 ? amountAfterDiscount * (feePercent / 100) : 0;
+                                        const finalAmount = amountAfterDiscount + feeValue;
+                                        const installmentValue = finalAmount / (pm.installments || 1);
+
+                                        return (
+                                            <div key={idx} className="bg-white p-3 rounded-lg border border-gray-200 shadow-sm">
+                                                <div className="flex justify-between items-center mb-2">
+                                                    <span className="font-bold text-gray-900 capitalize flex items-center gap-2">
+                                                        {pm.method === 'credit_card' ? 'Cartão de Crédito' : pm.method === 'cash' ? 'Dinheiro' : pm.method === 'boleto' ? 'Boleto' : 'PIX'}
+                                                        {pm.installments && pm.installments > 1 && (
+                                                            <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                                                                {pm.installments}x
+                                                            </span>
+                                                        )}
+                                                    </span>
+                                                    <span className="font-bold text-gray-900 text-lg">
+                                                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(finalAmount)}
+                                                    </span>
                                                 </div>
-                                                {pm.method === 'credit_card' && pm.installments && (
-                                                    <div className="text-xs text-gray-500">
-                                                        {pm.installments}x
-                                                        {(pm.card_fee_percent || 0) > 0 && ` (+${pm.card_fee_percent}%)`}
+
+                                                <div className="text-xs text-gray-500 space-y-1 pl-2 border-l-2 border-primary/20">
+                                                    <div className="flex justify-between">
+                                                        <span>Valor Original:</span>
+                                                        <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(originalAmount)}</span>
                                                     </div>
-                                                )}
+
+                                                    {discount > 0 && (
+                                                        <div className="flex justify-between text-green-600 font-medium">
+                                                            <span>Desconto aplic. ({(originalAmount > 0 ? (discount / originalAmount) * 100 : 0).toFixed(0)}%):</span>
+                                                            <span>- {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(discount)}</span>
+                                                        </div>
+                                                    )}
+
+                                                    {feeValue > 0 && (
+                                                        <div className="flex justify-between text-orange-600 font-medium">
+                                                            <span>Taxa Cartão ({feePercent}%):</span>
+                                                            <span>+ {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(feeValue)}</span>
+                                                        </div>
+                                                    )}
+
+                                                    {pm.installments && pm.installments > 1 && (
+                                                        <div className="flex justify-between pt-1 mt-1 border-t border-dashed border-gray-200 font-medium text-gray-700">
+                                                            <span>Parcelas:</span>
+                                                            <span>{pm.installments}x de {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(installmentValue)}</span>
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
-                                            <div className="font-medium text-gray-900">
-                                                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(pm.amount || 0)}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            ) : (
-                                // Fallback for legacy data
-                                <div className="space-y-2 mb-4 pb-4 border-b border-gray-200">
-                                    <div className="flex justify-between">
-                                        <span className="text-gray-600">Forma de Pagamento:</span>
-                                        <span className="font-medium text-gray-900 capitalize">
-                                            {budget.payment_method === 'credit_card' ? 'Cartão de Crédito' : budget.payment_method}
+                                        );
+                                    })}
+
+                                    <div className="flex justify-between items-center pt-4 mt-2 border-t border-gray-200">
+                                        <span className="text-lg font-bold text-gray-900">VALOR TOTAL FINAL:</span>
+                                        <span className="text-2xl font-bold text-primary">
+                                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(budget.total_with_fee)}
                                         </span>
                                     </div>
-                                    {budget.payment_method === 'credit_card' && budget.installments && (
-                                        <div className="flex justify-between text-gray-600">
-                                            <span>Parcelamento:</span>
-                                            <span>{budget.installments}x</span>
-                                        </div>
-                                    )}
+                                </>
+                            ) : (
+                                <div className="text-center text-gray-500 py-4">
+                                    Nenhuma forma de pagamento registrada.
                                 </div>
                             )}
-
-                            <div className="flex justify-between items-center pt-2">
-                                <span className="text-lg font-bold text-gray-900">TOTAL:</span>
-                                <span className="text-xl font-bold text-primary">
-                                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(budget.total_with_fee)}
-                                </span>
-                            </div>
                         </div>
                     </div>
                 </div>

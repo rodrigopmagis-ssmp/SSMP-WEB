@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Lead, Estagio, Clinic } from '../types';
+import { Lead, Estagio, Clinic, Campaign } from '../types';
 import { negociosService } from '../src/services/negociosService';
 import { supabaseService } from '../src/services/supabaseService';
 import { supabase } from '../lib/supabase';
@@ -7,9 +7,10 @@ import { supabase } from '../lib/supabase';
 interface NovoNegocioModalProps {
     onClose: () => void;
     onSuccess: () => void;
+    selectedCampaign?: Campaign | null;
 }
 
-export function NovoNegocioModal({ onClose, onSuccess }: NovoNegocioModalProps) {
+export function NovoNegocioModal({ onClose, onSuccess, selectedCampaign }: NovoNegocioModalProps) {
     const [leads, setLeads] = useState<Lead[]>([]);
     const [loading, setLoading] = useState(true);
     const [creating, setCreating] = useState(false);
@@ -27,12 +28,17 @@ export function NovoNegocioModal({ onClose, onSuccess }: NovoNegocioModalProps) 
     // New lead fields
     const [name, setName] = useState('');
     const [whatsapp, setWhatsapp] = useState('');
-    const [initialStage, setInitialStage] = useState<Estagio>('lead_quiz');
+    const [initialStage, setInitialStage] = useState<string>('lead_quiz'); // Can be Estagio key or Stage ID
 
     useEffect(() => {
         loadLeads();
         loadClinicContext();
-    }, []);
+
+        // Set initial stage based on campaign if exists
+        if (selectedCampaign && selectedCampaign.stages && selectedCampaign.stages.length > 0) {
+            setInitialStage(selectedCampaign.stages[0].id);
+        }
+    }, [selectedCampaign]);
 
     const loadClinicContext = async () => {
         try {
@@ -104,15 +110,36 @@ export function NovoNegocioModal({ onClose, onSuccess }: NovoNegocioModalProps) 
 
         const clinicIdToUse = userClinicId || selectedClinicId;
 
+        // Determine Stage ID and Title
+        let stageIdToUse: string | undefined;
+        let estagioTitleToUse: Estagio = initialStage as Estagio;
+
+        if (selectedCampaign) {
+            // If campaign is selected, initialStage holds the Stage ID
+            stageIdToUse = initialStage;
+            const stageObj = selectedCampaign.stages?.find(s => s.id === initialStage);
+            if (stageObj) {
+                estagioTitleToUse = stageObj.title;
+            } else {
+                // Fallback if something is wrong
+                estagioTitleToUse = 'lead_quiz';
+            }
+        } else {
+            // Legacy mode, initialStage holds the Enum key
+            estagioTitleToUse = initialStage as Estagio;
+        }
+
         setCreating(true);
         try {
             if (mode === 'select') {
                 // Create deal from existing lead
                 await negociosService.criarNegocioDeLead(
                     selectedLeadId,
-                    initialStage,
+                    estagioTitleToUse,
                     undefined, // idVendedor
-                    clinicIdToUse
+                    clinicIdToUse,
+                    selectedCampaign?.id, // Campaign ID
+                    stageIdToUse          // Stage ID
                 );
             } else {
                 // Create lead first, then deal
@@ -133,9 +160,11 @@ export function NovoNegocioModal({ onClose, onSuccess }: NovoNegocioModalProps) 
                 const newLead = await supabaseService.createLead(leadData);
                 await negociosService.criarNegocioDeLead(
                     newLead.id,
-                    initialStage,
+                    estagioTitleToUse,
                     undefined, // idVendedor
-                    clinicIdToUse
+                    clinicIdToUse,
+                    selectedCampaign?.id, // Campaign ID
+                    stageIdToUse          // Stage ID
                 );
             }
 
@@ -153,7 +182,7 @@ export function NovoNegocioModal({ onClose, onSuccess }: NovoNegocioModalProps) 
         <div className="modal-overlay" onClick={onClose}>
             <div className="modal-content" onClick={(e) => e.stopPropagation()}>
                 <div className="modal-header">
-                    <h2>➕ Novo Negócio</h2>
+                    <h2>➕ Novo Negócio {selectedCampaign ? `- ${selectedCampaign.name}` : ''}</h2>
                     <button className="close-btn" onClick={onClose}>✕</button>
                 </div>
 
@@ -254,13 +283,21 @@ export function NovoNegocioModal({ onClose, onSuccess }: NovoNegocioModalProps) 
                             <label>Estágio Inicial</label>
                             <select
                                 value={initialStage}
-                                onChange={(e) => setInitialStage(e.target.value as Estagio)}
+                                onChange={(e) => setInitialStage(e.target.value)}
                                 aria-label="Estágio inicial"
                             >
-                                <option value="lead_quiz">Lead Quiz</option>
-                                <option value="em_atendimento">Em Atendimento</option>
-                                <option value="qualific ado">Qualificado</option>
-                                <option value="oferta_consulta">Oferta de Consulta</option>
+                                {selectedCampaign && selectedCampaign.stages ? (
+                                    selectedCampaign.stages.map(stage => (
+                                        <option key={stage.id} value={stage.id}>{stage.title}</option>
+                                    ))
+                                ) : (
+                                    <>
+                                        <option value="lead_quiz">Lead Quiz</option>
+                                        <option value="em_atendimento">Em Atendimento</option>
+                                        <option value="qualificado">Qualificado</option>
+                                        <option value="oferta_consulta">Oferta de Consulta</option>
+                                    </>
+                                )}
                             </select>
                         </div>
 

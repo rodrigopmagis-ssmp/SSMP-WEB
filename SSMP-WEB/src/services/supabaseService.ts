@@ -1020,6 +1020,28 @@ export const supabaseService = {
         if (error) throw error;
     },
 
+    async assignLeadToCampaign(leadId: string, campaignId: string) {
+        const { data, error } = await supabase.rpc('assign_lead_to_campaign', {
+            lead_id: leadId,
+            campaign_id: campaignId
+        });
+
+        if (error) throw error;
+        return data;
+    },
+
+    async ensureDealForLead(leadId: string, clinicId: string, campaignId: string, leadName: string) {
+        const { data, error } = await supabase.rpc('ensure_deal_for_lead', {
+            p_lead_id: leadId,
+            p_clinic_id: clinicId,
+            p_campaign_id: campaignId,
+            p_lead_name: leadName
+        });
+
+        if (error) throw error;
+        return data;
+    },
+
     // --- Ombudsman ---
 
     async createComplaint(complaint: Partial<OmbudsmanComplaint>) {

@@ -22,7 +22,13 @@ export const negociosService = {
           ai_score,
           ai_urgency,
           concerns,
-          procedure_awareness
+          procedure_awareness,
+          ai_summary,
+          observations,
+          previous_experience,
+          budget_range,
+          timeline,
+          commitment_level
         ),
         profiles!negocios_id_vendedor_fkey (
           id,
@@ -69,17 +75,24 @@ export const negociosService = {
         idLead: string,
         estagioInicial: Estagio = 'lead_quiz',
         idVendedor?: string,
-        idClinica?: string
+        idClinica?: string,
+        campaignId?: string, // NEW
+        stageId?: string     // NEW
     ): Promise<Negocio> {
+        const payload: any = {
+            id_lead: idLead,
+            estagio: estagioInicial,
+            id_vendedor: idVendedor,
+            id_clinica: idClinica,
+            entrou_pipeline_em: new Date().toISOString()
+        };
+
+        if (campaignId) payload.campaign_id = campaignId;
+        if (stageId) payload.stage_id = stageId;
+
         const { data, error } = await supabase
             .from('negocios')
-            .insert({
-                id_lead: idLead,
-                estagio: estagioInicial,
-                id_vendedor: idVendedor,
-                id_clinica: idClinica,
-                entrou_pipeline_em: new Date().toISOString()
-            })
+            .insert(payload)
             .select(`
         *,
         leads (
@@ -87,7 +100,15 @@ export const negociosService = {
           name,
           whatsapp,
           ai_score,
-          ai_urgency
+          ai_urgency,
+          ai_summary,
+          observations,
+          concerns,
+          procedure_awareness,
+          previous_experience,
+          budget_range,
+          timeline,
+          commitment_level
         )
       `)
             .single();
@@ -130,7 +151,13 @@ export const negociosService = {
           ai_score,
           ai_urgency,
           concerns,
-          procedure_awareness
+          procedure_awareness,
+          ai_summary,
+          observations,
+          previous_experience,
+          budget_range,
+          timeline,
+          commitment_level
         ),
         profiles!negocios_id_vendedor_fkey (
           id,

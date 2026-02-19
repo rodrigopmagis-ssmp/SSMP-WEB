@@ -132,6 +132,7 @@ export interface Budget {
   patient_id: string;
   patient?: Patient; // Join
   clinic_id?: string;
+  clinic?: Clinic; // Join
   status: 'draft' | 'sent' | 'approved' | 'cancelled';
   payment_method?: 'pix' | 'credit_card' | 'boleto' | 'cash';
   installments?: number;
@@ -330,6 +331,7 @@ export interface Lead {
   protocol_data?: any;
   procedure_id?: string;
   clinic_id?: string;
+  campaign_id?: string;
   created_at: string;
 }
 
@@ -346,7 +348,30 @@ export type Estagio =
   | 'consulta_paga'
   | 'ganho'
   | 'consulta_realizada'
-  | 'perdido';
+  | 'perdido'
+  | string; // Allow dynamic strings for custom stages
+
+export interface CampaignStage {
+  id: string;
+  campaign_id: string;
+  title: string;
+  position: number;
+  color?: string;
+  is_system_default?: boolean;
+}
+
+export interface Campaign {
+  id: string;
+  clinic_id: string;
+  name: string;
+  description?: string;
+  is_active: boolean;
+  stages?: CampaignStage[];
+  quiz_config?: any;
+  external_quiz_url?: string;
+  followup_config?: ScriptStage[];
+  created_at?: string;
+}
 
 export type StatusPagamento =
   | 'pendente'
@@ -379,7 +404,11 @@ export interface Negocio {
   id_paciente?: string;
   id_clinica: string;
 
-  // Etapa do Pipeline
+  // Campanha e Estágio
+  campaign_id?: string;
+  stage_id?: string;
+
+  // Etapa do Pipeline (Mantido para compatibilidade, mas idealmente migrado para stage_id)
   estagio: Estagio;
   subestagio?: string;
 

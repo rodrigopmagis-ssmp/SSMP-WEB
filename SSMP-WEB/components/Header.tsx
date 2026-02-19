@@ -57,6 +57,12 @@ const Header: React.FC<HeaderProps> = ({ currentView, onViewChange, onNewRegistr
               Dashboard
             </button>
             <button
+              className={`${currentView === 'agenda' ? 'text-primary border-b-2 border-primary' : 'text-[#1b0d11] dark:text-[#fcf8f9] font-medium'} text-sm leading-normal pb-1 transition-all`}
+              onClick={() => onViewChange('agenda')}
+            >
+              Agenda
+            </button>
+            <button
               className={`${currentView === 'patients' || currentView === 'details' ? 'text-primary border-b-2 border-primary' : 'text-[#1b0d11] dark:text-[#fcf8f9] font-medium'} text-sm leading-normal pb-1 transition-all`}
               onClick={() => onViewChange('patients')}
             >

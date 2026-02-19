@@ -26,6 +26,7 @@ import UserManagement from './components/UserManagement';
 import OmbudsmanDashboard from './components/ombudsman/OmbudsmanDashboard';
 import { TasksDashboard } from './components/tasks/TasksDashboard';
 import { BudgetsPage } from './src/pages/Budgets';
+import Agenda from './src/pages/Agenda';
 import { ThemeProvider } from './lib/theme';
 import { Toaster } from 'react-hot-toast';
 
@@ -40,7 +41,7 @@ const App: React.FC = () => {
   const [activeTreatments, setActiveTreatments] = useState<PatientTreatment[]>([]);
 
   // View State
-  const [currentView, setCurrentView] = useState<'dashboard' | 'patients' | 'financial' | 'reports' | 'settings' | 'users' | 'quiz' | 'crm_kanban' | 'lead_details' | 'sales_pipeline' | 'ombudsman' | 'tasks'>('dashboard');
+  const [currentView, setCurrentView] = useState<'dashboard' | 'patients' | 'financial' | 'reports' | 'settings' | 'users' | 'quiz' | 'crm_kanban' | 'lead_details' | 'sales_pipeline' | 'ombudsman' | 'tasks' | 'budgets' | 'agenda' | 'profile' | 'details' | 'register' | 'procedures' | 'procedure_register' | 'protocol_register'>('dashboard');
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [selectedProcedureId, setSelectedProcedureId] = useState<string | null>(null);
   const [selectedTreatmentId, setSelectedTreatmentId] = useState<string | undefined>(undefined);
@@ -458,9 +459,11 @@ const App: React.FC = () => {
         return <TasksDashboard />;
       case 'budgets':
         return <BudgetsPage />;
+      case 'agenda':
+        return <Agenda patients={patients} procedures={procedures} />;
       // return <UserManagement onBack={() => setCurrentView('dashboard')} />;
       default:
-        return <Dashboard patients={patients} onPatientSelect={navigateToProfile} onNewRegistration={() => { setEditingPatient(null); setCurrentView('register'); }} />;
+        return <Dashboard patients={patients} procedures={procedures} onPatientSelect={navigateToProfile} onNewRegistration={() => { setEditingPatient(null); setCurrentView('register'); }} />;
     }
   };
 
@@ -482,7 +485,6 @@ const App: React.FC = () => {
         <div className="flex flex-1 overflow-hidden">
           {currentView === 'procedures' && (
             <Sidebar
-              currentView={currentView}
               onViewChange={setCurrentView}
               procedures={procedures}
               categories={categories}
@@ -495,8 +497,8 @@ const App: React.FC = () => {
               onSelectProcedure={(id) => setSelectedProcedureId(id)}
             />
           )}
-          <main className={`flex-1 bg-background-light dark:bg-background-dark ${(currentView === 'crm_kanban' || currentView === 'sales_pipeline') ? 'overflow-hidden flex flex-col' : 'overflow-y-auto custom-scrollbar'}`}>
-            {(currentView === 'crm_kanban' || currentView === 'sales_pipeline') ? (
+          <main className={`flex-1 bg-background-light dark:bg-background-dark ${(currentView === 'crm_kanban' || currentView === 'sales_pipeline' || currentView === 'agenda') ? 'overflow-hidden flex flex-col' : 'overflow-y-auto custom-scrollbar'}`}>
+            {(currentView === 'crm_kanban' || currentView === 'sales_pipeline' || currentView === 'agenda') ? (
               renderView()
             ) : (
               <div className="max-w-7xl mx-auto w-full px-4 md:px-10 py-8">
