@@ -27,6 +27,12 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task: initia
     const [sendingComment, setSendingComment] = useState(false);
     const [currentUser, setCurrentUser] = useState<any>(null);
     const [showAssigneeSelector, setShowAssigneeSelector] = useState(false);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [showRenameModal, setShowRenameModal] = useState(false);
+    const [pendingAttachment, setPendingAttachment] = useState<{ file: File, category: any } | null>(null);
+    const [customFileName, setCustomFileName] = useState('');
+    const [deleteType, setDeleteType] = useState<'task' | 'attachment'>('task');
+    const [attachmentToDelete, setAttachmentToDelete] = useState<TaskAttachment | null>(null);
     const commentsEndRef = useRef<HTMLDivElement>(null);
 
     const [localAssigneeIds, setLocalAssigneeIds] = useState<string[]>(task.assigneeIds || []);
@@ -151,22 +157,29 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task: initia
 
     const handleUploadAttachment = async (file: File, category: 'comprovante_pagamento' | 'foto_paciente' | 'boleto') => {
         if (!currentUser) return;
+
+        // Intercept upload to show rename modal
+        const fileNameWithoutExt = file.name.split('.').slice(0, -1).join('.');
+        setCustomFileName(fileNameWithoutExt);
+        setPendingAttachment({ file, category });
+        setShowRenameModal(true);
+    };
+
+    const executeUpload = async (file: File, category: string, finalFileName: string) => {
         setIsUploading(true);
+        setShowRenameModal(false);
         try {
-            // Tenta obter clinicId por ordem de prioridade: prop -> tarefa -> metadata -> objeto usuario
             const clinicId = propClinicId || task.clinicId || (currentUser as any).user_metadata?.clinic_id || (currentUser as any).clinic_id;
 
             if (!clinicId) {
-                console.error('DEBUG: Clinic ID missing in TaskDetailsModal.', {
-                    prop: propClinicId,
-                    taskClinicId: task.clinicId,
-                    metadata: (currentUser as any).user_metadata?.clinic_id,
-                    userObj: (currentUser as any).clinic_id
-                });
                 throw new Error('ID da Clínica não encontrado. Por favor, tente recarregar a página.');
             }
 
-            await taskService.uploadTaskAttachment(task.id, file, category, currentUser.id, clinicId);
+            // Create a new File object with the custom name if it was changed
+            const fileExt = file.name.split('.').pop();
+            const renamedFile = new File([file], `${finalFileName}.${fileExt}`, { type: file.type });
+
+            await taskService.uploadTaskAttachment(task.id, renamedFile, category, currentUser.id, clinicId);
             toast.success('Anexo enviado com sucesso');
             loadAttachments();
         } catch (error: any) {
@@ -175,14 +188,23 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task: initia
             toast.error(`Erro ao enviar anexo: ${errorMessage}`);
         } finally {
             setIsUploading(false);
+            setPendingAttachment(null);
         }
     };
 
     const handleDeleteAttachment = async (attachment: TaskAttachment) => {
-        if (!window.confirm('Tem certeza que deseja excluir este anexo?')) return;
+        setAttachmentToDelete(attachment);
+        setDeleteType('attachment');
+        setShowDeleteConfirm(true);
+    };
+
+    const confirmDeleteAttachment = async () => {
+        if (!attachmentToDelete) return;
         try {
-            await taskService.deleteTaskAttachment(attachment.id, attachment.filePath, task.id, currentUser?.id || '');
+            await taskService.deleteTaskAttachment(attachmentToDelete.id, attachmentToDelete.filePath, task.id, currentUser?.id || '');
             toast.success('Anexo excluído');
+            setShowDeleteConfirm(false);
+            setAttachmentToDelete(null);
             loadAttachments();
         } catch (error) {
             console.error('Erro ao excluir anexo:', error);
@@ -210,17 +232,20 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task: initia
     };
 
     const handleDelete = async () => {
-        if (confirm('Tem certeza que deseja excluir esta tarefa? Esta ação não pode ser desfeita.')) {
-            try {
-                await taskService.deleteTask(task.id);
-                toast.success('Tarefa excluída');
-                onUpdate();
-                onClose();
-                window.dispatchEvent(new CustomEvent('task-updated'));
-            } catch (error) {
-                console.error('Erro ao excluir tarefa:', error);
-                toast.error('Erro ao excluir tarefa');
-            }
+        setDeleteType('task');
+        setShowDeleteConfirm(true);
+    };
+
+    const confirmDeleteTask = async () => {
+        try {
+            await taskService.deleteTask(task.id);
+            toast.success('Tarefa excluída');
+            onUpdate();
+            onClose();
+            window.dispatchEvent(new CustomEvent('task-updated'));
+        } catch (error) {
+            console.error('Erro ao excluir tarefa:', error);
+            toast.error('Erro ao excluir tarefa');
         }
     };
 
@@ -876,6 +901,10 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task: initia
                                                                 <span className="text-[10px] text-gray-400">
                                                                     {formatFileSize(attachment.fileSize)}
                                                                 </span>
+                                                                <span className="text-[10px] text-gray-300 dark:text-gray-500 flex items-center gap-1">
+                                                                    <span className="material-symbols-outlined text-[10px]">calendar_today</span>
+                                                                    {format(new Date(attachment.createdAt), "dd/MM/yy")}
+                                                                </span>
                                                             </div>
                                                         </div>
                                                     </div>
@@ -975,6 +1004,97 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task: initia
                     </button>
                 </div>
             </div>
+
+            {/* Custom Delete Confirmation Modal */}
+            {showDeleteConfirm && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-in fade-in duration-300">
+                    <div className="bg-white dark:bg-[#2d181e] rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border border-red-500/20 animate-in zoom-in-95 duration-300">
+                        <div className="p-8 flex flex-col items-center text-center">
+                            <div className="size-20 rounded-full bg-red-50 dark:bg-red-900/20 flex items-center justify-center mb-6 shadow-inner border border-red-100 dark:border-red-900/30">
+                                <span className="material-symbols-outlined text-4xl text-red-600 animate-pulse">delete_forever</span>
+                            </div>
+
+                            <h3 className="text-xl font-black text-gray-900 dark:text-white mb-2 uppercase tracking-tight">
+                                {deleteType === 'task' ? 'Excluir Tarefa?' : 'Excluir Anexo?'}
+                            </h3>
+
+                            <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed font-medium">
+                                {deleteType === 'task'
+                                    ? 'Tem certeza que deseja remover esta tarefa permanentemente? Esta ação não pode ser desfeita.'
+                                    : 'Deseja realmente excluir este anexo? O arquivo será removido do sistema.'}
+                            </p>
+                        </div>
+
+                        <div className="grid grid-cols-2 p-4 pt-0 gap-3">
+                            <button
+                                onClick={() => {
+                                    setShowDeleteConfirm(false);
+                                    setAttachmentToDelete(null);
+                                }}
+                                className="px-4 py-3 bg-gray-100 dark:bg-white/5 hover:bg-gray-200 dark:hover:bg-white/10 text-gray-700 dark:text-gray-300 rounded-xl text-sm font-bold transition-all border border-transparent"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={deleteType === 'task' ? confirmDeleteTask : confirmDeleteAttachment}
+                                className="px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-bold transition-all shadow-[0_4px_12px_rgba(220,38,38,0.3)] hover:shadow-[0_6px_16px_rgba(220,38,38,0.4)] hover:-translate-y-0.5 active:translate-y-0"
+                            >
+                                Sim, Excluir
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Custom Rename Modal */}
+            {showRenameModal && pendingAttachment && (
+                <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-in fade-in duration-300">
+                    <div className="bg-white dark:bg-[#2d181e] rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border border-primary/20 animate-in zoom-in-95 duration-300">
+                        <div className="p-8 flex flex-col items-center text-center">
+                            <div className="size-20 rounded-full bg-primary/5 dark:bg-primary/10 flex items-center justify-center mb-6 shadow-inner border border-primary/10 dark:border-primary/20">
+                                <span className="material-symbols-outlined text-4xl text-primary">edit_document</span>
+                            </div>
+
+                            <h3 className="text-xl font-black text-gray-900 dark:text-white mb-2 uppercase tracking-tight">
+                                Renomear Arquivo?
+                            </h3>
+
+                            <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed font-medium mb-6">
+                                Deseja alterar o nome do arquivo antes do envio?
+                            </p>
+
+                            <div className="w-full space-y-2">
+                                <input
+                                    type="text"
+                                    value={customFileName}
+                                    onChange={(e) => setCustomFileName(e.target.value)}
+                                    placeholder="Nome do arquivo"
+                                    className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-black/20 focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all dark:text-white font-medium text-sm"
+                                    autoFocus
+                                />
+                                <p className="text-[10px] text-gray-400 text-left pl-2 italic">
+                                    A extensão será mantida automaticamente.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 p-4 pt-0 gap-3">
+                            <button
+                                onClick={() => executeUpload(pendingAttachment.file, pendingAttachment.category, pendingAttachment.file.name.split('.').slice(0, -1).join('.'))}
+                                className="px-4 py-3 bg-gray-100 dark:bg-white/5 hover:bg-gray-200 dark:hover:bg-white/10 text-gray-700 dark:text-gray-300 rounded-xl text-sm font-bold transition-all border border-transparent"
+                            >
+                                Manter Original
+                            </button>
+                            <button
+                                onClick={() => executeUpload(pendingAttachment.file, pendingAttachment.category, customFileName || 'documento')}
+                                className="px-4 py-3 bg-primary hover:bg-primary-dark text-white rounded-xl text-sm font-bold transition-all shadow-[0_4px_12px_rgba(var(--primary-rgb),0.3)] hover:shadow-[0_6px_16px_rgba(var(--primary-rgb),0.4)] hover:-translate-y-0.5 active:translate-y-0"
+                            >
+                                Salvar e Enviar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
