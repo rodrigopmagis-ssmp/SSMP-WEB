@@ -9,6 +9,7 @@ import toast from 'react-hot-toast';
 interface TaskFormModalProps {
     onClose: () => void;
     onSuccess: () => void;
+    clinicId?: string | null;
     preloadedUsers?: User[];
     taskToEdit?: Task | null;
 }
@@ -20,7 +21,7 @@ interface User {
     email: string;
 }
 
-export const TaskFormModal: React.FC<TaskFormModalProps> = ({ onClose, onSuccess, preloadedUsers = [], taskToEdit }) => {
+export const TaskFormModal: React.FC<TaskFormModalProps> = ({ onClose, onSuccess, clinicId: propClinicId, preloadedUsers = [], taskToEdit }) => {
     const [users, setUsers] = useState<User[]>(preloadedUsers);
     const [loadingUsers, setLoadingUsers] = useState(preloadedUsers.length === 0);
     const [categories, setCategories] = useState<TaskCategory[]>([]);
@@ -160,9 +161,9 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({ onClose, onSuccess
     const fetchCategories = async () => {
         try {
             const { data: { user } } = await supabase.auth.getUser();
-            if (!user) return;
+            if (!user && !propClinicId) return;
 
-            const clinicId = user.user_metadata?.clinic_id;
+            const clinicId = propClinicId || user?.user_metadata?.clinic_id;
             const data = await taskCategoryService.getCategories(clinicId);
             setCategories(data);
         } catch (error) {
@@ -226,7 +227,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({ onClose, onSuccess
                 assigneeIds: selectedAssignees,
                 createdBy: user.id,
                 visibility: data.visibility,
-                clinicId: user.user_metadata?.clinic_id // Get clinic_id from metadata
+                clinicId: propClinicId || user.user_metadata?.clinic_id // Get clinic_id from prop or metadata
             };
 
             if (taskToEdit) {

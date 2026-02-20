@@ -539,8 +539,8 @@ export const BudgetForm: React.FC<BudgetFormProps> = ({ initialData, onSave, onC
                                     <span className="material-symbols-outlined text-sm">delete</span>
                                 </button>
 
-                                <div className="grid grid-cols-12 gap-2 items-end pr-8 min-w-[700px]">
-                                    <div className="col-span-6">
+                                <div className="grid grid-cols-2 md:grid-cols-12 gap-4 md:gap-2 items-end pr-0 md:pr-8">
+                                    <div className="col-span-2 md:col-span-6">
                                         <label className="block text-xs font-medium text-gray-500 mb-1">Procedimento</label>
                                         <select
                                             value={watchedItems[index]?.procedure_id || ''}
@@ -569,7 +569,7 @@ export const BudgetForm: React.FC<BudgetFormProps> = ({ initialData, onSave, onC
                                         </select>
                                     </div>
 
-                                    <div className="col-span-2">
+                                    <div className="col-span-1 md:col-span-2">
                                         <label className="block text-xs font-medium text-gray-500 mb-1">Valor Unit.</label>
                                         <div className="relative">
                                             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">R$</span>
@@ -588,7 +588,7 @@ export const BudgetForm: React.FC<BudgetFormProps> = ({ initialData, onSave, onC
                                         </div>
                                     </div>
 
-                                    <div className="col-span-1">
+                                    <div className="col-span-1 md:col-span-1">
                                         <label className="block text-xs font-medium text-gray-500 mb-1">Qtd.</label>
                                         <input
                                             type="number"
@@ -603,7 +603,7 @@ export const BudgetForm: React.FC<BudgetFormProps> = ({ initialData, onSave, onC
                                         />
                                     </div>
 
-                                    <div className="col-span-1">
+                                    <div className="col-span-1 md:col-span-1">
                                         <label className="block text-xs font-medium text-gray-500 mb-1">Desc. (%)</label>
                                         <div className="relative">
                                             {/* <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500 text-xs text-[10px]">%</span> */}
@@ -622,7 +622,7 @@ export const BudgetForm: React.FC<BudgetFormProps> = ({ initialData, onSave, onC
                                         </div>
                                     </div>
 
-                                    <div className="col-span-2">
+                                    <div className="col-span-1 md:col-span-2">
                                         <label className="block text-xs font-medium text-gray-500 mb-1">Total Item</label>
                                         <div className="w-full text-sm py-2 px-3 bg-gray-100 dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-600 font-bold text-gray-900 dark:text-white text-right">
                                             {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(watchedItems[index]?.total_price || 0)}
@@ -694,8 +694,8 @@ export const BudgetForm: React.FC<BudgetFormProps> = ({ initialData, onSave, onC
                                         <span className="material-symbols-outlined text-sm">delete</span>
                                     </button>
 
-                                    <div className="grid grid-cols-12 gap-3 mb-3">
-                                        <div className="col-span-3">
+                                    <div className="grid grid-cols-2 md:grid-cols-12 gap-3 mb-3">
+                                        <div className="col-span-1 md:col-span-3">
                                             <label className="block text-xs font-medium text-gray-500 mb-1">Método</label>
                                             <select
                                                 {...register(`payment_methods.${index}.method` as const, {
@@ -717,7 +717,7 @@ export const BudgetForm: React.FC<BudgetFormProps> = ({ initialData, onSave, onC
                                                 <option value="cash">Dinheiro</option>
                                             </select>
                                         </div>
-                                        <div className="col-span-3">
+                                        <div className="col-span-1 md:col-span-3">
                                             <label className="block text-xs font-medium text-gray-500 mb-1">Valor</label>
                                             <Controller
                                                 control={control}
@@ -738,7 +738,7 @@ export const BudgetForm: React.FC<BudgetFormProps> = ({ initialData, onSave, onC
                                                 )}
                                             />
                                         </div>
-                                        <div className="col-span-2">
+                                        <div className="col-span-1 md:col-span-2">
                                             <label className="block text-xs font-medium text-gray-500 mb-1">Desc. (%)</label>
                                             <input
                                                 type="number"
@@ -760,7 +760,7 @@ export const BudgetForm: React.FC<BudgetFormProps> = ({ initialData, onSave, onC
                                             />
                                         </div>
                                         {watchedPaymentMethods[index]?.method !== 'credit_card' && (
-                                            <div className="col-span-4">
+                                            <div className="col-span-1 md:col-span-4">
                                                 <label className="block text-xs font-medium text-gray-500 mb-1">Valor c/ Desc.</label>
                                                 <div className="w-full text-sm py-2 px-3 bg-gray-100 dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-600 font-bold text-gray-900 dark:text-white h-[38px]">
                                                     {(() => {

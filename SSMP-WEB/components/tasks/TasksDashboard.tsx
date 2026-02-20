@@ -33,7 +33,7 @@ export const TasksDashboard: React.FC = () => {
     const analyticsRef = useRef<HTMLDivElement>(null);
 
     // Filters - Start with 'all', but will be set to PENDING on first load
-    const [statusFilter, setStatusFilter] = useState<TaskStatusEnum | 'all'>('all');
+    const [statusFilter, setStatusFilter] = useState<TaskStatusEnum | 'all' | 'overdue'>('all');
     const [priorityFilter, setPriorityFilter] = useState<TaskPriority | 'all'>('all');
     const [typeFilter, setTypeFilter] = useState<TaskType | 'all'>('all'); // New: filter by type
     const [assigneeFilter, setAssigneeFilter] = useState<string | 'all'>('all');
@@ -643,6 +643,7 @@ export const TasksDashboard: React.FC = () => {
                         setIsFormModalOpen(false);
                         fetchTasks();
                     }}
+                    clinicId={clinicId}
                     preloadedUsers={users}
                     taskToEdit={editingTask}
                 />
@@ -653,6 +654,7 @@ export const TasksDashboard: React.FC = () => {
                 <TaskDetailsModal
                     task={viewingTask}
                     users={users}
+                    clinicId={clinicId}
                     onClose={() => setViewingTask(null)}
                     onEdit={(task) => {
                         setViewingTask(null);

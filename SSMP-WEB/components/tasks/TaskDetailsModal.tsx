@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Task, TaskPriority, TaskStatusEnum, TaskType, TaskComment, TaskVisibility } from '../../types';
+import { Task, TaskPriority, TaskStatusEnum, TaskType, TaskComment, TaskVisibility, TaskAttachment } from '../../types';
 import { taskService } from '../../src/services/tasksService';
 import { supabase } from '../../lib/supabase';
 import toast from 'react-hot-toast';
@@ -12,13 +12,17 @@ interface TaskDetailsModalProps {
     onEdit: (task: Task) => void;
     onUpdate: () => void;
     users: any[];
+    clinicId?: string | null;
 }
 
-export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task: initialTask, onClose, onEdit, onUpdate, users }) => {
+export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task: initialTask, users, clinicId: propClinicId, onClose, onEdit, onUpdate }) => {
     const [task, setTask] = useState(initialTask);
-    const [activeTab, setActiveTab] = useState<'details' | 'comments' | 'history' | 'summary'>('details');
+    const [activeTab, setActiveTab] = useState<'details' | 'comments' | 'history' | 'summary' | 'attachments'>('details');
     const [comments, setComments] = useState<TaskComment[]>([]);
     const [history, setHistory] = useState<any[]>([]); // TODO: Type this properly
+    const [attachments, setAttachments] = useState<TaskAttachment[]>([]);
+    const [loadingAttachments, setLoadingAttachments] = useState(false);
+    const [isUploading, setIsUploading] = useState(false);
     const [newComment, setNewComment] = useState('');
     const [sendingComment, setSendingComment] = useState(false);
     const [currentUser, setCurrentUser] = useState<any>(null);
@@ -65,6 +69,9 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task: initia
         loadHistory();
         if (activeTab === 'comments') {
             loadComments();
+        }
+        if (activeTab === 'attachments') {
+            loadAttachments();
         }
     }, [activeTab, task.id]);
 
@@ -129,6 +136,60 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task: initia
         }
     };
 
+    const loadAttachments = async () => {
+        setLoadingAttachments(true);
+        try {
+            const data = await taskService.getTaskAttachments(task.id);
+            setAttachments(data);
+        } catch (error) {
+            console.error('Erro ao carregar anexos:', error);
+            toast.error('Erro ao carregar anexos');
+        } finally {
+            setLoadingAttachments(false);
+        }
+    };
+
+    const handleUploadAttachment = async (file: File, category: 'comprovante_pagamento' | 'foto_paciente' | 'boleto') => {
+        if (!currentUser) return;
+        setIsUploading(true);
+        try {
+            // Tenta obter clinicId por ordem de prioridade: prop -> tarefa -> metadata -> objeto usuario
+            const clinicId = propClinicId || task.clinicId || (currentUser as any).user_metadata?.clinic_id || (currentUser as any).clinic_id;
+
+            if (!clinicId) {
+                console.error('DEBUG: Clinic ID missing in TaskDetailsModal.', {
+                    prop: propClinicId,
+                    taskClinicId: task.clinicId,
+                    metadata: (currentUser as any).user_metadata?.clinic_id,
+                    userObj: (currentUser as any).clinic_id
+                });
+                throw new Error('ID da Clínica não encontrado. Por favor, tente recarregar a página.');
+            }
+
+            await taskService.uploadTaskAttachment(task.id, file, category, currentUser.id, clinicId);
+            toast.success('Anexo enviado com sucesso');
+            loadAttachments();
+        } catch (error: any) {
+            console.error('Erro ao enviar anexo:', error);
+            const errorMessage = error.message || (typeof error === 'string' ? error : 'Erro desconhecido');
+            toast.error(`Erro ao enviar anexo: ${errorMessage}`);
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
+    const handleDeleteAttachment = async (attachment: TaskAttachment) => {
+        if (!window.confirm('Tem certeza que deseja excluir este anexo?')) return;
+        try {
+            await taskService.deleteTaskAttachment(attachment.id, attachment.filePath, task.id, currentUser?.id || '');
+            toast.success('Anexo excluído');
+            loadAttachments();
+        } catch (error) {
+            console.error('Erro ao excluir anexo:', error);
+            toast.error('Erro ao excluir anexo');
+        }
+    };
+
     const handleStatusChange = async (newStatus: TaskStatusEnum) => {
         try {
             if (newStatus === TaskStatusEnum.COMPLETED) {
@@ -171,6 +232,14 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task: initia
             case TaskPriority.LOW: return 'bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800';
             default: return 'bg-gray-100 text-gray-700 border-gray-200';
         }
+    };
+
+    const formatFileSize = (bytes: number) => {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     };
 
     const getPriorityLabel = (priority: TaskPriority) => {
@@ -247,6 +316,15 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task: initia
                     >
                         <span className="material-symbols-outlined text-lg">info</span>
                         Detalhes
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('attachments')}
+                        className={`py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap flex items-center gap-2 ${activeTab === 'attachments'
+                            ? 'border-primary text-primary'
+                            : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
+                    >
+                        <span className="material-symbols-outlined text-lg">attach_file</span>
+                        Anexos
                     </button>
                     <button
                         onClick={() => setActiveTab('comments')}
@@ -752,6 +830,124 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task: initia
                                 </div>
 
 
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ATTACHMENTS TAB */}
+                    {activeTab === 'attachments' && (
+                        <div className="flex flex-col h-full animate-in fade-in slide-in-from-right-2 duration-300">
+                            <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
+                                {loadingAttachments ? (
+                                    <div className="flex flex-col items-center justify-center h-full gap-3 text-gray-500">
+                                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                                        <p className="text-sm">Carregando anexos...</p>
+                                    </div>
+                                ) : attachments.length === 0 ? (
+                                    <div className="flex flex-col items-center justify-center h-full text-gray-400">
+                                        <span className="material-symbols-outlined text-5xl mb-3 opacity-30">attach_file</span>
+                                        <p className="text-base font-medium">Nenhum anexo encontrado.</p>
+                                        <p className="text-sm opacity-70">Faça upload de documentos ou fotos.</p>
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        {attachments.map(attachment => {
+                                            const isImage = attachment.fileType.includes('image');
+                                            return (
+                                                <div key={attachment.id} className="bg-white dark:bg-[#3d242a] p-3 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm flex items-center justify-between group hover:border-primary/30 transition-all">
+                                                    <div className="flex items-center gap-3 overflow-hidden">
+                                                        <div className={`size-10 rounded-lg flex items-center justify-center shrink-0 ${isImage ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-500' : 'bg-orange-50 dark:bg-orange-900/20 text-orange-500'
+                                                            }`}>
+                                                            <span className="material-symbols-outlined text-2xl">
+                                                                {isImage ? 'image' : 'description'}
+                                                            </span>
+                                                        </div>
+                                                        <div className="overflow-hidden">
+                                                            <p className="text-sm font-bold text-gray-900 dark:text-white truncate" title={attachment.fileName}>
+                                                                {attachment.fileName}
+                                                            </p>
+                                                            <div className="flex items-center gap-2 mt-0.5">
+                                                                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider ${attachment.category === 'comprovante_pagamento' ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' :
+                                                                    attachment.category === 'foto_paciente' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400' :
+                                                                        'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400'
+                                                                    }`}>
+                                                                    {attachment.category.replace(/_/g, ' ')}
+                                                                </span>
+                                                                <span className="text-[10px] text-gray-400">
+                                                                    {formatFileSize(attachment.fileSize)}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <button
+                                                            onClick={async () => {
+                                                                const url = await taskService.getAttachmentPublicUrl(attachment.filePath);
+                                                                window.open(url, '_blank');
+                                                            }}
+                                                            className="p-1.5 text-gray-400 hover:text-primary rounded-lg hover:bg-primary/5 transition-colors"
+                                                            title="Visualizar"
+                                                        >
+                                                            <span className="material-symbols-outlined text-lg">visibility</span>
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDeleteAttachment(attachment)}
+                                                            className="p-1.5 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                                                            title="Excluir"
+                                                        >
+                                                            <span className="material-symbols-outlined text-lg">delete</span>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Upload Area */}
+                            <div className="p-4 border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-[#2d181e] shrink-0">
+                                <div className="flex flex-col gap-3">
+                                    <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
+                                        {[
+                                            { id: 'comprovante_pagamento', label: 'Comprovante', icon: 'payments', color: 'text-green-500' },
+                                            { id: 'foto_paciente', label: 'Foto Paciente', icon: 'patient_list', color: 'text-blue-500' },
+                                            { id: 'boleto', label: 'Boleto', icon: 'description', color: 'text-yellow-500' }
+                                        ].map(cat => (
+                                            <label
+                                                key={cat.id}
+                                                className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-bold whitespace-nowrap cursor-pointer transition-all ${isUploading ? 'opacity-50 cursor-not-allowed' : 'hover:border-primary/50'
+                                                    } bg-gray-50 dark:bg-black/20 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 shadow-sm`}
+                                            >
+                                                <input
+                                                    type="file"
+                                                    className="hidden"
+                                                    disabled={isUploading}
+                                                    accept=".pdf,image/*"
+                                                    onChange={(e) => {
+                                                        const file = e.target.files?.[0];
+                                                        if (file) handleUploadAttachment(file, cat.id as any);
+                                                        // Reset input value to allow the same file to be uploaded again if needed
+                                                        e.target.value = '';
+                                                    }}
+                                                />
+                                                <span className={`material-symbols-outlined text-sm ${cat.color}`}>{cat.icon}</span>
+                                                {isUploading ? 'Enviando...' : `Anexar ${cat.label}`}
+                                            </label>
+                                        ))}
+                                    </div>
+                                    <div className="flex items-center justify-between px-1">
+                                        <p className="text-[10px] text-gray-400 italic">
+                                            Formatos aceitos: PDF e Imagens (JPG, PNG). Tamanho máx: 10MB.
+                                        </p>
+                                        {isUploading && (
+                                            <div className="flex items-center gap-2 text-[10px] text-primary font-bold animate-pulse">
+                                                <span className="material-symbols-outlined text-xs animate-spin font-bold">sync</span>
+                                                Realizando upload...
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     )}

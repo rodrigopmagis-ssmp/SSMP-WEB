@@ -1,6 +1,6 @@
 
 import { supabase } from '../lib/supabase';
-import { Task, TaskPriority, TaskStatusEnum, TaskType, TaskVisibility } from '../../types';
+import { Task, TaskAttachment, TaskPriority, TaskStatusEnum, TaskType, TaskVisibility } from '../../types';
 
 export interface CreateTaskDTO {
     title: string;
@@ -494,5 +494,115 @@ export const taskService = {
         await this.logHistory(taskId, userId, 'POSTPONED', { newDueAt });
 
         return data;
+    },
+
+    async getTaskAttachments(taskId: string): Promise<TaskAttachment[]> {
+        const { data, error } = await supabase
+            .from('task_attachments')
+            .select('*')
+            .eq('task_id', taskId)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        return (data || []).map(item => ({
+            id: item.id,
+            taskId: item.task_id,
+            clinicId: item.clinic_id,
+            filePath: item.file_path,
+            fileName: item.file_name,
+            fileType: item.file_type,
+            fileSize: item.file_size,
+            category: item.category,
+            createdBy: item.created_by,
+            createdAt: item.created_at,
+            updatedAt: item.updated_at
+        }));
+    },
+
+    async uploadTaskAttachment(taskId: string, file: File, category: string, userId: string, clinicId: string): Promise<TaskAttachment> {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${taskId}/${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
+        const filePath = `${fileName}`;
+
+        // Upload to Storage
+        const { error: uploadError } = await supabase.storage
+            .from('task-attachments')
+            .upload(filePath, file);
+
+        if (uploadError) throw uploadError;
+
+        // Save to Database
+        const { data, error: dbError } = await supabase
+            .from('task_attachments')
+            .insert({
+                task_id: taskId,
+                clinic_id: clinicId,
+                file_path: filePath,
+                file_name: file.name,
+                file_type: file.type,
+                file_size: file.size,
+                category: category,
+                created_by: userId
+            })
+            .select()
+            .single();
+
+        if (dbError) {
+            // Cleanup storage on DB failure
+            await supabase.storage.from('task-attachments').remove([filePath]);
+            throw dbError;
+        }
+
+        await this.logHistory(taskId, userId, 'UPDATED', { action: 'ATTACHMENT_ADDED', fileName: file.name });
+
+        return {
+            id: data.id,
+            taskId: data.task_id,
+            clinicId: data.clinic_id,
+            filePath: data.file_path,
+            fileName: data.file_name,
+            fileType: data.file_type,
+            fileSize: data.file_size,
+            category: data.category,
+            createdBy: data.created_by,
+            createdAt: data.created_at,
+            updatedAt: data.updated_at
+        };
+    },
+
+    async deleteTaskAttachment(attachmentId: string, filePath: string, taskId: string, userId: string): Promise<void> {
+        // Delete from Storage
+        const { error: storageError } = await supabase.storage
+            .from('task-attachments')
+            .remove([filePath]);
+
+        if (storageError) console.error('Error deleting file from storage:', storageError);
+
+        // Delete from Database
+        const { error: dbError } = await supabase
+            .from('task_attachments')
+            .delete()
+            .eq('id', attachmentId);
+
+        if (dbError) throw dbError;
+
+        await this.logHistory(taskId, userId, 'UPDATED', { action: 'ATTACHMENT_REMOVED' });
+    },
+
+    async getAttachmentPublicUrl(filePath: string) {
+        const { data, error } = await supabase.storage
+            .from('task-attachments')
+            .createSignedUrl(filePath, 3600); // URL válida por 1 hora
+
+        if (error) {
+            console.error('Erro ao gerar URL assinada:', error);
+            // Fallback para URL pública caso a assinada falhe (embora bucket privado retorne 404)
+            const { data: publicData } = supabase.storage
+                .from('task-attachments')
+                .getPublicUrl(filePath);
+            return publicData.publicUrl;
+        }
+
+        return data.signedUrl;
     }
 };

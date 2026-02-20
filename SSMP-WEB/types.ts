@@ -666,6 +666,20 @@ export interface TaskComment {
     avatar_url?: string;
   };
 }
+
+export interface TaskAttachment {
+  id: string;
+  taskId: string;
+  clinicId: string;
+  filePath: string;
+  fileName: string;
+  fileType: string;
+  fileSize: number;
+  category: 'comprovante_pagamento' | 'foto_paciente' | 'boleto';
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
 // ... existing code ...
 
 export interface TaskHistory {
