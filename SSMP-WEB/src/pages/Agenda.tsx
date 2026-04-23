@@ -425,7 +425,7 @@ const Agenda: React.FC<AgendaProps> = ({ patients, procedures }) => {
         if (isToday) {
             return {
                 style: {
-                    backgroundColor: '#eff6ff',
+                    backgroundColor: '#fff1f2',
                 },
                 className: 'rbc-today',
             };
@@ -452,7 +452,7 @@ const Agenda: React.FC<AgendaProps> = ({ patients, procedures }) => {
         if (isWithinBusinessHours && !isHol && !isSatSun) {
             return {
                 style: {
-                    backgroundColor: isToday ? '#eff6ff' : 'white',
+                    backgroundColor: isToday ? '#fff1f2' : 'white',
                     pointerEvents: 'auto',
                 },
             };
