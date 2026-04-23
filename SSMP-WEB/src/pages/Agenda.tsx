@@ -841,10 +841,14 @@ const Agenda: React.FC<AgendaProps> = ({ patients, procedures }) => {
                                         style: {
                                             backgroundColor: '#fee2e2',
                                             borderLeft: '4px solid #dc2626',
+                                            borderTop: '1px solid white',
+                                            borderRight: '1px solid white',
+                                            borderBottom: '1px solid white',
                                             backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 4px, rgba(220,38,38,0.12) 4px, rgba(220,38,38,0.12) 8px)',
                                             color: '#7f1d1d',
                                             padding: '2px 4px',
                                             cursor: 'default',
+                                            borderRadius: '4px',
                                         },
                                     };
                                 }
@@ -891,11 +895,11 @@ const Agenda: React.FC<AgendaProps> = ({ patients, procedures }) => {
                                     style: {
                                         backgroundColor: bg,
                                         borderLeft: `4px solid ${border}`,
+                                        borderTop: '1px solid white',
+                                        borderRight: '1px solid white',
+                                        borderBottom: '1px solid white',
                                         color: color,
                                         padding: '0 4px',
-                                        borderTop: 'none',
-                                        borderRight: 'none',
-                                        borderBottom: 'none',
                                         borderRadius: '4px',
                                         fontSize: '0.75rem',
                                         boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
