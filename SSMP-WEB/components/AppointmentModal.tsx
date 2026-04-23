@@ -20,6 +20,7 @@ interface AppointmentModalProps {
     isPatientFixed?: boolean;
     defaultPatientId?: string;
     isEmbedded?: boolean;
+    isReadOnly?: boolean;
 }
 
 const CancelOptionsModal = ({ isOpen, onClose, onReschedule, onCancel }: { isOpen: boolean, onClose: () => void, onReschedule: () => void, onCancel: () => void }) => {
@@ -191,7 +192,8 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
     clinicId,
     isPatientFixed,
     defaultPatientId,
-    isEmbedded
+    isEmbedded,
+    isReadOnly
 }) => {
     const [loading, setLoading] = useState(false);
     const [formData, setFormData] = useState({
@@ -727,7 +729,8 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
                                     id="status"
                                     value={formData.status}
                                     onChange={handleStatusChange}
-                                    className={`flex-1 p-2 rounded-lg border text-sm font-medium outline-none focus:ring-2 focus:ring-offset-1 focus:ring-primary ${statusColors[formData.status]}`}
+                                    disabled={isReadOnly}
+                                    className={`flex-1 p-2 rounded-lg border text-sm font-medium outline-none focus:ring-2 focus:ring-offset-1 focus:ring-primary ${statusColors[formData.status]} ${isReadOnly ? 'cursor-not-allowed opacity-80' : ''}`}
                                 >
                                     {Object.entries(statusLabels).map(([value, label]) => (
                                         <option key={value} value={value} className="bg-white text-gray-900 dark:bg-gray-800 dark:text-white">
@@ -771,8 +774,8 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
                                         onFocus={() => setIsPatientDropdownOpen(true)}
                                         onClick={() => setIsPatientDropdownOpen(true)}
                                         placeholder="Digite para buscar paciente..."
-                                        className={`w-full p-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white ${isPatientFixed ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed opacity-80' : ''}`}
-                                        disabled={isPatientFixed}
+                                        className={`w-full p-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white ${(isPatientFixed || isReadOnly) ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed opacity-80' : ''}`}
+                                        disabled={isPatientFixed || isReadOnly}
                                         autoComplete="off"
                                     />
                                     <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
@@ -824,8 +827,9 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
                                     id="professional_id"
                                     value={formData.professional_id}
                                     onChange={(e) => setFormData({ ...formData, professional_id: e.target.value })}
-                                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                                    className={`w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white ${isReadOnly ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed opacity-80' : ''}`}
                                     required
+                                    disabled={isReadOnly}
                                 >
                                     <option value="">Selecione um profissional</option>
                                     {professionals.map(p => (
@@ -843,7 +847,8 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
                                     id="procedure_id"
                                     value={formData.procedure_id}
                                     onChange={(e) => setFormData({ ...formData, procedure_id: e.target.value })}
-                                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                                    className={`w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white ${isReadOnly ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed opacity-80' : ''}`}
+                                    disabled={isReadOnly}
                                 >
                                     <option value="">Selecione um procedimento</option>
                                     {procedures.map(p => (
@@ -863,8 +868,9 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
                                         type="datetime-local"
                                         value={formData.start_time}
                                         onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
-                                        className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                                        className={`w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white ${isReadOnly ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed opacity-80' : ''}`}
                                         required
+                                        disabled={isReadOnly}
                                     />
                                 </div>
                                 <div>
@@ -876,8 +882,9 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
                                         type="datetime-local"
                                         value={formData.end_time}
                                         onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
-                                        className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                                        className={`w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white ${isReadOnly ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed opacity-80' : ''}`}
                                         required
+                                        disabled={isReadOnly}
                                     />
                                 </div>
                             </div>
@@ -891,9 +898,10 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
                                     id="notes"
                                     value={formData.notes}
                                     onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                                    className={`w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white ${isReadOnly ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed opacity-80' : ''}`}
                                     rows={3}
                                     placeholder="Detalhes adicionais..."
+                                    disabled={isReadOnly}
                                 />
                             </div>
 
@@ -901,7 +909,7 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
                     </div>
 
                     <div className="p-6 border-t border-gray-100 dark:border-gray-700 flex justify-end items-center gap-3 bg-gray-50 dark:bg-gray-800/50 flex-shrink-0">
-                        {initialEvent && (
+                        {initialEvent && !isReadOnly && (
                             <button
                                 type="button"
                                 onClick={() => setShowDeleteConfirm(true)}
@@ -920,21 +928,32 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
                         >
                             Cancelar
                         </button>
-                        <button
-                            form="appointment-form"
-                            type="submit"
-                            disabled={loading || isOperationComplete}
-                            className="px-4 py-2 text-sm font-medium text-white bg-primary rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center gap-2"
-                        >
-                            {loading ? (
-                                <>
-                                    <span className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin"></span>
-                                    {isRescheduleMode ? 'Reagendando...' : 'Salvando...'}
-                                </>
-                            ) : (
-                                isRescheduleMode ? 'Confirmar Reagendamento' : (initialEvent ? 'Salvar Alterações' : 'Criar Agendamento')
-                            )}
-                        </button>
+                        {!isReadOnly ? (
+                            <button
+                                form="appointment-form"
+                                type="submit"
+                                disabled={loading || isOperationComplete}
+                                className="px-4 py-2 text-sm font-medium text-white bg-primary rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center gap-2"
+                            >
+                                {loading ? (
+                                    <>
+                                        <span className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin"></span>
+                                        {isRescheduleMode ? 'Reagendando...' : 'Salvando...'}
+                                    </>
+                                ) : (
+                                    isRescheduleMode ? 'Confirmar Reagendamento' : (initialEvent ? 'Salvar Alterações' : 'Criar Agendamento')
+                                )}
+                            </button>
+                        ) : (
+                            <button
+                                type="button"
+                                onClick={onClose}
+                                className="px-4 py-2 text-sm font-medium text-white bg-primary rounded-lg hover:bg-primary/90 transition-colors flex items-center gap-2"
+                            >
+                                <span className="material-symbols-outlined text-lg">check</span>
+                                OK
+                            </button>
+                        )}
                     </div>
             </div>
     );
@@ -942,7 +961,7 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
     return (
         <>
             {isEmbedded ? content : (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
                     {content}
                 </div>
             )}

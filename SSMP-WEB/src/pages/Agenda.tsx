@@ -105,6 +105,7 @@ const Agenda: React.FC<AgendaProps> = ({ patients, procedures }) => {
     const [selectedBlock, setSelectedBlock] = useState<any | undefined>(undefined);
     const [isReportOpen, setIsReportOpen] = useState(false);
     const [isExtractOpen, setIsExtractOpen] = useState(false);
+    const [isModalReadOnly, setIsModalReadOnly] = useState(false);
 
     // Warning Modal State
     const [warningModal, setWarningModal] = useState<{
@@ -302,11 +303,12 @@ const Agenda: React.FC<AgendaProps> = ({ patients, procedures }) => {
         return holiday?.description || null;
     };
 
-    const openAppointmentModal = (slot?: Date, event?: any) => {
+    const openAppointmentModal = (slot?: Date, event?: any, readOnly = false) => {
         setSelectedSlot(slot || new Date());
         setSelectedEvent(event);
         setModalDefaultTab('appointment');
         setSelectedBlock(undefined);
+        setIsModalReadOnly(readOnly);
         setIsUnifiedModalOpen(true);
     };
 
@@ -314,6 +316,7 @@ const Agenda: React.FC<AgendaProps> = ({ patients, procedures }) => {
         setSelectedBlock(block);
         setModalDefaultTab('block');
         setSelectedEvent(undefined);
+        setIsModalReadOnly(false);
         setIsUnifiedModalOpen(true);
     };
 
@@ -934,6 +937,7 @@ const Agenda: React.FC<AgendaProps> = ({ patients, procedures }) => {
                     clinicId={clinicId}
                     defaultTab={modalDefaultTab}
                     editingBlock={selectedBlock}
+                    isReadOnly={isModalReadOnly}
                 />
             </main>
 
@@ -950,6 +954,24 @@ const Agenda: React.FC<AgendaProps> = ({ patients, procedures }) => {
                 isOpen={isReportOpen}
                 onClose={() => setIsReportOpen(false)}
                 professionals={professionals}
+                onEditAppointment={(appt) => {
+                    const event = {
+                        id: appt.id,
+                        resource: appt,
+                        start: new Date(appt.start_time),
+                        end: new Date(appt.end_time)
+                    };
+                    openAppointmentModal(undefined, event, false);
+                }}
+                onViewAppointment={(appt) => {
+                    const event = {
+                        id: appt.id,
+                        resource: appt,
+                        start: new Date(appt.start_time),
+                        end: new Date(appt.end_time)
+                    };
+                    openAppointmentModal(undefined, event, true);
+                }}
             />
 
             {/* Extract Modal */}

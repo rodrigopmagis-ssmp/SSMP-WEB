@@ -14,6 +14,7 @@ interface UnifiedAgendaModalProps {
     clinicId?: string | null;
     defaultTab?: 'appointment' | 'block';
     editingBlock?: any;
+    isReadOnly?: boolean;
 }
 
 const UnifiedAgendaModal: React.FC<UnifiedAgendaModalProps> = ({
@@ -27,7 +28,8 @@ const UnifiedAgendaModal: React.FC<UnifiedAgendaModalProps> = ({
     initialEvent,
     clinicId,
     defaultTab = 'appointment',
-    editingBlock
+    editingBlock,
+    isReadOnly
 }) => {
     const [activeTab, setActiveTab] = useState<'appointment' | 'block'>(defaultTab);
 
@@ -52,14 +54,14 @@ const UnifiedAgendaModal: React.FC<UnifiedAgendaModalProps> = ({
     const showTabs = !initialEvent && !editingBlock;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
             <div className={`bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full ${activeTab === 'appointment' ? 'max-w-lg' : 'max-w-2xl'} overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]`}>
                 
                 {/* Header with Tabs */}
                 <div className="flex flex-col border-b border-gray-100 dark:border-gray-700 flex-shrink-0">
                     <div className="flex justify-between items-center p-6 pb-2">
                         <h2 className="text-xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
-                            {initialEvent ? 'Editar Agendamento' : (editingBlock ? 'Editar Bloqueio' : (activeTab === 'appointment' ? 'Novo Agendamento' : 'Bloqueio de Horário'))}
+                            {initialEvent ? (isReadOnly ? 'Visualizar Agendamento' : 'Editar Agendamento') : (editingBlock ? 'Editar Bloqueio' : (activeTab === 'appointment' ? 'Novo Agendamento' : 'Bloqueio de Horário'))}
                         </h2>
                         <button
                             onClick={onClose}
@@ -118,6 +120,7 @@ const UnifiedAgendaModal: React.FC<UnifiedAgendaModalProps> = ({
                                 initialEvent={initialEvent}
                                 clinicId={clinicId}
                                 isEmbedded={true}
+                                isReadOnly={isReadOnly}
                             />
                         </div>
                     ) : (

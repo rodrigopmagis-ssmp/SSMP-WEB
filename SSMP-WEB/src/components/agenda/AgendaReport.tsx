@@ -21,6 +21,8 @@ interface AgendaReportProps {
     isOpen: boolean;
     onClose: () => void;
     professionals: { id: string; full_name: string }[];
+    onEditAppointment?: (appointment: Appointment) => void;
+    onViewAppointment?: (appointment: Appointment) => void;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -62,7 +64,7 @@ function avatarColor(name: string): string {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-const AgendaReport: React.FC<AgendaReportProps> = ({ isOpen, onClose, professionals }) => {
+const AgendaReport: React.FC<AgendaReportProps> = ({ isOpen, onClose, professionals, onEditAppointment, onViewAppointment }) => {
     const [appointments, setAppointments] = useState<Appointment[]>([]);
     const [loading, setLoading] = useState(false);
     const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -471,9 +473,22 @@ const AgendaReport: React.FC<AgendaReportProps> = ({ isOpen, onClose, profession
                                                 </span>
                                             </td>
                                             <td className="px-3 py-3">
-                                                <button className="p-1 text-gray-400 hover:text-gray-600 rounded transition-colors">
-                                                    <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>more_vert</span>
-                                                </button>
+                                                <div className="flex items-center gap-1">
+                                                    <button 
+                                                        onClick={() => onViewAppointment?.(appt)}
+                                                        className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                                        title="Visualizar"
+                                                    >
+                                                        <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>visibility</span>
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => onEditAppointment?.(appt)}
+                                                        className="p-1 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded transition-colors"
+                                                        title="Editar"
+                                                    >
+                                                        <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>edit</span>
+                                                    </button>
+                                                </div>
                                             </td>
                                         </tr>
                                     );
