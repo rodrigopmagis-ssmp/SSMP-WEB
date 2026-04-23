@@ -136,14 +136,20 @@ const CustomAgenda: React.FC<CustomAgendaProps> = ({ events, date }) => {
                                         );
                                     }
 
-                                    if (event.type === 'block' || event.type === 'block-banner') {
+                                    if (event.type === 'block-banner') {
+                                        return null;
+                                    }
+
+                                    if (event.type === 'block') {
                                         return (
                                             <div key={event.id} className="bg-red-50 border-l-4 border-red-400 p-3 rounded-r-md flex items-center gap-3 opacity-70">
                                                 <span className="material-symbols-outlined text-red-600">block</span>
                                                 <div className="flex flex-col">
                                                     <span className="font-medium text-red-900">{event.title}</span>
                                                     <span className="text-xs text-red-700">
-                                                        {format(event.start, 'HH:mm')} - {format(event.end, 'HH:mm')}
+                                                        {event.resource.is_full_day 
+                                                            ? 'Dia Inteiro' 
+                                                            : `${format(event.start, 'HH:mm')} - ${format(event.end, 'HH:mm')}`}
                                                     </span>
                                                 </div>
                                             </div>

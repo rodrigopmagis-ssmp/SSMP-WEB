@@ -38,7 +38,7 @@ CREATE POLICY "Users can view schedule blocks for their clinic"
   FOR SELECT
   USING (
     clinic_id IN (
-      SELECT id FROM clinics WHERE user_id = auth.uid()
+      SELECT clinic_id FROM profiles WHERE id = auth.uid()
     )
   );
 
@@ -48,7 +48,7 @@ CREATE POLICY "Users can insert schedule blocks for their clinic"
   FOR INSERT
   WITH CHECK (
     clinic_id IN (
-      SELECT id FROM clinics WHERE user_id = auth.uid()
+      SELECT clinic_id FROM profiles WHERE id = auth.uid()
     )
   );
 
@@ -58,7 +58,7 @@ CREATE POLICY "Users can update schedule blocks for their clinic"
   FOR UPDATE
   USING (
     clinic_id IN (
-      SELECT id FROM clinics WHERE user_id = auth.uid()
+      SELECT clinic_id FROM profiles WHERE id = auth.uid()
     )
   );
 
@@ -68,7 +68,7 @@ CREATE POLICY "Users can delete schedule blocks for their clinic"
   FOR DELETE
   USING (
     clinic_id IN (
-      SELECT id FROM clinics WHERE user_id = auth.uid()
+      SELECT clinic_id FROM profiles WHERE id = auth.uid()
     )
   );
 

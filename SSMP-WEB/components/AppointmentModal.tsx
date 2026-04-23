@@ -19,6 +19,7 @@ interface AppointmentModalProps {
     clinicId?: string | null;
     isPatientFixed?: boolean;
     defaultPatientId?: string;
+    isEmbedded?: boolean;
 }
 
 const CancelOptionsModal = ({ isOpen, onClose, onReschedule, onCancel }: { isOpen: boolean, onClose: () => void, onReschedule: () => void, onCancel: () => void }) => {
@@ -148,7 +149,8 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
     initialEvent,
     clinicId,
     isPatientFixed,
-    defaultPatientId
+    defaultPatientId,
+    isEmbedded
 }) => {
     const [loading, setLoading] = useState(false);
     const [formData, setFormData] = useState({
@@ -613,33 +615,33 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
 
     if (!isOpen) return null;
 
-    return (
-        <>
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-                <div className={`bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh] ${isRescheduleMode ? 'ring-2 ring-primary ring-offset-2' : ''}`}>
-                    <div className="flex justify-between items-center p-6 border-b border-gray-100 dark:border-gray-700 flex-shrink-0">
-                        <div className="flex flex-col">
-                            <h2 className="text-xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
-                                {isRescheduleMode ? (
-                                    <>
-                                        <span className="material-symbols-outlined text-primary">update</span>
-                                        Reagendamento
-                                    </>
-                                ) : (
-                                    initialEvent ? 'Editar Agendamento' : 'Novo Agendamento'
-                                )}
-                            </h2>
-                            {isRescheduleMode && (
-                                <p className="text-xs text-primary mt-1 font-medium">Selecione o novo horário para este paciente</p>
+    const content = (
+        <div className={`bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh] ${isRescheduleMode ? 'ring-2 ring-primary ring-offset-2' : ''} ${isEmbedded ? 'shadow-none rounded-none max-h-none h-full' : ''}`}>
+            {!isEmbedded && (
+                <div className="flex justify-between items-center p-6 border-b border-gray-100 dark:border-gray-700 flex-shrink-0">
+                    <div className="flex flex-col">
+                        <h2 className="text-xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                            {isRescheduleMode ? (
+                                <>
+                                    <span className="material-symbols-outlined text-primary">update</span>
+                                    Reagendamento
+                                </>
+                            ) : (
+                                initialEvent ? 'Editar Agendamento' : 'Novo Agendamento'
                             )}
-                        </div>
-                        <button
-                            onClick={onClose}
-                            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors text-gray-500"
-                        >
-                            <span className="material-symbols-outlined">close</span>
-                        </button>
+                        </h2>
+                        {isRescheduleMode && (
+                            <p className="text-xs text-primary mt-1 font-medium">Selecione o novo horário para este paciente</p>
+                        )}
                     </div>
+                    <button
+                        onClick={onClose}
+                        className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors text-gray-500"
+                    >
+                        <span className="material-symbols-outlined">close</span>
+                    </button>
+                </div>
+            )}
 
                     <div className="overflow-y-auto p-6 space-y-4 flex-grow">
                         {/* Status Selector - Prominent at Top */}
@@ -848,8 +850,16 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
                             )}
                         </button>
                     </div>
-                </div>
             </div>
+    );
+
+    return (
+        <>
+            {isEmbedded ? content : (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                    {content}
+                </div>
+            )}
 
             {/* Exception Validation Modal */}
             <ExceptionModal

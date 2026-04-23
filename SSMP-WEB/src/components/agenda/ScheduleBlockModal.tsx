@@ -20,6 +20,7 @@ interface ScheduleBlockModalProps {
         is_full_day: boolean;
         reason: string | null;
     };
+    isEmbedded?: boolean;
 }
 
 const ScheduleBlockModal: React.FC<ScheduleBlockModalProps> = ({
@@ -29,7 +30,8 @@ const ScheduleBlockModal: React.FC<ScheduleBlockModalProps> = ({
     clinicId,
     professionals,
     initialDate,
-    editingBlock
+    editingBlock,
+    isEmbedded
 }) => {
     const { createScheduleBlock, updateScheduleBlock, deleteScheduleBlock } = useScheduleBlocks(clinicId);
     const { getBusinessHoursForDate } = useBusinessHours(clinicId);
@@ -199,30 +201,22 @@ const ScheduleBlockModal: React.FC<ScheduleBlockModalProps> = ({
 
     if (!isOpen) return null;
 
-    return (
-        <>
-            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                {toast && toast.visible && (
-                    <Toast
-                        message={toast.message}
-                        type={toast.type}
-                        onClose={() => setToast(null)}
-                    />
-                )}
-
-                <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-                    {/* Header */}
-                    <div className="sticky top-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 p-6 flex items-center justify-between">
-                        <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-                            {editingBlock ? 'Editar Bloqueio de Horário' : 'Bloqueio de Horário'}
-                        </h2>
-                        <button
-                            onClick={onClose}
-                            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
-                        >
-                            <span className="material-symbols-outlined text-gray-500">close</span>
-                        </button>
-                    </div>
+    const content = (
+        <div className={`bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto ${isEmbedded ? 'shadow-none rounded-none max-h-none' : ''}`}>
+            {/* Header */}
+            {!isEmbedded && (
+                <div className="sticky top-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 p-6 flex items-center justify-between">
+                    <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                        {editingBlock ? 'Editar Bloqueio de Horário' : 'Bloqueio de Horário'}
+                    </h2>
+                    <button
+                        onClick={onClose}
+                        className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
+                    >
+                        <span className="material-symbols-outlined text-gray-500">close</span>
+                    </button>
+                </div>
+            )}
 
                     {/* Content */}
                     <div className="p-6 space-y-6">
@@ -462,7 +456,22 @@ const ScheduleBlockModal: React.FC<ScheduleBlockModalProps> = ({
                         </div>
                     </div>
                 </div>
-            </div>
+    );
+
+    return (
+        <>
+            {toast && toast.visible && (
+                <Toast
+                    message={toast.message}
+                    type={toast.type}
+                    onClose={() => setToast(null)}
+                />
+            )}
+            {isEmbedded ? content : (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    {content}
+                </div>
+            )}
 
             {/* Delete Confirmation Dialog */}
             {

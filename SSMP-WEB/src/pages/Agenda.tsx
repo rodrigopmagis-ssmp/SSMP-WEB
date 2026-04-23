@@ -4,12 +4,10 @@ import { format, parse, startOfWeek, getDay, isSameDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import { AgendaService, Appointment } from '../services/AgendaService';
-import AppointmentModal from '../../components/AppointmentModal';
-import { Patient, Procedure } from '../../types';
 import AgendaEvent from '../../components/AgendaEvent';
 import MiniCalendar from '../../components/MiniCalendar';
-import ScheduleBlockModal from '../components/agenda/ScheduleBlockModal';
 import AgendaReport from '../components/agenda/AgendaReport';
+import UnifiedAgendaModal from '../../components/agenda/UnifiedAgendaModal';
 import CustomAgenda from '../components/agenda/CustomAgenda';
 import ProfessionalExtractModal from '../components/agenda/ProfessionalExtractModal';
 import { supabase } from '../lib/supabase';
@@ -100,16 +98,11 @@ const Agenda: React.FC<AgendaProps> = ({ patients, procedures }) => {
     const [selectedStatus, setSelectedStatus] = useState<string>('Todos');
     const [clinicId, setClinicId] = useState<string | null>(null);
 
-    // Modal State
-    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isUnifiedModalOpen, setIsUnifiedModalOpen] = useState(false);
+    const [modalDefaultTab, setModalDefaultTab] = useState<'appointment' | 'block'>('appointment');
     const [selectedSlot, setSelectedSlot] = useState<Date | undefined>(undefined);
     const [selectedEvent, setSelectedEvent] = useState<any | undefined>(undefined);
-
-    // Schedule Block Modal State
-    const [isBlockModalOpen, setIsBlockModalOpen] = useState(false);
     const [selectedBlock, setSelectedBlock] = useState<any | undefined>(undefined);
-
-    // Report Modal State
     const [isReportOpen, setIsReportOpen] = useState(false);
     const [isExtractOpen, setIsExtractOpen] = useState(false);
 
@@ -122,7 +115,7 @@ const Agenda: React.FC<AgendaProps> = ({ patients, procedures }) => {
 
     // Hooks
     const { holidays } = useHolidays(clinicId || undefined);
-    const { businessHours } = useBusinessHours(clinicId || undefined);
+    const { businessHours, getBusinessHoursForDate } = useBusinessHours(clinicId || undefined);
     const { scheduleBlocks, refetch: refetchBlocks } = useScheduleBlocks(clinicId || undefined);
 
     // Load data
@@ -201,37 +194,32 @@ const Agenda: React.FC<AgendaProps> = ({ patients, procedures }) => {
         const baseDate = new Date(year, month - 1, day);
         const label = `🚫 ${block.reason || 'Bloqueio'}`;
 
-        if (block.is_full_day || !block.start_time || !block.end_time) {
-            // Full-day block: single all-day event
-            return [{
-                id: `block-${block.id}`,
-                title: label,
-                start: baseDate,
-                end: new Date(year, month - 1, day + 1),
-                allDay: true,
-                resource: block,
-                type: 'block',
-            }];
-        }
+        // Determine effective times
+        const startTimeStr = block.is_full_day ? '00:00:00' : (block.start_time || '00:00:00');
+        const endTimeStr = block.is_full_day ? '23:59:59' : (block.end_time || '23:59:59');
 
-        // Partial block: banner (all-day) + timed event in the grid
-        const [sh, sm] = block.start_time.split(':').map(Number);
-        const [eh, em] = block.end_time.split(':').map(Number);
+        const [sh, sm] = startTimeStr.split(':').map(Number);
+        const [eh, em] = endTimeStr.split(':').map(Number);
         const start = new Date(year, month - 1, day, sh, sm);
         const end = new Date(year, month - 1, day, eh, em);
 
+        // Banner title (different if partial)
+        const bannerTitle = block.is_full_day 
+            ? label 
+            : `🚫 ${block.start_time?.slice(0, 5)}–${block.end_time?.slice(0, 5)} ${block.reason || 'Bloqueio'}`;
+
         return [
-            // 1. All-day banner at the top of the day column
+            // 1. All-day banner at the top
             {
                 id: `block-banner-${block.id}`,
-                title: `🚫 ${block.start_time?.slice(0, 5)}–${block.end_time?.slice(0, 5)} ${block.reason || 'Bloqueio'}`,
+                title: bannerTitle,
                 start: baseDate,
                 end: new Date(year, month - 1, day + 1),
                 allDay: true,
                 resource: block,
                 type: 'block-banner',
             },
-            // 2. Timed event spanning the blocked hours
+            // 2. Timed event spanning the blocked hours (fills the grid)
             {
                 id: `block-${block.id}`,
                 title: label,
@@ -314,13 +302,20 @@ const Agenda: React.FC<AgendaProps> = ({ patients, procedures }) => {
         return holiday?.description || null;
     };
 
-    const openAppointmentModal = (slot: Date) => {
-        setSelectedSlot(slot);
-        setSelectedEvent(undefined);
-        setIsModalOpen(true);
+    const openAppointmentModal = (slot?: Date, event?: any) => {
+        setSelectedSlot(slot || new Date());
+        setSelectedEvent(event);
+        setModalDefaultTab('appointment');
+        setSelectedBlock(undefined);
+        setIsUnifiedModalOpen(true);
     };
 
-
+    const openBlockModal = (block?: any) => {
+        setSelectedBlock(block);
+        setModalDefaultTab('block');
+        setSelectedEvent(undefined);
+        setIsUnifiedModalOpen(true);
+    };
 
     const handleSelectSlot = (slotInfo: { start: Date; end: Date }) => {
         const slot = slotInfo.start;
@@ -356,13 +351,10 @@ const Agenda: React.FC<AgendaProps> = ({ patients, procedures }) => {
         if (event.type === 'holiday') return;
         if (event.type === 'block' || event.type === 'block-banner') {
             // Open block modal in edit mode
-            setSelectedBlock(event.resource);
-            setIsBlockModalOpen(true);
+            openBlockModal(event.resource);
             return;
         }
-        setSelectedEvent(event);
-        setSelectedSlot(undefined);
-        setIsModalOpen(true);
+        openAppointmentModal(undefined, event.resource);
     };
 
     const handleModalSuccess = () => {
@@ -430,17 +422,11 @@ const Agenda: React.FC<AgendaProps> = ({ patients, procedures }) => {
 
         if (isHol) {
             return {
-                style: {
-                    backgroundColor: '#fef3c7', // amber-100
-                },
                 className: 'rbc-day-holiday',
             };
         }
         if (isSat || isSun) {
             return {
-                style: {
-                    backgroundColor: '#f0f4ff', // light blue-gray
-                },
                 className: 'rbc-day-weekend',
             };
         }
@@ -448,15 +434,38 @@ const Agenda: React.FC<AgendaProps> = ({ patients, procedures }) => {
     }, [holidays]);
 
     // Slot styling for week/day views
-    const slotPropGetter = useCallback((date: Date) => {
-        const day = date.getDay();
-        if (day === 0 || day === 6) {
+    const slotPropGetter = useCallback((slotDate: Date) => {
+        const timeStr = format(slotDate, 'HH:mm');
+        const ranges = getBusinessHoursForDate(slotDate);
+        const isToday = isSameDay(slotDate, new Date());
+
+        // Check if within any active range
+        const isWithinBusinessHours = ranges.some(range => {
+            return timeStr >= range.start && timeStr < range.end;
+        });
+
+        const isHol = isHolidayDate(slotDate);
+        const isSatSun = slotDate.getDay() === 0 || slotDate.getDay() === 6;
+
+        // Se estiver no horário comercial E NÃO for feriado/fim de semana, fica branco (ou azul claro se for hoje)
+        if (isWithinBusinessHours && !isHol && !isSatSun) {
             return {
-                style: { backgroundColor: '#f0f4ff' },
+                style: {
+                    backgroundColor: isToday ? '#eff6ff' : 'white',
+                    pointerEvents: 'auto',
+                },
             };
         }
-        return {};
-    }, []);
+
+        // Caso contrário (fora de hora, feriado ou fim de semana), fica transparente para mostrar o padrão do fundo
+        return {
+            style: {
+                backgroundColor: 'transparent',
+                pointerEvents: 'auto',
+            },
+            className: `rbc-off-hours-slot ${isToday ? 'is-today' : ''}`,
+        };
+    }, [getBusinessHoursForDate]);
 
     // Custom header with Tailwind classes (fixing lint)
     const CustomDayHeader = useCallback(({ date: headerDate, label }: { date: Date; label: string }) => (
@@ -479,6 +488,25 @@ const Agenda: React.FC<AgendaProps> = ({ patients, procedures }) => {
 
     return (
         <div className="flex h-screen bg-white overflow-hidden relative">
+            <style>{`
+                .rbc-time-gutter .rbc-time-slot {
+                    background-color: transparent !important;
+                    background-image: none !important;
+                    opacity: 1 !important;
+                }
+                /* Fundo contínuo para a coluna do dia */
+                .rbc-day-slot {
+                    background-color: #f8fafc !important;
+                    background-image: repeating-linear-gradient(45deg, transparent, transparent 12px, #e2e8f0 12px, #e2e8f0 24px) !important;
+                }
+                .rbc-day-slot.rbc-today {
+                    background-color: #eff6ff !important;
+                }
+                /* Slots individuais */
+                .rbc-time-slot {
+                    border-top: 1px solid #f1f5f9;
+                }
+            `}</style>
             {/* Mobile Sidebar Overlay */}
             {isSidebarOpen && (
                 <div
@@ -504,12 +532,7 @@ const Agenda: React.FC<AgendaProps> = ({ patients, procedures }) => {
                 <div className="flex-1 overflow-y-auto p-3 custom-scrollbar">
                     {/* Create Button */}
                     <button
-                        onClick={() => {
-                            setSelectedEvent(undefined);
-                            setSelectedSlot(new Date());
-                            setIsModalOpen(true);
-                            setIsSidebarOpen(false);
-                        }}
+                        onClick={() => openAppointmentModal(new Date())}
                         className="mb-4 flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-300 rounded-full shadow-sm hover:shadow-md transition-all text-sm font-medium text-gray-700 hover:bg-gray-50 w-full justify-center"
                     >
                         <span className="material-symbols-outlined text-xl">add</span>
@@ -518,7 +541,7 @@ const Agenda: React.FC<AgendaProps> = ({ patients, procedures }) => {
 
                     {/* Schedule Block Button */}
                     <button
-                        onClick={() => { setIsBlockModalOpen(true); setIsSidebarOpen(false); }}
+                        onClick={() => openBlockModal()}
                         className="mb-4 flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-300 rounded-full shadow-sm hover:shadow-md transition-all text-sm font-medium text-gray-700 hover:bg-gray-50 w-full justify-center"
                     >
                         <span className="material-symbols-outlined text-xl">block</span>
@@ -885,41 +908,27 @@ const Agenda: React.FC<AgendaProps> = ({ patients, procedures }) => {
                 {/* FAB */}
                 <button
                     className="fixed bottom-8 right-8 z-30 w-14 h-14 bg-primary text-white rounded-full shadow-lg flex items-center justify-center hover:bg-primary/90 transition-transform hover:scale-105 active:scale-95"
-                    onClick={() => {
-                        setSelectedSlot(new Date());
-                        setSelectedEvent(undefined);
-                        setIsModalOpen(true);
-                    }}
+                    onClick={() => openAppointmentModal(new Date())}
                 >
                     <span className="material-symbols-outlined text-3xl">add</span>
                 </button>
 
-                <AppointmentModal
-                    isOpen={isModalOpen}
-                    onClose={() => setIsModalOpen(false)}
-                    onSuccess={handleModalSuccess}
+                <UnifiedAgendaModal
+                    isOpen={isUnifiedModalOpen}
+                    onClose={() => setIsUnifiedModalOpen(false)}
+                    onSuccess={() => {
+                        handleModalSuccess();
+                        refetchBlocks();
+                    }}
                     patients={patients}
                     procedures={procedures}
                     professionals={professionals}
                     initialDate={selectedSlot}
                     initialEvent={selectedEvent}
                     clinicId={clinicId}
+                    defaultTab={modalDefaultTab}
+                    editingBlock={selectedBlock}
                 />
-
-                {clinicId && (
-                    <ScheduleBlockModal
-                        isOpen={isBlockModalOpen}
-                        onClose={() => {
-                            setIsBlockModalOpen(false);
-                            setSelectedBlock(undefined);
-                        }}
-                        onSuccess={refetchBlocks}
-                        clinicId={clinicId}
-                        professionals={professionals.map(p => ({ id: p.id, name: p.full_name }))}
-                        initialDate={date.toISOString().split('T')[0]}
-                        editingBlock={selectedBlock}
-                    />
-                )}
             </main>
 
             {/* Warning Modal */}
