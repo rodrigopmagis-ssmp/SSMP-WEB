@@ -101,6 +101,47 @@ const ExceptionModal = ({ isOpen, warnings, onClose, onConfirm }: { isOpen: bool
     );
 };
 
+const DeleteConfirmationModal = ({ isOpen, onClose, onConfirm, loading }: { isOpen: boolean, onClose: () => void, onConfirm: () => void, loading: boolean }) => {
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
+                <div className="p-6">
+                    <div className="flex items-center gap-3 mb-4 text-red-600 dark:text-red-400">
+                        <span className="material-symbols-outlined text-3xl">delete_forever</span>
+                        <h3 className="text-lg font-bold text-gray-900 dark:text-white">Excluir Agendamento</h3>
+                    </div>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+                        Tem certeza que deseja excluir permanentemente este agendamento? Esta ação não pode ser desfeita.
+                    </p>
+                    <div className="flex justify-end gap-3">
+                        <button
+                            onClick={onClose}
+                            className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                            disabled={loading}
+                        >
+                            Cancelar
+                        </button>
+                        <button
+                            onClick={onConfirm}
+                            className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors flex items-center gap-2"
+                            disabled={loading}
+                        >
+                            {loading ? (
+                                <span className="animate-spin material-symbols-outlined text-lg">sync</span>
+                            ) : (
+                                <span className="material-symbols-outlined text-lg">delete</span>
+                            )}
+                            Sim, Excluir
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 const RetroactiveModal = ({ isOpen, onClose, onConfirm }: { isOpen: boolean, onClose: () => void, onConfirm: () => void }) => {
     if (!isOpen) return null;
 
@@ -175,6 +216,7 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
 
     // Track if an immediate operation (like cancellation) has been completed
     const [isOperationComplete, setIsOperationComplete] = useState(false);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
     // Patient Search State
     const [patientSearchTerm, setPatientSearchTerm] = useState('');
@@ -447,6 +489,24 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
         setFormData(prev => ({ ...prev, status: 'scheduled' })); // The NEW appointment is scheduled
         setShowCancelOptions(false);
         toast('Modo Reagendamento: Selecione a nova data e horário.', { icon: '🔄' });
+    };
+
+    const handleDelete = async () => {
+        if (!initialEvent?.resource?.id) return;
+
+        try {
+            setLoading(true);
+            await AgendaService.deleteAppointment(initialEvent.resource.id);
+            toast.success('Agendamento excluído com sucesso!');
+            onSuccess();
+            onClose();
+        } catch (error: any) {
+            console.error('Error deleting appointment:', error);
+            toast.error(`Erro ao excluir agendamento: ${error.message || 'Erro desconhecido'}`);
+        } finally {
+            setLoading(false);
+            setShowDeleteConfirm(false);
+        }
     };
 
     const handleConfirmRetroactive = () => {
@@ -840,7 +900,18 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
                         </form>
                     </div>
 
-                    <div className="p-6 border-t border-gray-100 dark:border-gray-700 flex justify-end gap-3 bg-gray-50 dark:bg-gray-800/50 flex-shrink-0">
+                    <div className="p-6 border-t border-gray-100 dark:border-gray-700 flex justify-end items-center gap-3 bg-gray-50 dark:bg-gray-800/50 flex-shrink-0">
+                        {initialEvent && (
+                            <button
+                                type="button"
+                                onClick={() => setShowDeleteConfirm(true)}
+                                className="mr-auto px-4 py-2 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors flex items-center gap-2"
+                                disabled={loading}
+                            >
+                                <span className="material-symbols-outlined text-lg">delete</span>
+                                Excluir
+                            </button>
+                        )}
                         <button
                             type="button"
                             onClick={onClose}
@@ -897,6 +968,14 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
                 isOpen={isRetroactiveModalOpen}
                 onClose={() => setIsRetroactiveModalOpen(false)}
                 onConfirm={handleConfirmRetroactive}
+            />
+
+            {/* Delete Confirmation Modal */}
+            <DeleteConfirmationModal
+                isOpen={showDeleteConfirm}
+                onClose={() => setShowDeleteConfirm(false)}
+                onConfirm={handleDelete}
+                loading={loading}
             />
         </>
     );
