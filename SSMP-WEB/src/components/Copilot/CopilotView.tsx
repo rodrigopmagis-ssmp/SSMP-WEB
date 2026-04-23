@@ -94,6 +94,7 @@ export const CopilotView: React.FC<CopilotViewProps> = ({ patientId, onBack }) =
                 <CopilotHistorySidebar
                     consultations={consultations}
                     selectedId={selectedId}
+                    patientName={patient?.name || ''}
                     loading={loading}
                     onSelect={handleSelectConsultation}
                     onNewConsultation={handleNewConsultation}
@@ -125,7 +126,10 @@ export const CopilotView: React.FC<CopilotViewProps> = ({ patientId, onBack }) =
 
                         {viewMode === 'details' && selectedId && (
                             <div className="h-full bg-white dark:bg-[#0d0d0d] overflow-y-auto animate-in fade-in slide-in-from-right-4 duration-500 relative">
-                                <CopilotTimeline consultationId={selectedId} />
+                                <CopilotTimeline 
+                                    consultationId={selectedId} 
+                                    patientName={patient?.name || ''}
+                                />
                             </div>
                         )}
                     </div>

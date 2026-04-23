@@ -88,6 +88,7 @@ export interface Consultation {
   id: string;
   patientId: string;
   doctorId: string;
+  clinicId?: string;
   audioPath?: string;
   rawTranscript?: string;
   cleanTranscript?: string;

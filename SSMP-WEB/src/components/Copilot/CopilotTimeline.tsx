@@ -3,26 +3,37 @@ import { useConsultationStatus } from '../../hooks/useConsultationStatus';
 import { Consultation } from '../../../types';
 import { supabaseService } from '../../services/supabaseService';
 import { toast } from 'react-hot-toast';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 interface CopilotTimelineProps {
     consultationId: string;
+    patientName?: string;
     onClose?: () => void;
 }
 
-export const CopilotTimeline: React.FC<CopilotTimelineProps> = ({ consultationId, onClose }) => {
+export const CopilotTimeline: React.FC<CopilotTimelineProps> = ({ consultationId, patientName, onClose }) => {
     const { consultation, isLoading, error } = useConsultationStatus(consultationId);
     const [editedProntuario, setEditedProntuario] = useState<any>(null);
     const [isSaving, setIsSaving] = useState(false);
 
     useEffect(() => {
         if (consultation?.aiProntuario) {
-            // DEBUG: Verificar estrutura dos dados
-            console.log('🔍 DEBUG - Consultation:', consultation);
-            console.log('🔍 DEBUG - aiProntuario:', consultation.aiProntuario);
-            console.log('🔍 DEBUG - dialogo:', consultation.aiProntuario?.dialogo);
-            console.log('🔍 DEBUG - dialogo is array?', Array.isArray(consultation.aiProntuario?.dialogo));
-
-            setEditedProntuario(consultation.aiProntuario);
+            // Se for string, tenta dar parse (defensivo)
+            let parsed = consultation.aiProntuario;
+            if (typeof parsed === 'string') {
+                try { 
+                    parsed = JSON.parse(parsed); 
+                } catch (e) { 
+                    console.error('Failed to parse aiProntuario JSON:', e);
+                    parsed = {};
+                }
+            }
+            
+            // Garantir que temos um objeto para edição
+            setEditedProntuario(parsed || {});
+        } else if (consultation && !consultation.aiProntuario) {
+            setEditedProntuario({});
         }
     }, [consultation]);
 
@@ -62,36 +73,76 @@ export const CopilotTimeline: React.FC<CopilotTimelineProps> = ({ consultationId
 
     const isProcessing = consultation.status === 'processing';
 
+    const formatDuration = (seconds: number) => {
+        if (!seconds) return '0:00';
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+    };
+
     return (
         <div className="flex flex-col h-full bg-gray-50/50">
             {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b bg-white/80 backdrop-blur-sm sticky top-0 z-10">
-                <div className="flex items-center gap-2">
-                    <span className="material-symbols-outlined text-blue-600">vital_signs</span>
-                    <h2 className="font-semibold text-gray-800">Revisão de Consulta IA</h2>
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${isProcessing ? 'bg-blue-100 text-blue-700' :
-                        consultation.status === 'signed' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'
-                        }`}>
-                        {isProcessing ? 'Processando...' : consultation.status === 'signed' ? 'Assinado' : 'Revisão Pendente'}
-                    </span>
-                </div>
+            <div className="flex flex-col p-6 bg-white border-b sticky top-0 z-20 shadow-sm gap-4">
+                <div className="flex items-center justify-between">
+                    <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-4">
+                            <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-200">
+                                <span className="material-symbols-outlined text-white text-3xl">person</span>
+                            </div>
+                            <div>
+                                <div className="flex items-center gap-2 mb-1">
+                                    <h2 className="text-2xl font-black text-gray-900 tracking-tight">
+                                        {patientName || 'Paciente'}
+                                    </h2>
+                                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-700 uppercase">Paciente</span>
+                                </div>
+                                <div className="flex items-center gap-3 text-sm text-gray-500 font-medium">
+                                    <div className="flex items-center gap-1.5 px-3 py-1 bg-gray-50 rounded-full border border-gray-100">
+                                        <span className="material-symbols-outlined text-[16px] text-blue-500">calendar_today</span>
+                                        {consultation?.createdAt ? format(new Date(consultation.createdAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR }) : '--/--/--'}
+                                    </div>
+                                    <div className="flex items-center gap-1.5 px-3 py-1 bg-gray-50 rounded-full border border-gray-100">
+                                        <span className="material-symbols-outlined text-[16px] text-blue-500">timer</span>
+                                        {formatDuration(consultation?.metadata?.duration)}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
-                <div className="flex gap-2">
-                    <button
-                        onClick={() => handleSave('draft')}
-                        disabled={isProcessing || isSaving || consultation.status === 'signed'}
-                        className="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-md transition-colors disabled:opacity-50"
-                    >
-                        Salvar Rascunho
-                    </button>
-                    <button
-                        onClick={() => handleSave('signed')}
-                        disabled={isProcessing || isSaving || consultation.status === 'signed'}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50"
-                    >
-                        <span className="material-symbols-outlined text-[14px]">check_circle</span>
-                        Assinar Prontuário
-                    </button>
+                    <div className="flex items-center gap-4">
+                        <div className="flex flex-col items-end gap-1">
+                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Status do Atendimento</span>
+                            <span className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold tracking-wide ${isProcessing ? 'bg-blue-50 text-blue-700 border border-blue-100 shadow-sm' :
+                                consultation.status === 'signed' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100 shadow-sm' : 'bg-amber-50 text-amber-700 border border-amber-100 shadow-sm'
+                                }`}>
+                                <div className={`w-2 h-2 rounded-full ${isProcessing ? 'bg-blue-500 animate-pulse' : consultation.status === 'signed' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                                {isProcessing ? 'PROCESSANDO IA' : consultation.status === 'signed' ? 'CONCLUÍDO & ASSINADO' : 'REVISÃO PENDENTE'}
+                            </span>
+                        </div>
+
+                        <div className="h-10 w-[1px] bg-gray-100 mx-1" />
+
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => handleSave('draft')}
+                                disabled={isProcessing || isSaving || consultation.status === 'signed'}
+                                className="px-5 py-2.5 text-sm font-bold text-gray-700 hover:bg-gray-100 rounded-xl border border-gray-200 transition-all active:scale-95 disabled:opacity-50 flex items-center gap-2"
+                            >
+                                <span className="material-symbols-outlined text-[18px]">save</span>
+                                Salvar Rascunho
+                            </button>
+                            <button
+                                onClick={() => handleSave('signed')}
+                                disabled={isProcessing || isSaving || consultation.status === 'signed'}
+                                className="flex items-center gap-2 px-6 py-2.5 text-sm font-bold bg-blue-600 text-white rounded-xl hover:bg-blue-700 shadow-lg shadow-blue-500/25 transition-all active:scale-95 disabled:opacity-50"
+                            >
+                                <span className="material-symbols-outlined text-[20px]">verified_user</span>
+                                Assinar agora
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -185,24 +236,30 @@ export const CopilotTimeline: React.FC<CopilotTimelineProps> = ({ consultationId
                                                                 icon: 'info', color: 'bg-gray-50 text-gray-700 border-gray-200', label: subKey
                                                             };
                                                             const items: string[] = Array.isArray(subVal) ? subVal : [String(subVal)];
+                                                            const displayVal = items.join('\n');
+                                                            
                                                             return (
                                                                 <div key={subKey} className={`p-3 rounded-lg border ${meta.color.split(' ')[0]} border-opacity-50`} style={{ borderColor: 'currentColor', borderWidth: 1 }}>
                                                                     <div className={`flex items-center gap-1.5 mb-2 ${meta.color.split(' ').slice(1).join(' ')}`}>
                                                                         <span className="material-symbols-outlined text-[14px]">{meta.icon}</span>
                                                                         <span className="text-xs font-semibold uppercase tracking-wide">{meta.label}</span>
                                                                     </div>
-                                                                    {items.length === 0 ? (
-                                                                        <p className="text-xs text-gray-400 italic">Nenhum registro</p>
-                                                                    ) : (
-                                                                        <ul className="space-y-1">
-                                                                            {items.map((item, i) => (
-                                                                                <li key={i} className="flex items-start gap-1.5 text-sm text-gray-800">
-                                                                                    <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-current shrink-0" />
-                                                                                    {item}
-                                                                                </li>
-                                                                            ))}
-                                                                        </ul>
-                                                                    )}
+                                                                    <textarea
+                                                                        value={displayVal}
+                                                                        placeholder="Digite um por linha..."
+                                                                        onChange={(e) => {
+                                                                            const newLines = e.target.value.split('\n').filter(line => line.trim() !== '');
+                                                                            setEditedProntuario({
+                                                                                ...editedProntuario,
+                                                                                [key]: {
+                                                                                    ...(editedProntuario[key] as object),
+                                                                                    [subKey]: newLines
+                                                                                }
+                                                                            });
+                                                                        }}
+                                                                        className="w-full text-sm text-gray-800 border-0 focus:ring-0 p-0 resize-none bg-transparent placeholder:text-gray-300 min-h-[60px]"
+                                                                        rows={Math.max(2, items.length)}
+                                                                    />
                                                                 </div>
                                                             );
                                                         })}
@@ -216,21 +273,24 @@ export const CopilotTimeline: React.FC<CopilotTimelineProps> = ({ consultationId
                                             const items = value.map((v: any) =>
                                                 typeof v === 'object' ? JSON.stringify(v) : String(v)
                                             );
+                                            const displayVal = items.join('\n');
+
                                             return (
                                                 <div key={key} className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
                                                     <label className="block text-xs font-semibold text-gray-500 uppercase mb-2">{label}</label>
-                                                    {items.length === 0 ? (
-                                                        <p className="text-xs text-gray-400 italic">Nenhum registro</p>
-                                                    ) : (
-                                                        <ul className="space-y-1">
-                                                            {items.map((item, i) => (
-                                                                <li key={i} className="flex items-start gap-2 text-sm text-gray-800">
-                                                                    <span className="mt-2 w-1.5 h-1.5 rounded-full bg-rose-400 shrink-0" />
-                                                                    {item}
-                                                                </li>
-                                                            ))}
-                                                        </ul>
-                                                    )}
+                                                    <textarea
+                                                        value={displayVal}
+                                                        placeholder="Digite um por linha..."
+                                                        onChange={(e) => {
+                                                            const newLines = e.target.value.split('\n').filter(line => line.trim() !== '');
+                                                            setEditedProntuario({
+                                                                ...editedProntuario,
+                                                                [key]: newLines
+                                                            });
+                                                        }}
+                                                        className="w-full text-sm text-gray-800 border-0 focus:ring-0 p-0 resize-none bg-transparent placeholder:text-gray-300 min-h-[40px]"
+                                                        rows={Math.max(2, items.length)}
+                                                    />
                                                 </div>
                                             );
                                         }
@@ -238,13 +298,17 @@ export const CopilotTimeline: React.FC<CopilotTimelineProps> = ({ consultationId
                                         // ── Primitive (string, number) ──
                                         const displayValue = String(value ?? '');
                                         return (
-                                            <div key={key} className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-                                                <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">{label}</label>
+                                            <div key={key} className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 hover:border-blue-200 transition-all group">
+                                                <div className="flex items-center gap-2 mb-3">
+                                                    <div className="h-2 w-2 rounded-full bg-blue-400 group-focus-within:bg-blue-600 transition-colors" />
+                                                    <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest">{label}</label>
+                                                </div>
                                                 <textarea
                                                     value={displayValue}
                                                     onChange={(e) => setEditedProntuario({ ...editedProntuario, [key]: e.target.value })}
-                                                    className="w-full text-sm text-gray-800 border-0 focus:ring-0 p-0 resize-none bg-transparent"
-                                                    rows={Math.max(2, displayValue.length / 60)}
+                                                    className="w-full text-[15px] text-gray-800 border-0 focus:ring-0 p-0 resize-none bg-transparent leading-relaxed placeholder:text-gray-300"
+                                                    placeholder={`Descreva ${label.toLowerCase()}...`}
+                                                    rows={Math.max(2, Math.ceil(displayValue.length / 50))}
                                                 />
                                             </div>
                                         );

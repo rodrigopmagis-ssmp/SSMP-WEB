@@ -1,4 +1,4 @@
-﻿import { supabase } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import { Patient, Procedure, PatientTreatment, SurveyStatus, TreatmentLog, UserProfile, Lead, OmbudsmanComplaint, OmbudsmanTimeline, ComplaintSeverity, OmbudsmanContact, ResponseStatus, Consultation, PatientMemory, Budget, BudgetItem } from '../../types';
 import { PROCEDURES as INITIAL_PROCEDURES } from '../../constants';
 
@@ -15,6 +15,19 @@ export const supabaseService = {
             .single();
 
         return profile?.clinic_id;
+    },
+
+    async verifyPassword(password: string) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user || !user.email) throw new Error('Usuário não autenticado');
+
+        const { error } = await supabase.auth.signInWithPassword({
+            email: user.email,
+            password: password
+        });
+
+        if (error) return false;
+        return true;
     },
 
     // --- Patients ---
@@ -1485,6 +1498,7 @@ export const supabaseService = {
         const dbConsultation = {
             patient_id: consultation.patientId,
             doctor_id: consultation.doctorId || user.id,
+            clinic_id: await this._getClinicId(),
             audio_path: consultation.audioPath,
             status: consultation.status || 'draft',
             created_at: new Date().toISOString()
@@ -1502,6 +1516,7 @@ export const supabaseService = {
             ...data,
             patientId: data.patient_id,
             doctorId: data.doctor_id,
+            clinicId: data.clinic_id,
             audioPath: data.audio_path,
             rawTranscript: data.raw_transcript,
             cleanTranscript: data.clean_transcript,
@@ -1535,6 +1550,7 @@ export const supabaseService = {
             id: data.id,
             patientId: data.patient_id,
             doctorId: data.doctor_id,
+            clinicId: data.clinic_id,
             audioPath: data.audio_path,
             rawTranscript: data.raw_transcript,
             cleanTranscript: data.clean_transcript,
@@ -1571,6 +1587,7 @@ export const supabaseService = {
             ...data,
             patientId: data.patient_id,
             doctorId: data.doctor_id,
+            clinicId: data.clinic_id,
             audioPath: data.audio_path,
             rawTranscript: data.raw_transcript,
             cleanTranscript: data.clean_transcript,
@@ -1581,11 +1598,17 @@ export const supabaseService = {
     },
 
     async getPatientConsultations(patientId: string) {
-        const { data, error } = await supabase
+        const clinicId = await this._getClinicId();
+        let query = supabase
             .from('consultations')
             .select('*')
-            .eq('patient_id', patientId)
-            .order('created_at', { ascending: false });
+            .eq('patient_id', patientId);
+
+        if (clinicId) {
+            query = query.eq('clinic_id', clinicId);
+        }
+
+        const { data, error } = await query.order('created_at', { ascending: false });
 
         if (error) throw error;
 
@@ -1593,6 +1616,7 @@ export const supabaseService = {
             id: c.id,
             patientId: c.patient_id,
             doctorId: c.doctor_id,
+            clinicId: c.clinic_id,
             audioPath: c.audio_path,
             rawTranscript: c.raw_transcript,
             cleanTranscript: c.clean_transcript,
