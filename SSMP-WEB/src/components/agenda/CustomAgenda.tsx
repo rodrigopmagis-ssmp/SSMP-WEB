@@ -6,6 +6,7 @@ interface CustomAgendaProps {
     events: any[];
     date: Date;
     onNavigate: (date: Date) => void;
+    onSelectEvent: (event: any) => void;
 }
 
 const getStatusColor = (status: string) => {
@@ -19,7 +20,7 @@ const getStatusColor = (status: string) => {
     }
 };
 
-const CustomAgenda: React.FC<CustomAgendaProps> = ({ events, date }) => {
+const CustomAgenda: React.FC<CustomAgendaProps> = ({ events, date, onSelectEvent }) => {
     // Filter events to show only from selected date onwards (or just group all passsed events?)
     // Usually Agenda view shows upcoming events from the selected date.
     // Let's filter events starting from 'date' (start of day).
@@ -142,7 +143,11 @@ const CustomAgenda: React.FC<CustomAgendaProps> = ({ events, date }) => {
 
                                     if (event.type === 'block') {
                                         return (
-                                            <div key={event.id} className="bg-red-50 border-l-4 border-red-400 p-3 rounded-r-md flex items-center gap-3 opacity-70">
+                                            <div 
+                                                key={event.id} 
+                                                className="bg-red-50 border-l-4 border-red-400 p-3 rounded-r-md flex items-center gap-3 opacity-70 cursor-pointer hover:bg-red-100 transition-colors"
+                                                onClick={() => onSelectEvent(event)}
+                                            >
                                                 <span className="material-symbols-outlined text-red-600">block</span>
                                                 <div className="flex flex-col">
                                                     <span className="font-medium text-red-900">{event.title}</span>
@@ -166,7 +171,8 @@ const CustomAgenda: React.FC<CustomAgendaProps> = ({ events, date }) => {
                                     return (
                                         <div
                                             key={event.id}
-                                            className={`relative flex flex-col p-3 rounded-r-md border-l-4 ${colors.border} ${colors.bg} hover:shadow-md transition-shadow`}
+                                            className={`relative flex flex-col p-3 rounded-r-md border-l-4 ${colors.border} ${colors.bg} hover:shadow-md transition-shadow cursor-pointer`}
+                                            onClick={() => onSelectEvent(event)}
                                         >
                                             <div className="flex items-center gap-2 mb-1">
                                                 <div className={`w-2 h-2 rounded-full ${colors.dot}`} />

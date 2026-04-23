@@ -354,7 +354,7 @@ const Agenda: React.FC<AgendaProps> = ({ patients, procedures }) => {
             openBlockModal(event.resource);
             return;
         }
-        openAppointmentModal(undefined, event.resource);
+        openAppointmentModal(undefined, event);
     };
 
     const handleModalSuccess = () => {
@@ -413,23 +413,24 @@ const Agenda: React.FC<AgendaProps> = ({ patients, procedures }) => {
         [Views.AGENDA]: 'Agenda',
     };
 
-    // Day styling: weekends get a light blue/gray tint
     const dayPropGetter = useCallback((date: Date) => {
-        const day = date.getDay();
-        const isSat = day === 6;
-        const isSun = day === 0;
+        const isToday = isSameDay(date, new Date());
         const isHol = isHolidayDate(date);
+        const day = date.getDay();
+        const isWeekend = day === 0 || day === 6;
 
-        if (isHol) {
+        if (isHol) return { className: 'rbc-day-holiday' };
+        if (isWeekend) return { className: 'rbc-day-weekend' };
+        
+        if (isToday) {
             return {
-                className: 'rbc-day-holiday',
+                style: {
+                    backgroundColor: '#eff6ff',
+                },
+                className: 'rbc-today',
             };
         }
-        if (isSat || isSun) {
-            return {
-                className: 'rbc-day-weekend',
-            };
-        }
+
         return {};
     }, [holidays]);
 
@@ -758,6 +759,7 @@ const Agenda: React.FC<AgendaProps> = ({ patients, procedures }) => {
                                 events={allEvents}
                                 date={date}
                                 onNavigate={setDate}
+                                onSelectEvent={handleSelectEvent}
                             />
                         </div>
                     ) : (
