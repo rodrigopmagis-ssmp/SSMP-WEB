@@ -197,7 +197,8 @@ export interface ActionItem {
   id: string;
   description: string;
   completed: boolean;
-  type: 'message' | 'photo_request' | 'call' | 'appointment' | 'custom';
+  type: 'message' | 'photo_request' | 'call' | 'appointment' | 'custom' | 'tag' | 'stage' | 'notification';
+  value?: string;
 }
 
 export interface ScriptStage {
@@ -370,6 +371,8 @@ export interface Campaign {
   quiz_config?: any;
   external_quiz_url?: string;
   followup_config?: ScriptStage[];
+  webhook_url?: string;
+  webhook_enabled: boolean;
   created_at?: string;
 }
 
@@ -702,3 +705,179 @@ export enum TaskHistoryAction {
   COMMENT_ADDED = 'COMMENT_ADDED',
   ASSIGNED = 'ASSIGNED'
 }
+
+// ============================================================
+// CRM Premium – Tipos do Kanban Inteligente
+// ============================================================
+
+export type BlocoKanban =
+  | 'captacao'
+  | 'qualificacao'
+  | 'conversao'
+  | 'pos_venda'
+  | 'perda';
+
+export type ColunaKanban =
+  // Captação
+  | 'novo_lead'
+  | 'contato_automatico_enviado'
+  | 'aguardando_resposta'
+  | 'tentativa_2'
+  | 'lead_frio'
+  // Qualificação
+  | 'respondido'
+  | 'em_diagnostico'
+  | 'perfil_aprovado'
+  | 'proposta_enviada'
+  | 'aguardando_decisao'
+  // Conversão
+  | 'avaliacao_agendada'
+  | 'avaliacao_confirmada'
+  | 'compareceu'
+  | 'fechamento_realizado'
+  | 'procedimento_executado'
+  // Pós-Venda
+  | 'pos_48h'
+  | 'acompanhamento_30d'
+  | 'upsell'
+  | 'cliente_vip'
+  | 'solicitar_indicacao'
+  // Perda
+  | 'nao_respondeu'
+  | 'sem_perfil_financeiro'
+  | 'perdeu_concorrente'
+  | 'cancelou_avaliacao'
+  | 'no_show';
+
+export interface NegocioCRM extends Negocio {
+  // Kanban premium
+  bloco?: BlocoKanban;
+  coluna?: ColunaKanban;
+  valor_procedimento?: number;
+
+  // SLA
+  sla_primeiro_contato_limite?: string;
+  sla_estourou?: boolean;
+  sla_respondido_em?: string;
+
+  // Follow-up timestamps
+  followup_1_sent_at?: string;
+  followup_2_sent_at?: string;
+  followup_3_sent_at?: string;
+  followup_4_sent_at?: string;
+}
+
+export type DirecaoMensagem = 'inbound' | 'outbound';
+export type CanalMensagem = 'whatsapp' | 'sms' | 'email' | 'internal';
+
+export interface MensagemCRM {
+  id: string;
+  lead_id: string;
+  negocio_id?: string;
+  direction: DirecaoMensagem;
+  canal: CanalMensagem;
+  conteudo: string;
+  sent_at: string;
+  delivered_at?: string;
+  read_at?: string;
+  external_id?: string;
+  template_slug?: string;
+  metadados?: any;
+  criado_em: string;
+}
+
+export type TipoSLA =
+  | 'primeiro_contato'
+  | 'resposta_atendente'
+  | 'followup_1'
+  | 'followup_2'
+  | 'followup_3'
+  | 'followup_4'
+  | 'agendamento';
+
+export interface SlaLog {
+  id: string;
+  lead_id: string;
+  negocio_id?: string;
+  tipo_sla: TipoSLA;
+  iniciado_em: string;
+  limite_em: string;
+  resolvido_em?: string;
+  tempo_decorrido?: number;
+  estourou: boolean;
+  metadados?: any;
+  criado_em: string;
+}
+
+export type StatusAgendamentoCRM =
+  | 'agendado'
+  | 'confirmado'
+  | 'compareceu'
+  | 'no_show'
+  | 'cancelado'
+  | 'reagendado';
+
+export interface AgendamentoCRM {
+  id: string;
+  lead_id: string;
+  negocio_id?: string;
+  google_event_id?: string;
+  google_calendar_id?: string;
+  data_hora: string;
+  duracao_minutos: number;
+  procedimento?: string;
+  vendedor_id?: string;
+  status: StatusAgendamentoCRM;
+  reminder_24h_sent: boolean;
+  reminder_24h_at?: string;
+  reminder_2h_sent: boolean;
+  reminder_2h_at?: string;
+  notas?: string;
+  criado_em: string;
+  atualizado_em: string;
+}
+
+export interface SlaTimerState {
+  secondsLeft: number;
+  isExpired: boolean;
+  percentLeft: number;    // 0-100 for progress bar
+  urgency: 'ok' | 'warning' | 'critical';
+}
+
+export interface ConfigKanbanBloco {
+  id: BlocoKanban;
+  label: string;
+  cor: string;
+  colunas: ConfigKanbanColuna[];
+}
+
+export interface ConfigKanbanColuna {
+  id: ColunaKanban;
+  label: string;
+  slaMinutos?: number;
+}
+
+export interface DashboardCRMMetrics {
+  // Velocidade
+  avgPrimeiroContatoMin: number;
+  pctSlaCumprido: number;
+  // Conversão
+  totalLeads: number;
+  qualificados: number;
+  agendados: number;
+  fechados: number;
+  taxaResposta: number;
+  taxaFechamento: number;
+  // Financeiro
+  receitaTotal: number;
+  ticketMedio: number;
+  // Performance por atendente
+  performanceAtendentes: {
+    nome: string;
+    leads: number;
+    fechamentos: number;
+    taxaConversao: number;
+    avgRespostaMin: number;
+  }[];
+}
+

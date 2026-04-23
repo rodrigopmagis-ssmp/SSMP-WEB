@@ -245,10 +245,10 @@ const PatientProfile: React.FC<PatientProfileProps> = ({ patient, onBack, onEdit
                         <div className="flex w-full md:w-auto gap-3">
                             <button
                                 onClick={() => setShowCopilot(true)}
-                                className="flex-1 md:flex-none flex items-center justify-center gap-2 rounded-lg h-10 px-6 bg-purple-700 text-white text-sm font-bold shadow-lg shadow-purple-500/20 hover:bg-purple-800 transition-all"
+                                className="flex-1 md:flex-none flex items-center justify-center gap-2.5 rounded-2xl h-11 px-6 bg-rose-500 text-white transition-all hover:bg-rose-600 hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-rose-500/25"
                             >
-                                <span className="material-symbols-outlined text-xl">psychology</span>
-                                <span>Copiloto IA</span>
+                                <span className="material-symbols-outlined text-white text-xl">auto_awesome</span>
+                                <span className="text-base font-bold">Ana</span>
                             </button>
                             <button onClick={onEdit} className="flex-1 md:flex-none flex items-center justify-center gap-2 rounded-lg h-10 px-6 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-sm font-bold transition-all hover:bg-gray-200">
                                 <span className="material-symbols-outlined text-xl">edit</span>

@@ -922,6 +922,29 @@ export const supabaseService = {
         return mapDbToLead(data, settings);
     },
 
+    async deleteLead(id: string) {
+        const { error } = await supabase
+            .from('leads')
+            .delete()
+            .eq('id', id);
+
+        if (error) throw error;
+        return true;
+    },
+
+    async deleteAllLeads() {
+        const clinicId = await this._getClinicId();
+        if (!clinicId) throw new Error('Clinic not found');
+
+        const { error } = await supabase
+            .from('leads')
+            .delete()
+            .eq('clinic_id', clinicId);
+
+        if (error) throw error;
+        return true;
+    },
+
     // --- Patient Tags ---
 
     async getTags() {
@@ -1290,7 +1313,28 @@ export const supabaseService = {
         return data;
     },
 
+    async deleteComplaint(id: string) {
+        const { error } = await supabase
+            .from('ombudsman_complaints')
+            .delete()
+            .eq('id', id);
 
+        if (error) throw error;
+        return true;
+    },
+
+    async deleteAllComplaints() {
+        const clinicId = await this._getClinicId();
+        if (!clinicId) throw new Error('Clinic not found');
+
+        const { error } = await supabase
+            .from('ombudsman_complaints')
+            .delete()
+            .eq('clinic_id', clinicId);
+
+        if (error) throw error;
+        return true;
+    },
 
     // --- Budgets ---
 
@@ -1638,10 +1682,76 @@ export const supabaseService = {
         } catch (error) {
             console.error('Failed to trigger n8n processing:', error);
             // Re-throw to let the UI know, but the UI now handles this gracefully
-            throw error;
+        }
+    },
+
+    async getChatMessages(leadId: string, clinicId?: string): Promise<any[]> {
+        try {
+            // 1. Encontrar o ID da conversa na tabela 'conversations'
+            let convQuery = supabase
+                .from('conversations')
+                .select('id')
+                .eq('lead_id', leadId);
+
+            if (clinicId) {
+                convQuery = convQuery.eq('clinic_id', clinicId);
+            }
+
+            const { data: convData, error: convError } = await convQuery.limit(1).maybeSingle();
+
+            if (convError) {
+                console.error('Erro ao buscar ID da conversa:', convError);
+                return [];
+            }
+
+            if (!convData) {
+                console.log('Nenhuma conversa encontrada para o lead:', leadId);
+                return [];
+            }
+
+            const conversationId = convData.id;
+
+            // 2. Buscar mensagens usando o conversationId
+            const { data, error } = await supabase
+                .from('messages')
+                .select('*')
+                .eq('conversation_id', conversationId)
+                .order('created_at', { ascending: true });
+
+            if (error) {
+                console.error('Erro ao carregar mensagens:', error);
+                return [];
+            }
+
+            return (data || []).map(msg => {
+                let sender = 'lead';
+                if (msg.sender_type === 'user') sender = 'clinic';
+                if (msg.sender_type === 'system') sender = 'system';
+
+                // Fallback de texto para mensagens de mídia sem conteúdo textual
+                const typeLabels: Record<string, string> = {
+                    image: '📷 Imagem',
+                    audio: '🔊 Áudio',
+                    video: '🎥 Vídeo',
+                    document: '📄 Documento',
+                };
+                const text = msg.content || typeLabels[msg.content_type] || '';
+
+                return {
+                    id: msg.id,
+                    text,
+                    sender: sender,
+                    type: msg.content_type || 'text',
+                    time: new Date(msg.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+                    timestamp: msg.created_at,
+                    metadata: msg.metadata
+                };
+            });
+        } catch (error) {
+            console.error('Erro geral ao buscar mensagens:', error);
+            return [];
         }
     }
-
 };
 
 
@@ -1665,9 +1775,9 @@ const mapDbToTreatment = (dbT: any): PatientTreatment => {
         stageData: stageData,
         surveyStatus: dbT.survey_status as SurveyStatus,
         surveyData: dbT.survey_data || undefined,
-        scripts: scriptsSnapshot // Popula o campo scripts no frontend
     };
 };
+
 
 // Helper function to map DB fields (snake_case) to Frontend fields (camelCase)
 const mapDbToPatient = (dbPatient: any): Patient => ({

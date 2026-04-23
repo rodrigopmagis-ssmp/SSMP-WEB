@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { FiltrosNegocio, Campaign } from '../types';
 
 interface SalesSidebarProps {
-  onViewChange: (view: 'kanban' | 'list') => void;
-  currentView: 'kanban' | 'list';
+  onViewChange: (view: 'kanban' | 'list' | 'dashboard' | 'crm') => void;
+  currentView: 'kanban' | 'list' | 'dashboard' | 'crm';
   filters: FiltrosNegocio;
   onFiltersChange: (filters: FiltrosNegocio) => void;
   onNewDeal: () => void;
@@ -106,9 +106,15 @@ export function SalesSidebar({
               <span className="material-symbols-outlined">calendar_month</span>
               Período
             </label>
-            <div className="date-range">
-              <input type="date" className="filter-input" placeholder="De" />
-              <input type="date" className="filter-input" placeholder="Até" />
+            <div className="date-range-vertical flex flex-col gap-2">
+              <div className="relative">
+                <span className="absolute -top-1.5 left-2 px-1 bg-white dark:bg-[#1E1E1E] text-[10px] font-bold text-gray-400 uppercase tracking-wider">De</span>
+                <input type="date" className="filter-input pt-4 pb-2" />
+              </div>
+              <div className="relative">
+                <span className="absolute -top-1.5 left-2 px-1 bg-white dark:bg-[#1E1E1E] text-[10px] font-bold text-gray-400 uppercase tracking-wider">Até</span>
+                <input type="date" className="filter-input pt-4 pb-2" />
+              </div>
             </div>
           </div>
 

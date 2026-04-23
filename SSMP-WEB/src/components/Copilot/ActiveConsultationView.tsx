@@ -31,6 +31,17 @@ export const ActiveConsultationView: React.FC<ActiveConsultationViewProps> = ({ 
     const [duration, setDuration] = useState(0);
     const [minimized, setMinimized] = useState(false);
 
+    // Processing State
+    const [processingStep, setProcessingStep] = useState<number>(-1); // -1 = idle
+    const [processingDone, setProcessingDone] = useState(false);
+
+    const PROCESSING_STEPS = [
+        { label: 'Salvando consulta...', icon: 'save' },
+        { label: 'Enviando áudio...', icon: 'cloud_upload' },
+        { label: 'Ativando IA Ana...', icon: 'psychology' },
+        { label: 'Consulta processada com sucesso!', icon: 'check_circle' },
+    ];
+
     // Patient State
     const [patient, setPatient] = useState<Patient | null>(null);
 
@@ -204,35 +215,43 @@ export const ActiveConsultationView: React.FC<ActiveConsultationViewProps> = ({ 
     };
 
     const saveConsultation = async (audioBlob: Blob) => {
-        const toastId = toast.loading('Salvando e processando consulta...');
+        setProcessingStep(0);
+        setProcessingDone(false);
         try {
-            // 1. Create Consultation
+            // Step 1: Create Consultation
             const consultation = await supabaseService.createConsultation({
                 patientId,
                 status: 'processing',
                 metadata: { duration }
             });
 
-            // 2. Upload Audio
+            // Step 2: Upload Audio
+            setProcessingStep(1);
             const audioPath = await supabaseService.uploadConsultationAudio(patientId, audioBlob);
-
-            // 3. Update Path
             await supabaseService.updateConsultation(consultation.id, { audioPath });
 
-            // 4. Trigger AI
+            // Step 3: Trigger AI
+            setProcessingStep(2);
             try {
                 await supabaseService.triggerCopilotProcessing(consultation.id, audioPath);
             } catch (err) {
                 console.error('N8N Trigger Error:', err);
-                // Non-blocking
             }
 
-            toast.success('Consulta finalizada com sucesso!', { id: toastId });
-            onComplete(consultation.id);
+            // Step 4: Done
+            setProcessingStep(3);
+            setProcessingDone(true);
+
+            // Navigate after short delay so user sees success
+            setTimeout(() => {
+                setProcessingStep(-1);
+                onComplete(consultation.id);
+            }, 1800);
 
         } catch (error) {
             console.error('Error saving:', error);
-            toast.error('Erro ao salvar consulta', { id: toastId });
+            setProcessingStep(-1);
+            toast.error('Erro ao salvar consulta. Tente novamente.');
         }
     };
 
@@ -248,8 +267,86 @@ export const ActiveConsultationView: React.FC<ActiveConsultationViewProps> = ({ 
         return `${mins.toString().padStart(2, '0')}m ${secs.toString().padStart(2, '0')}s`;
     };
 
+    const progressPercent = processingStep < 0 ? 0
+        : Math.round(((processingStep + 1) / PROCESSING_STEPS.length) * 100);
+
     return (
         <div className="w-full h-full bg-white dark:bg-gray-900 flex flex-col animate-in fade-in duration-300">
+
+            {/* Processing Overlay Modal */}
+            {processingStep >= 0 && (
+                <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                    <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl p-8 w-full max-w-sm mx-4 flex flex-col items-center gap-6">
+                        {/* Icon */}
+                        <div className={`w-16 h-16 rounded-full flex items-center justify-center ${
+                            processingDone
+                                ? 'bg-green-100 dark:bg-green-900/40'
+                                : 'bg-rose-100 dark:bg-rose-900/40'
+                        }`}>
+                            <span className={`material-symbols-outlined text-3xl ${
+                                processingDone ? 'text-green-600' : 'text-rose-500 animate-pulse'
+                            }`}>
+                                {PROCESSING_STEPS[processingStep]?.icon}
+                            </span>
+                        </div>
+
+                        {/* Title */}
+                        <div className="text-center">
+                            <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                                {processingDone ? 'Tudo pronto!' : 'Finalizando Consulta'}
+                            </h3>
+                            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                                {PROCESSING_STEPS[processingStep]?.label}
+                            </p>
+                        </div>
+
+                        {/* Progress Bar */}
+                        <div className="w-full">
+                            <div className="flex justify-between text-xs text-gray-400 mb-1">
+                                <span>Progresso</span>
+                                <span>{progressPercent}%</span>
+                            </div>
+                            <div className="w-full h-2 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+                                <div
+                                    className={`h-full rounded-full transition-all duration-700 ease-out ${
+                                        processingDone ? 'bg-green-500' : 'bg-rose-500'
+                                    }`}
+                                    style={{ width: `${progressPercent}%` }}
+                                />
+                            </div>
+                        </div>
+
+                        {/* Steps */}
+                        <div className="w-full space-y-2">
+                            {PROCESSING_STEPS.map((step, i) => (
+                                <div key={i} className={`flex items-center gap-3 p-2 rounded-lg transition-all ${
+                                    i < processingStep ? 'opacity-40'
+                                    : i === processingStep ? 'bg-rose-50 dark:bg-rose-900/20'
+                                    : 'opacity-25'
+                                }`}>
+                                    <span className={`material-symbols-outlined text-[18px] ${
+                                        i < processingStep ? 'text-green-500'
+                                        : i === processingStep
+                                            ? processingDone && i === PROCESSING_STEPS.length - 1
+                                                ? 'text-green-500'
+                                                : 'text-rose-500'
+                                            : 'text-gray-300'
+                                    }`}>
+                                        {i < processingStep ? 'check_circle'
+                                            : i === processingStep && processingDone ? 'check_circle'
+                                            : step.icon}
+                                    </span>
+                                    <span className={`text-sm ${
+                                        i === processingStep
+                                            ? 'text-gray-900 dark:text-white font-medium'
+                                            : 'text-gray-400'
+                                    }`}>{step.label}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
             {/* Header */}
             <div className="flex items-center justify-between px-8 py-4 border-b border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900">
                 <div className="flex items-center gap-4">
@@ -276,48 +373,73 @@ export const ActiveConsultationView: React.FC<ActiveConsultationViewProps> = ({ 
                 </div>
             </div>
 
-            {/* Main Content */}
-            <div className="flex-1 flex flex-col items-center justify-center relative p-8">
+            {/* Main Content Split Layout */}
+            <div className="flex-1 flex flex-col md:flex-row items-stretch overflow-hidden relative">
 
-                {/* Background Decoration */}
+                {/* Background Decoration (Global) */}
                 <div className="absolute inset-0 overflow-hidden pointer-events-none">
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-gradient-to-tr from-pink-100/30 to-purple-100/30 rounded-full blur-3xl opacity-50 dark:from-pink-900/10 dark:to-purple-900/10"></div>
+                    <div className="absolute top-1/2 left-1/4 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-gradient-to-tr from-pink-100/10 to-purple-100/10 rounded-full blur-3xl opacity-30 dark:from-pink-900/5 dark:to-purple-900/5"></div>
                 </div>
 
-                <div className="relative z-10 w-full max-w-4xl bg-white dark:bg-gray-800 rounded-3xl shadow-2xl border border-gray-100 dark:border-gray-700 p-12 flex flex-col items-center">
+                {/* LEFT PANEL: Control Command (38% - compact) */}
+                <div className="w-full md:w-[38%] flex flex-col items-center justify-center p-6 md:p-8 bg-gray-50/30 dark:bg-black/10 border-b md:border-b-0 md:border-r border-gray-100 dark:border-gray-800 relative z-10">
 
-                    {/* Microphone Pulse */}
-                    <div className="relative mb-12">
+                    {/* Microphone Pulse (Compact) */}
+                    <div className="relative mb-6">
                         <div className={`absolute inset-0 bg-red-500 rounded-full blur-xl opacity-20 ${!isPaused ? 'animate-pulse' : ''}`}></div>
-                        <div className="relative h-24 w-24 bg-gradient-to-br from-red-500 to-pink-600 rounded-full flex items-center justify-center shadow-lg shadow-red-500/30">
-                            <span className="material-symbols-outlined text-white text-4xl">mic</span>
+                        <div className="relative h-16 w-16 md:h-18 md:w-18 bg-gradient-to-br from-red-500 to-pink-600 rounded-full flex items-center justify-center shadow-lg shadow-red-500/30">
+                            <span className="material-symbols-outlined text-white text-2xl md:text-3xl">mic</span>
                         </div>
                     </div>
 
-                    {/* Visualizer */}
-                    <div className="h-24 w-full max-w-md mb-8 flex items-center justify-center">
+                    {/* Visualizer (Compact) */}
+                    <div className="h-12 w-full max-w-xs mb-6 flex items-center justify-center">
                         {isRecording && !isPaused && (
                             <AudioVisualizer
                                 stream={stream}
                                 isRecording={isRecording}
-                                barColor="#f43f5e" // rose-500
-                                gap={4}
+                                barColor="#f43f5e"
+                                gap={3}
                             />
                         )}
-                        {isPaused && <span className="text-gray-400 font-medium">Gravação Pausada</span>}
+                        {isPaused && <span className="text-gray-400 font-black uppercase tracking-[0.2em] text-[10px]">Pausado</span>}
                     </div>
 
-                    {/* Timer */}
-                    <div className="flex flex-col items-center mb-12">
-                        <span className="text-xs font-bold text-gray-400 tracking-[0.2em] mb-2 uppercase">Duração da Consulta</span>
-                        <div className="text-7xl font-mono font-bold text-gray-800 dark:text-white tracking-tight">
+                    {/* Timer (Scaled Down) */}
+                    <div className="flex flex-col items-center mb-8">
+                        <span className="text-[9px] font-black text-gray-400 tracking-[0.3em] mb-2 uppercase">Tempo de Consulta</span>
+                        <div className="text-4xl md:text-5xl font-mono font-bold text-gray-800 dark:text-white tracking-tighter">
                             {formatTime(duration)}
                         </div>
                     </div>
 
-                    {/* Controls */}
-                    <div className="flex items-center gap-3 flex-wrap justify-center">
-                        {/* Cancel / Discard */}
+                    {/* Compact Controls Cluster */}
+                    <div className="flex flex-col gap-2.5 w-full max-w-[280px]">
+                        <div className="grid grid-cols-2 gap-2.5">
+                            <button
+                                onClick={pauseRecording}
+                                className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-white dark:hover:bg-gray-700/50 font-bold text-gray-600 dark:text-gray-300 transition-all text-xs"
+                            >
+                                <span className="material-symbols-outlined text-base">{isPaused ? 'play_arrow' : 'pause'}</span>
+                                {isPaused ? 'Retomar' : 'Pausar'}
+                            </button>
+                            <button
+                                onClick={() => toast.success('Marcador em ' + formatTime(duration))}
+                                className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-white dark:hover:bg-gray-700/50 font-bold text-gray-600 dark:text-gray-300 transition-all text-xs"
+                            >
+                                <span className="material-symbols-outlined text-base">bookmark</span>
+                                Marcar
+                            </button>
+                        </div>
+
+                        <button
+                            onClick={handleFinish}
+                            className="flex items-center justify-center gap-2 w-full py-3.5 rounded-xl bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 text-white font-black shadow-lg shadow-red-500/20 transition-all active:scale-[0.97] uppercase tracking-wider text-xs"
+                        >
+                            <span className="material-symbols-outlined text-base">stop_circle</span>
+                            Finalizar Consulta
+                        </button>
+
                         <button
                             onClick={() => {
                                 if (confirm('Tem certeza que deseja cancelar? A gravação será descartada.')) {
@@ -325,85 +447,66 @@ export const ActiveConsultationView: React.FC<ActiveConsultationViewProps> = ({ 
                                     onCancel();
                                 }
                             }}
-                            className="flex items-center gap-2 px-5 py-3 rounded-xl border-2 border-red-200 hover:bg-red-50 dark:border-red-800 dark:hover:bg-red-900/20 font-bold text-red-500 transition-all"
+                            className="text-[9px] font-black text-gray-400 hover:text-red-500 transition-colors py-2 mt-1 uppercase tracking-widest text-center"
                         >
-                            <span className="material-symbols-outlined">cancel</span>
-                            Cancelar
-                        </button>
-
-                        {/* Pause / Resume */}
-                        <button
-                            onClick={pauseRecording}
-                            className="flex items-center gap-2 px-5 py-3 rounded-xl border-2 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 font-bold text-gray-600 dark:text-gray-300 transition-all"
-                        >
-                            <span className="material-symbols-outlined">{isPaused ? 'play_arrow' : 'pause'}</span>
-                            {isPaused ? 'Retomar' : 'Pausar'}
-                        </button>
-
-                        {/* Finish & Save */}
-                        <button
-                            onClick={handleFinish}
-                            className="flex items-center gap-2 px-8 py-3 rounded-xl bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 text-white font-bold shadow-lg transition-all active:scale-95"
-                        >
-                            <span className="material-symbols-outlined">stop_circle</span>
-                            Finalizar Consulta
-                        </button>
-
-                        {/* Bookmark */}
-                        <button
-                            onClick={() => toast.success('Marcador adicionado no tempo ' + formatTime(duration))}
-                            className="flex items-center gap-2 px-5 py-3 rounded-xl border-2 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 font-bold text-gray-600 dark:text-gray-300 transition-all"
-                        >
-                            <span className="material-symbols-outlined">bookmark_add</span>
-                            Marcar Evento
+                            Cancelar e Descartar
                         </button>
                     </div>
-
                 </div>
 
-                {/* Live Transcript View */}
-                <div className="mt-8 w-full max-w-3xl bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-200 dark:border-gray-700 p-6 shadow-inner min-h-[300px] max-h-[500px] overflow-y-auto relative">
+                {/* RIGHT PANEL: Injective Transcription Stream (62%) */}
+                <div className="flex-1 overflow-y-auto p-6 md:p-10 md:pl-12 bg-white dark:bg-gray-900 relative z-10 custom-scrollbar scroll-smooth">
+                    <div className="max-w-3xl">
 
-                    {transcriptSegments.length > 0 || interimResult ? (
-                        <div className="space-y-6">
-                            {transcriptSegments.map((segment) => (
-                                <div key={segment.id} className="animate-in fade-in slide-in-from-bottom-2 duration-500">
-                                    <span className="text-xs font-mono text-gray-400 block mb-1">
-                                        {segment.timestamp}
-                                    </span>
-                                    <p className="text-gray-700 dark:text-gray-300 text-lg leading-relaxed">
-                                        {segment.text}
-                                    </p>
-                                </div>
-                            ))}
-
+                        {/* Live Status Indicator */}
+                        <div className="flex items-center justify-between mb-8 border-b border-gray-50 dark:border-gray-800 pb-4">
+                            <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                                <span className="size-1.5 bg-blue-500 rounded-full animate-pulse"></span>
+                                Transcrição ao vivo
+                            </h3>
                             {interimResult && (
-                                <div className="animate-pulse">
-                                    <span className="text-xs font-mono text-gray-400 block mb-1">
-                                        {formatTime(duration)}
-                                    </span>
-                                    <p className="text-gray-500 dark:text-gray-400 text-lg leading-relaxed italic">
-                                        {interimResult}
-                                    </p>
-                                </div>
+                                <span className="px-1.5 py-0.5 rounded-md bg-blue-50 text-blue-600 text-[9px] font-black uppercase tracking-wider animate-in fade-in">
+                                    Processando áudio
+                                </span>
                             )}
-                            <div ref={transcriptEndRef} />
                         </div>
-                    ) : (
-                        <div className="flex flex-col items-center justify-center h-full text-gray-400 gap-2 min-h-[200px]">
-                            <span className="material-symbols-outlined text-3xl opacity-50">graphic_eq</span>
-                            <p className="text-sm italic">Detectando fala... Fale claramente.</p>
-                        </div>
-                    )}
 
-                    {/* Floating Indicators */}
-                    {(transcriptSegments.length > 0 || interimResult) && (
-                        <div className="absolute top-4 right-4 flex gap-2">
-                            <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-[10px] font-bold uppercase tracking-wider animate-in fade-in">
-                                Transcrevendo
-                            </span>
-                        </div>
-                    )}
+                        {transcriptSegments.length > 0 || interimResult ? (
+                            <div className="space-y-6">
+                                {transcriptSegments.map((segment) => (
+                                    <div key={segment.id} className="group animate-in fade-in slide-in-from-bottom-2 duration-500">
+                                        <div className="flex items-start gap-4">
+                                            <span className="text-[9px] font-bold font-mono text-gray-300 dark:text-gray-600 bg-gray-50 dark:bg-white/5 px-1.5 py-0.5 rounded mt-1 min-w-[45px] text-center">
+                                                {segment.timestamp}
+                                            </span>
+                                            <p className="flex-1 text-gray-700 dark:text-gray-200 text-sm md:text-base leading-relaxed font-medium">
+                                                {segment.text}
+                                            </p>
+                                        </div>
+                                    </div>
+                                ))}
+
+                                {interimResult && (
+                                    <div className="flex items-start gap-4 animate-pulse">
+                                        <span className="text-[9px] font-bold font-mono text-blue-300 dark:text-blue-900 bg-blue-50/50 dark:bg-blue-900/10 px-1.5 py-0.5 rounded mt-1 min-w-[45px] text-center">
+                                            {formatTranscriptTime(duration)}
+                                        </span>
+                                        <p className="flex-1 text-gray-400 dark:text-gray-500 text-sm md:text-base leading-relaxed italic font-medium">
+                                            {interimResult}
+                                        </p>
+                                    </div>
+                                )}
+                                <div ref={transcriptEndRef} className="h-24" />
+                            </div>
+                        ) : (
+                            <div className="flex flex-col items-center justify-center h-[50vh] text-gray-300 dark:text-gray-700 gap-3">
+                                <div className="size-12 rounded-full border border-dashed border-gray-200 dark:border-gray-800 flex items-center justify-center animate-[spin_10s_linear_infinite]">
+                                    <span className="material-symbols-outlined text-2xl opacity-30">graphic_eq</span>
+                                </div>
+                                <p className="text-[10px] font-black uppercase tracking-widest opacity-40">Capturando áudio...</p>
+                            </div>
+                        )}
+                    </div>
                 </div>
 
             </div>

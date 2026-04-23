@@ -82,6 +82,22 @@ const LeadQuiz: React.FC<LeadQuizProps> = ({ onBackendComplete }) => {
                 } catch (err) {
                     console.warn('LeadQuiz: Could not find clinic with slug:', clinicSlug);
                 }
+            } else if (campaignParam) {
+                // FALLBACK: Se não tem slug da clínica, mas tem campanha, busca a clínica da campanha
+                try {
+                    const { data: campaignData } = await supabase
+                        .from('campaigns')
+                        .select('clinic_id')
+                        .eq('id', campaignParam)
+                        .single();
+
+                    if (campaignData?.clinic_id) {
+                        setClinicId(campaignData.clinic_id);
+                        console.log('LeadQuiz: Resolved clinicId from campaign:', campaignData.clinic_id);
+                    }
+                } catch (err) {
+                    console.error('LeadQuiz: Error resolving clinic from campaign', err);
+                }
             }
         };
         loadContextFromUrl();
@@ -351,10 +367,23 @@ const LeadQuiz: React.FC<LeadQuizProps> = ({ onBackendComplete }) => {
     const submitQuiz = async () => {
         setLoading(true);
         try {
-            console.log('Submitting Quiz...', data, 'clinicId:', clinicId, 'campaignId:', campaignId);
+            // Se chegamos aqui sem clinicId, tentamos um último esforço se houver campaignId
+            let finalClinicId = clinicId;
+            if (!finalClinicId && campaignId) {
+                const { data: camp } = await supabase
+                    .from('campaigns')
+                    .select('clinic_id')
+                    .eq('id', campaignId)
+                    .single();
+                if (camp?.clinic_id) finalClinicId = camp.clinic_id;
+            }
+
+            if (!finalClinicId) {
+                throw new Error('Não foi possível identificar a clínica para este quiz. Verifique o link.');
+            }
 
             const { data: result, error } = await supabase.functions.invoke('new-lead', {
-                body: { ...data, clinic_id: clinicId, campaign_id: campaignId }
+                body: { ...data, clinic_id: finalClinicId, campaign_id: campaignId }
             });
 
             if (error) throw error;

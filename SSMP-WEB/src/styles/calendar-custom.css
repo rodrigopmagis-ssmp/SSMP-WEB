@@ -4,6 +4,60 @@
   overflow: visible !important;
 }
 
+.rbc-event-custom .rbc-event-label {
+  display: none !important;
+}
+
+/* Today Header Highlight (Week/Day views) */
+.rbc-time-view .rbc-header.rbc-today {
+  background-color: #ef4444 !important;
+  color: #ffffff !important;
+  border-bottom: none !important;
+}
+
+.rbc-time-view .rbc-header.rbc-today .rbc-day-header-custom span {
+  color: #ffffff !important;
+}
+
+.rbc-time-view .rbc-header.rbc-today .rbc-day-header-custom button {
+  color: rgba(255, 255, 255, 0.8) !important;
+}
+
+.rbc-time-view .rbc-header.rbc-today .rbc-day-header-custom button:hover {
+  color: #ffffff !important;
+}
+
+/* Today Highlight (Month view) - Circular highlight on number */
+.rbc-month-view .rbc-date-cell.rbc-now,
+.rbc-month-view .rbc-date-cell.rbc-today {
+  display: flex;
+  justify-content: flex-end;
+  padding: 4px !important;
+}
+
+.rbc-month-view .rbc-date-cell.rbc-now a,
+.rbc-month-view .rbc-date-cell.rbc-now button,
+.rbc-month-view .rbc-date-cell.rbc-today a,
+.rbc-month-view .rbc-date-cell.rbc-today button {
+  background-color: #ef4444 !important;
+  color: white !important;
+  width: 24px !important;
+  height: 24px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 50% !important;
+  font-weight: bold !important;
+  text-decoration: none !important;
+  border: none !important;
+  padding: 0 !important;
+}
+
+.rbc-month-view .rbc-day-bg.rbc-now,
+.rbc-month-view .rbc-day-bg.rbc-today {
+  background-color: rgba(239, 68, 68, 0.02) !important;
+}
+
 .rbc-event-custom .rbc-event-content {
   padding: 0 !important;
   height: 100%;

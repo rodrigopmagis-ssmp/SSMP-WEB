@@ -58,18 +58,43 @@ const AgendaEvent: React.FC<AgendaEventProps> = ({ event }) => {
         }
     };
 
+    // Color for the status indicator dot
+    const dotColors = {
+        scheduled: 'bg-blue-400',
+        confirmed: 'bg-green-500',
+        completed: 'bg-gray-400',
+        cancelled: 'bg-red-400',
+        no_show: 'bg-black',
+    };
+    const dotColorClass = dotColors[appointment.status as keyof typeof dotColors] || dotColors.scheduled;
+
     try {
         return (
             <Tooltip.Provider delayDuration={300}>
                 <Tooltip.Root>
                     <Tooltip.Trigger asChild>
-                        <div className="h-full w-full flex flex-col justify-between p-1 text-xs leading-tight overflow-hidden">
-                            {/* Conteúdo do Evento no Calendário (Compacto) */}
-                            <span className="font-bold truncate">{patientName}</span>
-                            <span className="text-[10px] opacity-80 mt-auto">{startTime} - {endTime}</span>
+                        <div className="h-full w-full flex flex-col p-1 text-[11px] leading-tight overflow-hidden">
+                            {/* Cabeçalho com Dot e Nome */}
+                            <div className="flex items-center gap-1 mb-0.5">
+                                <div className={`w-2 h-2 rounded-full flex-shrink-0 ${dotColorClass}`} />
+                                <span className="font-bold truncate text-gray-900 dark:text-gray-100">
+                                    {patientName}
+                                </span>
+                            </div>
+
+                            {/* Detalhes: Procedimento e Horário */}
+                            <div className="flex flex-col pl-3 space-y-0.5">
+                                <span className="truncate text-gray-700 dark:text-gray-300">
+                                    {procedureName}
+                                </span>
+                                <span className="text-[10px] text-gray-500 dark:text-gray-400 font-medium">
+                                    {startTime} - {endTime}
+                                </span>
+                            </div>
                         </div>
                     </Tooltip.Trigger>
 
+                    {/* ... (Tooltip.Portal content remains the same) */}
                     <Tooltip.Portal>
                         <Tooltip.Content
                             className="z-50 bg-white dark:bg-gray-800 rounded-lg shadow-xl p-4 w-72 border border-gray-100 dark:border-gray-700 data-[state=delayed-open]:animate-in data-[state=closed]:animate-out data-[state=delayed-open]:fade-in-0 data-[state=closed]:fade-out-0 data-[state=delayed-open]:zoom-in-95 data-[state=closed]:zoom-out-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2"
@@ -78,7 +103,7 @@ const AgendaEvent: React.FC<AgendaEventProps> = ({ event }) => {
                             <div className="flex flex-col gap-3">
                                 {/* Cabeçalho */}
                                 <div className="flex items-start gap-3">
-                                    <div className={`w-3 h-3 mt-1.5 rounded-full ${statusColorClass.split(' ')[0].replace('bg-', 'bg-')}`}></div> {/* Indicador de cor simples */}
+                                    <div className={`w-3 h-3 mt-1.5 rounded-full ${dotColorClass}`}></div> {/* Indicador de cor simples */}
                                     <div>
                                         <h4 className="font-bold text-gray-900 dark:text-white text-sm">Agendamento</h4>
                                         <p className="text-xs text-gray-500 capitalize">
@@ -111,7 +136,7 @@ const AgendaEvent: React.FC<AgendaEventProps> = ({ event }) => {
                                 <div className="space-y-2 pl-11">
                                     <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                                         <span className="material-symbols-outlined text-[16px]">schedule</span>
-                                        <span className="capitalize">{event.status === 'scheduled' ? 'Agendado' : event.status}</span>
+                                        <span className="capitalize">{appointment.status === 'scheduled' ? 'Agendado' : appointment.status}</span>
                                     </div>
                                     <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                                         <span className="material-symbols-outlined text-[16px]">medical_services</span>
@@ -139,9 +164,15 @@ const AgendaEvent: React.FC<AgendaEventProps> = ({ event }) => {
         console.error("Error rendering Tooltip in AgendaEvent:", e);
         // Fallback simple view if Tooltip fails
         return (
-            <div className="h-full w-full flex flex-col justify-between p-1 text-xs leading-tight overflow-hidden">
-                <span className="font-bold truncate">{patientName}</span>
-                <span className="text-[10px] opacity-80 mt-auto">{startTime} - {endTime}</span>
+            <div className="h-full w-full flex flex-col p-1 text-[11px] leading-tight overflow-hidden">
+                <div className="flex items-center gap-1 mb-0.5">
+                    <div className={`w-2 h-2 rounded-full flex-shrink-0 ${dotColorClass}`} />
+                    <span className="font-bold truncate text-gray-900">{patientName}</span>
+                </div>
+                <div className="flex flex-col pl-3 space-y-0.5">
+                    <span className="truncate text-gray-600">{procedureName}</span>
+                    <span className="text-[10px] text-gray-500 font-medium">{startTime} - {endTime}</span>
+                </div>
             </div>
         );
     }

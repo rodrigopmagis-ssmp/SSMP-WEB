@@ -829,35 +829,35 @@ const Agenda: React.FC<AgendaProps> = ({ patients, procedures }) => {
 
                                 switch (status) {
                                     case 'confirmed':
-                                        bg = '#4ade80'; // green-400
-                                        border = '#16a34a'; // green-600
-                                        color = '#fff';
+                                        bg = '#f0fdf4'; // green-50
+                                        border = '#22c55e'; // green-500
+                                        color = '#111827';
                                         break;
                                     case 'completed':
-                                        bg = '#9ca3af'; // gray-400
-                                        border = '#4b5563'; // gray-600
-                                        color = '#fff';
+                                        bg = '#f9fafb'; // gray-50
+                                        border = '#6b7280'; // gray-500
+                                        color = '#111827';
                                         break;
                                     case 'cancelled':
-                                        bg = '#f87171'; // red-400
-                                        border = '#dc2626'; // red-600
-                                        color = '#fff';
+                                        bg = '#fef2f2'; // red-50
+                                        border = '#ef4444'; // red-500
+                                        color = '#111827';
                                         break;
                                     case 'no_show':
-                                        bg = '#374151'; // gray-700
-                                        border = '#111827'; // gray-900
-                                        color = '#fff';
+                                        bg = '#f8fafc'; // slate-50
+                                        border = '#1e293b'; // slate-800
+                                        color = '#111827';
                                         break;
                                     case 'scheduled':
                                     default:
-                                        bg = '#60a5fa'; // blue-400
-                                        border = '#2563eb'; // blue-600
-                                        color = '#fff';
+                                        bg = '#eff6ff'; // blue-50
+                                        border = '#3b82f6'; // blue-500
+                                        color = '#111827';
                                         break;
                                     case 'rescheduled':
-                                        bg = '#e9d5ff'; // purple-200
-                                        border = '#9333ea'; // purple-600
-                                        color = '#6b21a8'; // purple-800
+                                        bg = '#faf5ff'; // purple-50
+                                        border = '#a855f7'; // purple-500
+                                        color = '#111827';
                                         break;
                                 }
 
@@ -871,8 +871,10 @@ const Agenda: React.FC<AgendaProps> = ({ patients, procedures }) => {
                                         borderTop: 'none',
                                         borderRight: 'none',
                                         borderBottom: 'none',
+                                        borderRadius: '4px',
                                         fontSize: '0.75rem',
-                                        opacity: status === 'cancelled' ? 0.7 : 1,
+                                        boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                                        opacity: status === 'cancelled' ? 0.75 : 1,
                                     },
                                 };
                             }}

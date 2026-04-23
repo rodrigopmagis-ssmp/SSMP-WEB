@@ -66,6 +66,18 @@ const ScheduleBlockModal: React.FC<ScheduleBlockModalProps> = ({
         }
     }, [editingBlock, initialDate]);
 
+    // Body scroll lock
+    useEffect(() => {
+        if (isOpen) {
+            document.body.style.overflow = 'hidden';
+        } else {
+            document.body.style.overflow = 'unset';
+        }
+        return () => {
+            document.body.style.overflow = 'unset';
+        };
+    }, [isOpen]);
+
     // Update times when full day is toggled or date changes
     useEffect(() => {
         if (formData.isFullDay && formData.date) {
@@ -128,7 +140,8 @@ const ScheduleBlockModal: React.FC<ScheduleBlockModalProps> = ({
                 end_time: formData.isFullDay ? null : `${formData.endTime}:00`,
                 is_clinic_wide: formData.isClinicWide,
                 is_full_day: formData.isFullDay,
-                reason: formData.title
+                reason: formData.title,
+                professional_id: formData.isClinicWide ? null : (formData.selectedProfessionals[0] || null)
             };
 
             if (editingBlock) {

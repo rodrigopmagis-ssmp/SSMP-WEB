@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabaseService } from '../../src/services/supabaseService';
+import { toast } from 'react-hot-toast';
 import { OmbudsmanComplaint, ComplaintStatus, ComplaintSeverity, Patient } from '../../types';
 import Input from '../ui/Input';
 import Button from '../ui/Button';
@@ -49,6 +50,22 @@ const OmbudsmanDashboard: React.FC<OmbudsmanDashboardProps> = ({
             setComplaints(data);
         } catch (error) {
             console.error('Error fetching complaints:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleDeleteAll = async () => {
+        if (!window.confirm('TEM CERTEZA? Isso apagará TODOS os registros da Ouvidoria permanentemente!')) return;
+
+        try {
+            setLoading(true);
+            await supabaseService.deleteAllComplaints();
+            toast.success('Todos os registros foram apagados com sucesso!');
+            setComplaints([]);
+        } catch (error) {
+            console.error('Error deleting complaints:', error);
+            toast.error('Erro ao apagar registros. Verifique as permissões.');
         } finally {
             setLoading(false);
         }

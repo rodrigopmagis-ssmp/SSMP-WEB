@@ -3,12 +3,16 @@ import { SalesSidebar } from './SalesSidebar';
 import { NegocioCard } from './NegocioCard';
 import { NegocioDetailsModal } from './NegocioDetailsModal';
 import { NovoNegocioModal } from './NovoNegocioModal';
-import { CampaignManager } from './CampaignManager'; // NEW
+import { CampaignManager } from './CampaignManager';
+import SalesDashboard from './SalesDashboard';
+import { KanbanBoardCRM } from './negocios/KanbanBoardCRM';
 import { useNegocios } from '../hooks/useNegocios';
-import { Negocio, Estagio, Campaign } from '../types';
+import { useCRMAutoTransition } from '../hooks/useCRMAutoTransition';
+import { Negocio, NegocioCRM, Estagio, Campaign, BlocoKanban, ColunaKanban } from '../types';
 import { useSLAMonitor } from '../hooks/useSLAMonitor';
 import { useAutoLoss } from '../hooks/useAutoLoss';
 import { supabase } from '../lib/supabase';
+import { COLUNA_TO_BLOCO } from '../lib/kanbanConfig';
 
 // Cores para fallback se não houver cor no estágio
 const DEFAULT_COLORS = [
@@ -16,7 +20,7 @@ const DEFAULT_COLORS = [
 ];
 
 export function SalesPipeline() {
-  const [currentView, setCurrentView] = useState<'kanban' | 'list'>('kanban');
+  const [currentView, setCurrentView] = useState<'kanban' | 'list' | 'dashboard' | 'crm'>('crm');
   const [filtros, setFiltros] = useState<{
     search?: string;
     estagio?: Estagio | 'em_andamento';
@@ -31,6 +35,7 @@ export function SalesPipeline() {
     assignedTo: undefined
   });
   const [negocioSelecionado, setNegocioSelecionado] = useState<Negocio | null>(null);
+  const [modalInitialTab, setModalInitialTab] = useState<'details' | 'whatsapp' | 'history' | 'followup'>('details');
   const [mostrarNovoNegocioModal, setMostrarNovoNegocioModal] = useState(false);
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
 
@@ -45,6 +50,16 @@ export function SalesPipeline() {
 
   // Ativar serviço de auto-loss (limpeza automática)
   useAutoLoss();
+
+  // Mover card no kanban CRM premium (bloco+coluna)
+  const moverCardCRM = React.useCallback(async (negocioId: string, coluna: ColunaKanban, bloco: BlocoKanban) => {
+    const negocio = negocios.find(n => n.id === negocioId);
+    if (!negocio || ((negocio as NegocioCRM).coluna === coluna)) return;
+    await atualizarNegocio(negocioId, { bloco, coluna } as any);
+  }, [negocios, atualizarNegocio]);
+
+  // WhatsApp auto-transition: lead responde → move para Qualificação > respondido
+  useCRMAutoTransition({ negocios, onMoverCard: moverCardCRM });
 
   // Obter usuário atual
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -197,7 +212,7 @@ export function SalesPipeline() {
                     ) : (
                       <div className="relative group">
                         <select
-                          className="appearance-none bg-transparent pr-10 py-1 text-2xl font-bold text-gray-900 dark:text-white border-b-2 border-transparent hover:border-gray-200 dark:hover:border-gray-700 transition-all cursor-pointer outline-none focus:border-blue-500 focus:ring-0"
+                          className="appearance-none bg-none bg-transparent [&::-ms-expand]:hidden pr-10 py-1 text-2xl font-bold text-gray-900 dark:text-white border-b-2 border-transparent hover:border-gray-200 dark:hover:border-gray-700 transition-all cursor-pointer outline-none focus:border-blue-500 focus:ring-0"
                           value={selectedCampaign?.id || ''}
                           onChange={(e) => {
                             const cmp = campaigns.find(c => c.id === e.target.value);
@@ -249,6 +264,26 @@ export function SalesPipeline() {
                       >
                         <span className="material-symbols-outlined text-[18px]">list</span>
                         <span className="hidden sm:inline">Lista</span>
+                      </button>
+                      <button
+                        onClick={() => setCurrentView('dashboard')}
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${currentView === 'dashboard'
+                          ? 'bg-zinc-900 text-white shadow-sm'
+                          : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                          }`}
+                      >
+                        <span className="material-symbols-outlined text-[18px]">dashboard</span>
+                        <span className="hidden sm:inline">Analytics</span>
+                      </button>
+                      <button
+                        onClick={() => setCurrentView('crm')}
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${currentView === 'crm'
+                          ? 'bg-zinc-950 text-white shadow-sm border border-zinc-700'
+                          : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                          }`}
+                      >
+                        <span className="material-symbols-outlined text-[18px]">hub</span>
+                        <span className="hidden sm:inline">CRM Pro</span>
                       </button>
                     </div>
 
@@ -319,7 +354,23 @@ export function SalesPipeline() {
 
             {/* Content Area */}
             <div className="flex-1 overflow-x-auto overflow-y-hidden px-4 pb-4 pt-1">
-              {currentView === 'list' ? (
+              {currentView === 'crm' ? (
+                <div className="h-full">
+                  <KanbanBoardCRM
+                    negocios={negociosFiltrados as NegocioCRM[]}
+                    onCardClick={(negocio, tab) => {
+                      setNegocioSelecionado(negocio);
+                      setModalInitialTab(tab || 'details');
+                    }}
+                    onMoverCard={moverCardCRM}
+                  />
+                </div>
+              ) : currentView === 'dashboard' ? (
+                <SalesDashboard
+                  clinicId={negocios[0]?.id_clinica || ''}
+                  onClose={() => setCurrentView('kanban')}
+                />
+              ) : currentView === 'list' ? (
                 // VIEW LISTA
                 <div className="bg-white dark:bg-[#1E1E1E] rounded-xl border border-gray-200 dark:border-gray-700/50 h-full overflow-y-auto w-full">
                   <table className="w-full text-left border-collapse">
@@ -336,7 +387,7 @@ export function SalesPipeline() {
                       {negociosFiltrados.map(negocio => (
                         <tr
                           key={negocio.id}
-                          onClick={() => setNegocioSelecionado(negocio)}
+                          onClick={() => { setNegocioSelecionado(negocio); setModalInitialTab('details'); }}
                           className="hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-pointer transition-colors"
                         >
                           <td className="p-4">
@@ -432,7 +483,7 @@ export function SalesPipeline() {
                               negocio={negocio}
                               onDragStart={handleDragStart}
                               onDragEnd={() => setDragOverColumn(null)}
-                              onClick={() => setNegocioSelecionado(negocio)}
+                              onClick={() => { setNegocioSelecionado(negocio); setModalInitialTab('details'); }}
                             />
                           ))}
                         </div>
@@ -461,6 +512,8 @@ export function SalesPipeline() {
           onClose={() => setNegocioSelecionado(null)}
           onUpdate={handleRefresh}
           campaignStages={selectedCampaign?.stages || []}
+          onMoverKanbanColuna={moverCardCRM}
+          initialTab={modalInitialTab}
         />
       )}
 

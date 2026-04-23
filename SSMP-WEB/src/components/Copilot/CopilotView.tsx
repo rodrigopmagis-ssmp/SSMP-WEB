@@ -67,23 +67,30 @@ export const CopilotView: React.FC<CopilotViewProps> = ({ patientId, onBack }) =
     };
 
     return (
-        <div className="fixed inset-0 z-[9999] bg-gray-100 dark:bg-gray-900 flex animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[9999] bg-white dark:bg-[#0a0a0a] flex animate-in fade-in duration-300 selection:bg-rose-500/30">
 
-            {/* Layout Container */}
-            <div className="flex w-full h-full bg-white dark:bg-gray-900 rounded-none shadow-none items-stretch overflow-hidden">
+            {/* Main Layout: Boundless Experience */}
+            <div className="flex w-full h-full items-stretch overflow-hidden relative">
 
-                {/* 0. Back Button Column */}
-                <div className="flex flex-col items-center pt-4 px-2 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 shrink-0">
+                {/* Left Action Strip (Technical/Minimal) */}
+                <div className="flex flex-col items-center pt-4 px-1 bg-gray-50/50 dark:bg-black/20 border-r border-gray-100 dark:border-white/5 shrink-0 z-30">
                     <button
                         onClick={onBack}
-                        className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 transition-colors"
-                        title="Voltar para o sistema"
+                        className="group flex flex-col items-center gap-1.5 p-1.5 rounded-lg hover:bg-white dark:hover:bg-white/5 transition-all text-gray-400 hover:text-rose-500"
+                        title="Sair da Ana"
                     >
-                        <span className="material-symbols-outlined text-gray-600 dark:text-gray-300">arrow_back</span>
+                        <div className="h-8 w-8 flex items-center justify-center rounded-lg border border-transparent group-hover:border-rose-500/10 transition-all">
+                            <span className="material-symbols-outlined text-[20px]">close</span>
+                        </div>
+                        <span className="text-[7.5px] font-black uppercase tracking-tighter">Sair</span>
                     </button>
+
+                    <div className="mt-auto mb-6 flex flex-col gap-4">
+                        <div className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse"></div>
+                    </div>
                 </div>
 
-                {/* 1. Sidebar (Fixed Width) */}
+                {/* Sidebar Component */}
                 <CopilotHistorySidebar
                     consultations={consultations}
                     selectedId={selectedId}
@@ -92,30 +99,36 @@ export const CopilotView: React.FC<CopilotViewProps> = ({ patientId, onBack }) =
                     onNewConsultation={handleNewConsultation}
                 />
 
-                {/* 2. Main Content Area (Flexible) */}
-                <div className="flex-1 bg-gray-50 dark:bg-black/20 overflow-hidden relative">
+                {/* Main Dynamic Surface */}
+                <div className="flex-1 overflow-hidden relative z-10">
 
-                    {viewMode === 'new' && (
-                        <CopilotNewConsultation
-                            patientName={patient?.name || ''}
-                            onStartRecording={handleStartRecording}
-                        />
-                    )}
+                    {/* View Transitions */}
+                    <div className="h-full relative overflow-hidden">
+                        {viewMode === 'new' && (
+                            <div className="h-full animate-in fade-in slide-in-from-bottom-2 duration-500">
+                                <CopilotNewConsultation
+                                    patientName={patient?.name || ''}
+                                    onStartRecording={handleStartRecording}
+                                />
+                            </div>
+                        )}
 
-                    {viewMode === 'recording' && (
-                        <ActiveConsultationView
-                            patientId={patientId}
-                            onCancel={handleCancelRecording}
-                            onComplete={handleRecordingComplete}
-                        />
-                    )}
+                        {viewMode === 'recording' && (
+                            <div className="h-full animate-in fade-in zoom-in-95 duration-500">
+                                <ActiveConsultationView
+                                    patientId={patientId}
+                                    onCancel={handleCancelRecording}
+                                    onComplete={handleRecordingComplete}
+                                />
+                            </div>
+                        )}
 
-                    {viewMode === 'details' && selectedId && (
-                        <div className="h-full overflow-y-auto bg-white dark:bg-gray-900">
-                            {/* Wrapper for Timeline to handle internal scroll */}
-                            <CopilotTimeline consultationId={selectedId} />
-                        </div>
-                    )}
+                        {viewMode === 'details' && selectedId && (
+                            <div className="h-full bg-white dark:bg-[#0d0d0d] overflow-y-auto animate-in fade-in slide-in-from-right-4 duration-500 relative">
+                                <CopilotTimeline consultationId={selectedId} />
+                            </div>
+                        )}
+                    </div>
 
                 </div>
 

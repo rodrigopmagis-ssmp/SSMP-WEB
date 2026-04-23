@@ -437,5 +437,33 @@ export const negociosService = {
             console.error('Erro ao excluir negócio:', error);
             throw error;
         }
+    },
+
+    /**
+     * Buscar atividades para múltiplos negócios (Otimizado para Dashboard/SLA)
+     */
+    async buscarAtividadesPorNegocios(idsNegocio: string[]): Promise<AtividadeNegocio[]> {
+        if (!idsNegocio || idsNegocio.length === 0) return [];
+
+        const { data, error } = await supabase
+            .from('atividades_negocios')
+            .select(`
+                *,
+                profiles (
+                    full_name
+                )
+            `)
+            .in('id_negocio', idsNegocio)
+            .order('criado_em', { ascending: true });
+
+        if (error) {
+            console.error('Erro ao buscar atividades bulk:', error);
+            throw error;
+        }
+
+        return (data || []).map((atividade: any) => ({
+            ...atividade,
+            nome_usuario: atividade.profiles?.full_name
+        }));
     }
 };

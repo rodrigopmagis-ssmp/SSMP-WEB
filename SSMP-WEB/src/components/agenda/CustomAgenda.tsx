@@ -153,8 +153,9 @@ const CustomAgenda: React.FC<CustomAgendaProps> = ({ events, date }) => {
                                     const appt = event.resource;
                                     const status = appt.status || 'scheduled';
                                     const colors = getStatusColor(status);
+                                    const patientName = appt.patient?.name || 'Paciente desconhecido';
                                     const professionalName = appt.professional?.full_name || 'Profissional não atribuído';
-                                    const procedureName = appt.type || appt.title || 'Consulta'; // AgendaService maps title to title, type to type using resource
+                                    const procedureName = appt.type || appt.title || 'Consulta';
 
                                     return (
                                         <div
@@ -164,17 +165,23 @@ const CustomAgenda: React.FC<CustomAgendaProps> = ({ events, date }) => {
                                             <div className="flex items-center gap-2 mb-1">
                                                 <div className={`w-2 h-2 rounded-full ${colors.dot}`} />
                                                 <span className="font-semibold text-gray-900 text-sm">
-                                                    {professionalName}
+                                                    {patientName}
                                                 </span>
                                             </div>
 
-                                            <div className="pl-4">
-                                                <div className="text-gray-700 text-sm mb-1 font-medium">
+                                            <div className="pl-4 space-y-0.5">
+                                                <div className="text-gray-700 text-sm font-medium">
                                                     {procedureName}
                                                 </div>
-                                                <div className="text-gray-500 text-xs flex items-center gap-1">
-                                                    <span className="material-symbols-outlined text-[14px]">schedule</span>
-                                                    {format(event.start, 'HH:mm')} - {format(event.end, 'HH:mm')}
+                                                <div className="text-gray-500 text-xs flex items-center gap-2">
+                                                    <div className="flex items-center gap-1">
+                                                        <span className="material-symbols-outlined text-[14px]">schedule</span>
+                                                        {format(event.start, 'HH:mm')} - {format(event.end, 'HH:mm')}
+                                                    </div>
+                                                    <div className="flex items-center gap-1">
+                                                        <span className="material-symbols-outlined text-[14px]">person</span>
+                                                        {professionalName}
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>

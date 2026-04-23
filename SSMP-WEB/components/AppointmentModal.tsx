@@ -171,6 +171,9 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
     // Retroactive Validation State
     const [isRetroactiveModalOpen, setIsRetroactiveModalOpen] = useState(false);
 
+    // Track if an immediate operation (like cancellation) has been completed
+    const [isOperationComplete, setIsOperationComplete] = useState(false);
+
     // Patient Search State
     const [patientSearchTerm, setPatientSearchTerm] = useState('');
     const [isPatientDropdownOpen, setIsPatientDropdownOpen] = useState(false);
@@ -217,6 +220,7 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
         if (!isOpen) {
             setIsRescheduleMode(false);
             setShowCancelOptions(false);
+            setIsOperationComplete(false);
         }
     }, [isOpen]);
 
@@ -431,26 +435,9 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
     };
 
     const handleConfirmCancel = () => {
-        setFormData(prev => ({ ...prev, status: 'cancelled' }));
         setShowCancelOptions(false);
-        // Note: User still needs to click "Salvar" to commit, or we could auto-submit here.
-        // Given the UX, updating the form status and letting them see it's cancelled before saving is safer,
-        // BUT the prompt implies action. Let's auto-save for smoother flow.
-        setTimeout(() => {
-            // Using a timeout to ensure state update processes or just call save directly with modified data
-            // Actually, better to just call saveAppointment but we need the state to be 'cancelled'.
-            // Let's just update state and let user click save, OR trigger submit.
-            // Requirement said: "se clicar em não pergunta ao usuário 'deseja realmente cancelar'". 
-            // The modal IS the question. If they click "Não, Apenas Cancelar", they confirmed.
-            // So we should probably save.
-
-            // Hack to save with 'cancelled' status immediately without waiting for state flush in strict mode
-            // We can't rely on formData being updated instantly if we call saveAppointment right after.
-            // So we'll update state and let user click save to be safe/consistent with other fields.
-            // OR we can force a submit.
-            // Let's just update the status UI and let them click "Salvar Alterações".
-            // It gives them a chance to add notes if they want.
-        }, 0);
+        // Save immediately as requested
+        saveWithStatus('cancelled', false);
     };
 
     const handleConfirmReschedule = () => {
@@ -493,7 +480,7 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
         }, 0);
     };
 
-    const saveWithStatus = async (statusOverride: any) => {
+    const saveWithStatus = async (statusOverride: any, shouldClose: boolean = true) => {
         // Create a temporary data object merging current form data with override
         const dataToSave = { ...formData, status: statusOverride };
 
@@ -543,8 +530,14 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
                 toast.success('Agendamento criado!');
             }
 
+            setFormData(prev => ({ ...prev, status: statusOverride }));
+
             onSuccess();
-            onClose();
+            if (shouldClose) {
+                onClose();
+            } else {
+                setIsOperationComplete(true);
+            }
         } catch (error: any) {
             console.error('Error saving appointment:', error);
             toast.error(`Erro ao salvar agendamento: ${error.message || 'Erro desconhecido'}`);
@@ -842,7 +835,7 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
                         <button
                             form="appointment-form"
                             type="submit"
-                            disabled={loading}
+                            disabled={loading || isOperationComplete}
                             className="px-4 py-2 text-sm font-medium text-white bg-primary rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center gap-2"
                         >
                             {loading ? (

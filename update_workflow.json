@@ -1,0 +1,927 @@
+{
+    "name": "WhatsApp Envio - Evolution API + Supabase",
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "enviar-whatsapp",
+                "responseMode": "responseNode",
+                "options": {}
+            },
+            "id": "7021a061-9da7-43da-a67d-b1e42f27d738",
+            "name": "Webhook Envio",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 1,
+            "position": [
+                -1888,
+                144
+            ],
+            "webhookId": "b30fd8c0-edfe-4eea-a629-90521773b241"
+        },
+        {
+            "parameters": {
+                "jsCode": "const body = $input.first().json.body;\nif (!body.negocioId) throw new Error('Campo negocioId ausente');\nif (!body.leadId)    throw new Error('Campo leadId ausente');\nif (!body.clinicId)  throw new Error('Campo clinicId ausente');\nif (!body.to)        throw new Error('Campo to ausente');\nif (!body.type)      throw new Error('Campo type ausente');\n\n// Mapeamento de tipos alternativos enviados pelo frontend\nconst tipoMap = {\n  'file': 'image',\n  'photo': 'image',\n  'picture': 'image',\n  'voice': 'audio',\n  'mp3': 'audio',\n  'ogg': 'audio',\n  'mp4': 'video',\n  'pdf': 'document',\n  'doc': 'document',\n  'docx': 'document',\n};\nconst type = tipoMap[body.type] || body.type;\n\nconst validTypes = ['text', 'audio', 'image', 'document', 'video'];\nif (!validTypes.includes(type)) {\n  throw new Error('Tipo invalido: ' + body.type);\n}\nif (type === 'text' && !body.text) {\n  throw new Error('Campo text obrigatorio para tipo text');\n}\nif (['audio', 'image', 'document', 'video'].includes(type)) {\n  if (!body.mediaUrl && !body.mediaBase64 && !body.fileContent) {\n    throw new Error('Para tipo ' + type + ', envie mediaUrl, mediaBase64 ou fileContent');\n  }\n}\n\n// Se veio fileContent (base64 raw), converte para mediaBase64\nconst mediaBase64 = body.mediaBase64 || body.fileContent || null;\n\nreturn [{\n  json: {\n    negocioId:     body.negocioId,\n    leadId:        body.leadId,\n    clinicId:      body.clinicId,\n    senderId:      body.senderId || null,\n    to:            body.to,\n    type:          type,\n    text:          body.text || null,\n    mediaUrl:      body.mediaUrl || null,\n    mediaBase64:   mediaBase64,\n    mediaName:     body.mediaName || body.fileName || null,\n    mediaMimetype: body.mediaMimetype || null,\n    caption:       body.caption || null,\n    timestamp:     body.timestamp || new Date().toISOString()\n  }\n}];"
+            },
+            "id": "1f59b289-415d-441a-8150-1c85caaae955",
+            "name": "Validacao dos Dados",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                -1664,
+                144
+            ]
+        },
+        {
+            "parameters": {
+                "url": "=https://tofbruviyllvdmcllgjx.supabase.co/rest/v1/conversations?lead_id=eq.{{ $json.leadId }}&clinic_id=eq.{{ $json.clinicId }}&status=eq.open&select=id&limit=1",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "apikey",
+                            "value": "YOUR_SUPABASE_SERVICE_ROLE_KEY"
+                        },
+                        {
+                            "name": "Authorization",
+                            "value": "Bearer YOUR_SUPABASE_SERVICE_ROLE_KEY"
+                        },
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "00654e96-40ec-484e-8598-1df913e6a87a",
+            "name": "Buscar Conversation",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 3,
+            "position": [
+                -1456,
+                144
+            ],
+            "alwaysOutputData": true
+        },
+        {
+            "parameters": {
+                "jsCode": "const input = $input.first().json;\nconst validData = $('Validacao dos Dados').first().json;\n\nlet conversationId = null;\n\nif (Array.isArray(input)) {\n  conversationId = input.length > 0 ? input[0].id : null;\n} else if (input && input.id) {\n  conversationId = input.id;\n} else {\n  conversationId = null;\n}\n\nreturn [{\n  json: {\n    ...validData,\n    conversationId,\n    needsCreate: !conversationId\n  }\n}];"
+            },
+            "id": "c7a97183-5b7b-4559-ab5d-8e049fd6e1b0",
+            "name": "Tem Conversation?",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                -1232,
+                144
+            ]
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "boolean": [
+                        {
+                            "value1": "={{ $json.needsCreate }}",
+                            "value2": true
+                        }
+                    ]
+                }
+            },
+            "id": "d15a0fc1-ed6b-4a1f-9880-dc0859212714",
+            "name": "Precisa Criar?",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 1,
+            "position": [
+                -1008,
+                144
+            ]
+        },
+        {
+            "parameters": {
+                "tableId": "conversations",
+                "fieldsUi": {
+                    "fieldValues": [
+                        {
+                            "fieldId": "lead_id",
+                            "fieldValue": "={{ $json.leadId }}"
+                        },
+                        {
+                            "fieldId": "clinic_id",
+                            "fieldValue": "={{ $json.clinicId }}"
+                        },
+                        {
+                            "fieldId": "status",
+                            "fieldValue": "open"
+                        },
+                        {
+                            "fieldId": "last_message_at",
+                            "fieldValue": "={{ $json.timestamp }}"
+                        },
+                        {
+                            "fieldId": "updated_at",
+                            "fieldValue": "={{ $json.timestamp }}"
+                        }
+                    ]
+                }
+            },
+            "id": "22eb3669-39d1-4bb3-949f-50d185d17d9b",
+            "name": "Criar Conversation",
+            "type": "n8n-nodes-base.supabase",
+            "typeVersion": 1,
+            "position": [
+                -784,
+                16
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "const validData = $('Validacao dos Dados').first().json;\nlet conversationId;\n\ntry {\n  const created = $('Criar Conversation').first().json;\n  conversationId = created.id || null;\n} catch(e) {\n  conversationId = null;\n}\n\nif (!conversationId) {\n  conversationId = $('Tem Conversation?').first().json.conversationId;\n}\n\nif (!conversationId) {\n  throw new Error('Nao foi possivel obter ou criar conversation. leadId: ' + validData.leadId);\n}\n\nreturn [{\n  json: {\n    ...validData,\n    conversationId\n  }\n}];"
+            },
+            "id": "8407e648-6318-4fc9-ad7b-2100af233d71",
+            "name": "Resolve Conversation ID",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                -576,
+                144
+            ]
+        },
+        {
+            "parameters": {
+                "dataType": "string",
+                "value1": "={{ $json.type }}",
+                "rules": {
+                    "rules": [
+                        {
+                            "value2": "text"
+                        },
+                        {
+                            "value2": "audio"
+                        },
+                        {
+                            "value2": "image"
+                        },
+                        {
+                            "value2": "document"
+                        },
+                        {
+                            "value2": "video"
+                        }
+                    ]
+                }
+            },
+            "id": "16ffa2ea-f71f-4b63-aca5-cb27668e0658",
+            "name": "Switch por Tipo",
+            "type": "n8n-nodes-base.switch",
+            "typeVersion": 2,
+            "position": [
+                -352,
+                144
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://prehistoricseahorse-evolution.cloudfy.live/message/sendText/DraIsabela",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "apikey",
+                            "value": "3mqOVBGxthcavrhY5QmQaQzS90AihxbT"
+                        },
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "bodyParameters": {
+                    "parameters": [
+                        {
+                            "name": "number",
+                            "value": "={{ $json.to }}"
+                        },
+                        {
+                            "name": "text",
+                            "value": "={{ $json.text }}"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "bd59b903-0d23-4936-aaaf-d56a38b1b350",
+            "name": "Evolution API - Text",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 3,
+            "position": [
+                -128,
+                -48
+            ],
+            "onError": "continueErrorOutput"
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://prehistoricseahorse-evolution.cloudfy.live/message/sendMedia/DraIsabela",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "apikey",
+                            "value": "3mqOVBGxthcavrhY5QmQaQzS90AihxbT"
+                        },
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "bodyParameters": {
+                    "parameters": [
+                        {
+                            "name": "number",
+                            "value": "={{ $json.to }}"
+                        },
+                        {
+                            "name": "mediatype",
+                            "value": "audio"
+                        },
+                        {
+                            "name": "mimetype",
+                            "value": "={{ $json.mediaMimetype || 'audio/ogg' }}"
+                        },
+                        {
+                            "name": "media",
+                            "value": "={{ $json.mediaUrl || $json.mediaBase64 }}"
+                        },
+                        {
+                            "name": "fileName",
+                            "value": "={{ $json.mediaName || 'audio.ogg' }}"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "9fcb7431-1cea-4264-b0af-df94b1a619f6",
+            "name": "Evolution API - Audio",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 3,
+            "position": [
+                -128,
+                96
+            ],
+            "onError": "continueErrorOutput"
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://prehistoricseahorse-evolution.cloudfy.live/message/sendMedia/DraIsabela",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "apikey",
+                            "value": "3mqOVBGxthcavrhY5QmQaQzS90AihxbT"
+                        },
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "bodyParameters": {
+                    "parameters": [
+                        {
+                            "name": "number",
+                            "value": "={{ $json.to }}"
+                        },
+                        {
+                            "name": "mediatype",
+                            "value": "image"
+                        },
+                        {
+                            "name": "mimetype",
+                            "value": "={{ $json.mediaMimetype || 'image/jpeg' }}"
+                        },
+                        {
+                            "name": "caption",
+                            "value": "={{ $json.caption || '' }}"
+                        },
+                        {
+                            "name": "media",
+                            "value": "={{ $json.mediaUrl || $json.mediaBase64 }}"
+                        },
+                        {
+                            "name": "fileName",
+                            "value": "={{ $json.mediaName || 'image.jpg' }}"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "2f8a734a-bd86-468a-8215-251b5dca821d",
+            "name": "Evolution API - Image",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 3,
+            "position": [
+                -128,
+                224
+            ],
+            "onError": "continueErrorOutput"
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://prehistoricseahorse-evolution.cloudfy.live/message/sendMedia/DraIsabela",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "apikey",
+                            "value": "3mqOVBGxthcavrhY5QmQaQzS90AihxbT"
+                        },
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "bodyParameters": {
+                    "parameters": [
+                        {
+                            "name": "number",
+                            "value": "={{ $json.to }}"
+                        },
+                        {
+                            "name": "mediatype",
+                            "value": "document"
+                        },
+                        {
+                            "name": "mimetype",
+                            "value": "={{ $json.mediaMimetype || 'application/pdf' }}"
+                        },
+                        {
+                            "name": "caption",
+                            "value": "={{ $json.caption || '' }}"
+                        },
+                        {
+                            "name": "media",
+                            "value": "={{ $json.mediaUrl || $json.mediaBase64 }}"
+                        },
+                        {
+                            "name": "fileName",
+                            "value": "={{ $json.mediaName || 'document.pdf' }}"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "d12f0dde-205f-446f-9f0e-6c1a7841fc79",
+            "name": "Evolution API - Document",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 3,
+            "position": [
+                -128,
+                368
+            ],
+            "onError": "continueErrorOutput"
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://prehistoricseahorse-evolution.cloudfy.live/message/sendMedia/DraIsabela",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "apikey",
+                            "value": "3mqOVBGxthcavrhY5QmQaQzS90AihxbT"
+                        },
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "bodyParameters": {
+                    "parameters": [
+                        {
+                            "name": "number",
+                            "value": "={{ $json.to }}"
+                        },
+                        {
+                            "name": "mediatype",
+                            "value": "video"
+                        },
+                        {
+                            "name": "mimetype",
+                            "value": "={{ $json.mediaMimetype || 'video/mp4' }}"
+                        },
+                        {
+                            "name": "caption",
+                            "value": "={{ $json.caption || '' }}"
+                        },
+                        {
+                            "name": "media",
+                            "value": "={{ $json.mediaUrl || $json.mediaBase64 }}"
+                        },
+                        {
+                            "name": "fileName",
+                            "value": "={{ $json.mediaName || 'video.mp4' }}"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "4b9b5494-9b9b-4551-a073-d3f164109165",
+            "name": "Evolution API - Video",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 3,
+            "position": [
+                -128,
+                512
+            ],
+            "onError": "continueErrorOutput"
+        },
+        {
+            "parameters": {
+                "jsCode": "const inputData = $('Validacao dos Dados').first().json;\n\nlet evoResp, success, evoMessageId, errorDetail;\n\ntry {\n  evoResp = $input.first().json;\n  \n  if (evoResp.error || evoResp.status >= 400 || evoResp.errorMessage) {\n    success = false;\n    evoMessageId = null;\n    const rawError = evoResp.response?.message || evoResp.error || evoResp.message || evoResp.errorMessage || JSON.stringify(evoResp);\n    const arr = Array.isArray(rawError) ? rawError.flat() : [rawError];\n    errorDetail = arr.join(' | ');\n  } else {\n    evoMessageId = evoResp.key?.id || evoResp.id || evoResp.messageId || null;\n    success = !!evoMessageId;\n    errorDetail = success ? null : 'Sem messageId na resposta: ' + JSON.stringify(evoResp);\n  }\n} catch(e) {\n  success = false;\n  evoMessageId = null;\n  errorDetail = 'Erro interno: ' + e.message;\n}\n\nlet friendlyError = null;\nif (!success) {\n  const type = inputData.type || 'arquivo';\n  if (errorDetail && errorDetail.includes('mimetype')) {\n    friendlyError = 'Formato de ' + type + ' não suportado pelo WhatsApp.';\n  } else if (errorDetail && errorDetail.includes('media')) {\n    friendlyError = 'Não foi possível enviar a mídia. Verifique o formato do arquivo.';\n  } else {\n    friendlyError = 'Não foi possível enviar a mensagem via WhatsApp.';\n  }\n}\n\nconst metadata = {\n  whatsapp_message_id: evoMessageId,\n  instancia: 'DraIsabela',\n  numero_destino: inputData.to,\n  media_url: inputData.mediaUrl || null,\n  media_name: inputData.mediaName || null,\n  negocio_id: inputData.negocioId,\n  enviado_em: new Date().toISOString(),\n  erro: errorDetail\n};\n\nreturn [{\n  json: {\n    success,\n    evoMessageId,\n    conversationId: inputData.conversationId,\n    senderId:       inputData.senderId,\n    contentType:    inputData.type,\n    content:        inputData.text || inputData.caption || null,\n    metadata,\n    timestamp:      inputData.timestamp,\n    errorDetail,\n    friendlyError\n  }\n}];"
+            },
+            "id": "8e8bfd8d-6eb6-4361-bcd3-9cdab9379631",
+            "name": "Consolida Resultado",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                96,
+                224
+            ]
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "boolean": [
+                        {
+                            "value1": "={{ $json.success }}",
+                            "value2": true
+                        }
+                    ]
+                }
+            },
+            "id": "96824e00-92cc-43af-a1f3-4654ffe67797",
+            "name": "Sucesso?",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 1,
+            "position": [
+                304,
+                224
+            ]
+        },
+        {
+            "parameters": {
+                "tableId": "messages",
+                "fieldsUi": {
+                    "fieldValues": [
+                        {
+                            "fieldId": "conversation_id",
+                            "fieldValue": "={{ $json.conversationId }}"
+                        },
+                        {
+                            "fieldId": "sender_type",
+                            "fieldValue": "user"
+                        },
+                        {
+                            "fieldId": "sender_id",
+                            "fieldValue": "={{ $json.senderId }}"
+                        },
+                        {
+                            "fieldId": "content_type",
+                            "fieldValue": "={{ $json.contentType }}"
+                        },
+                        {
+                            "fieldId": "content",
+                            "fieldValue": "={{ $json.content }}"
+                        },
+                        {
+                            "fieldId": "metadata",
+                            "fieldValue": "={{ JSON.stringify($json.metadata) }}"
+                        },
+                        {
+                            "fieldId": "created_at",
+                            "fieldValue": "={{ $json.timestamp }}"
+                        }
+                    ]
+                }
+            },
+            "id": "212013b6-1300-4d43-a73d-98091ed3144d",
+            "name": "Salvar Message - Sucesso",
+            "type": "n8n-nodes-base.supabase",
+            "typeVersion": 1,
+            "position": [
+                528,
+                112
+            ]
+        },
+        {
+            "parameters": {
+                "operation": "update",
+                "tableId": "conversations",
+                "filterType": "string",
+                "filterString": "=id=eq.{{ $json.conversation_id }}",
+                "fieldsUi": {
+                    "fieldValues": [
+                        {
+                            "fieldId": "last_message_at",
+                            "fieldValue": "={{ new Date().toISOString() }}"
+                        },
+                        {
+                            "fieldId": "updated_at",
+                            "fieldValue": "={{ new Date().toISOString() }}"
+                        }
+                    ]
+                }
+            },
+            "id": "6120f641-e432-49c7-bb27-4ffb8465844e",
+            "name": "Atualiza last_message_at",
+            "type": "n8n-nodes-base.supabase",
+            "typeVersion": 1,
+            "position": [
+                752,
+                112
+            ]
+        },
+        {
+            "parameters": {
+                "tableId": "messages",
+                "fieldsUi": {
+                    "fieldValues": [
+                        {
+                            "fieldId": "conversation_id",
+                            "fieldValue": "={{ $json.conversationId }}"
+                        },
+                        {
+                            "fieldId": "sender_type",
+                            "fieldValue": "system"
+                        },
+                        {
+                            "fieldId": "sender_id"
+                        },
+                        {
+                            "fieldId": "content_type",
+                            "fieldValue": "={{ $json.contentType }}"
+                        },
+                        {
+                            "fieldId": "content",
+                            "fieldValue": "={{ $json.content }}"
+                        },
+                        {
+                            "fieldId": "metadata",
+                            "fieldValue": "={{ JSON.stringify({ ...($json.metadata), status: 'erro_envio', error_detail: $json.errorDetail }) }}"
+                        },
+                        {
+                            "fieldId": "created_at",
+                            "fieldValue": "={{ $json.timestamp }}"
+                        }
+                    ]
+                }
+            },
+            "id": "267c1dc3-dada-4c60-9ae2-d08c4ecf1d00",
+            "name": "Salvar Message - Erro",
+            "type": "n8n-nodes-base.supabase",
+            "typeVersion": 1,
+            "position": [
+                528,
+                352
+            ]
+        },
+        {
+            "parameters": {
+                "respondWith": "json",
+                "responseBody": "={\n  \"success\": true,\n  \"messageId\": \"{{ $('Consolida Resultado').first().json.evoMessageId }}\",\n  \"conversationId\": \"{{ $('Consolida Resultado').first().json.conversationId }}\",\n  \"timestamp\": \"{{ $('Consolida Resultado').first().json.timestamp }}\"\n}",
+                "options": {
+                    "responseCode": 200
+                }
+            },
+            "id": "754a481c-6944-4d30-a644-8477c3c3910c",
+            "name": "Resposta Sucesso",
+            "type": "n8n-nodes-base.respondToWebhook",
+            "typeVersion": 1,
+            "position": [
+                976,
+                112
+            ]
+        },
+        {
+            "parameters": {
+                "respondWith": "json",
+                "responseBody": "={\n  \"success\": false,\n  \"error\": \"{{ $json.friendlyError || 'Falha ao enviar mensagem' }}\",\n  \"detail\": \"{{ $json.errorDetail }}\",\n  \"type\": \"{{ $json.contentType }}\"\n}",
+                "options": {
+                    "responseCode": 500
+                }
+            },
+            "id": "a7283e47-08c4-4874-8049-435ec85ba54d",
+            "name": "Resposta Erro",
+            "type": "n8n-nodes-base.respondToWebhook",
+            "typeVersion": 1,
+            "position": [
+                752,
+                352
+            ]
+        }
+    ],
+    "connections": {
+        "Webhook Envio": {
+            "main": [
+                [
+                    {
+                        "node": "Validacao dos Dados",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Validacao dos Dados": {
+            "main": [
+                [
+                    {
+                        "node": "Buscar Conversation",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Buscar Conversation": {
+            "main": [
+                [
+                    {
+                        "node": "Tem Conversation?",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Tem Conversation?": {
+            "main": [
+                [
+                    {
+                        "node": "Precisa Criar?",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Precisa Criar?": {
+            "main": [
+                [
+                    {
+                        "node": "Criar Conversation",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Resolve Conversation ID",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Criar Conversation": {
+            "main": [
+                [
+                    {
+                        "node": "Resolve Conversation ID",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Resolve Conversation ID": {
+            "main": [
+                [
+                    {
+                        "node": "Switch por Tipo",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Switch por Tipo": {
+            "main": [
+                [
+                    {
+                        "node": "Evolution API - Text",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Evolution API - Audio",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Evolution API - Image",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Evolution API - Document",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Evolution API - Video",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Evolution API - Text": {
+            "main": [
+                [
+                    {
+                        "node": "Consolida Resultado",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Consolida Resultado",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Evolution API - Audio": {
+            "main": [
+                [
+                    {
+                        "node": "Consolida Resultado",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Consolida Resultado",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Evolution API - Image": {
+            "main": [
+                [
+                    {
+                        "node": "Consolida Resultado",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Consolida Resultado",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Evolution API - Document": {
+            "main": [
+                [
+                    {
+                        "node": "Consolida Resultado",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Consolida Resultado",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Evolution API - Video": {
+            "main": [
+                [
+                    {
+                        "node": "Consolida Resultado",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Consolida Resultado",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Consolida Resultado": {
+            "main": [
+                [
+                    {
+                        "node": "Sucesso?",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Sucesso?": {
+            "main": [
+                [
+                    {
+                        "node": "Salvar Message - Sucesso",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Salvar Message - Erro",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Salvar Message - Sucesso": {
+            "main": [
+                [
+                    {
+                        "node": "Atualiza last_message_at",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Atualiza last_message_at": {
+            "main": [
+                [
+                    {
+                        "node": "Resposta Sucesso",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Salvar Message - Erro": {
+            "main": [
+                [
+                    {
+                        "node": "Resposta Erro",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "settings": {
+        "executionOrder": "v1",
+        "binaryMode": "separate",
+        "availableInMCP": true,
+        "timeSavedMode": "fixed",
+        "callerPolicy": "workflowsFromSameOwner"
+    },
+    "staticData": null,
+    "meta": {
+        "templateCredsSetupCompleted": true
+    },
+    "pinData": {},
+    "versionId": "cacde2b5-8dc2-4384-9aed-3bf6a742d8fb"
+}

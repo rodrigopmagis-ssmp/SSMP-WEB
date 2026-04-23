@@ -17,12 +17,14 @@ export function CampaignManager({ onClose }: CampaignManagerProps) {
     const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
     const [stages, setStages] = useState<CampaignStage[]>([]);
     const [loadingStages, setLoadingStages] = useState(false);
-    const [activeTab, setActiveTab] = useState<'stages' | 'quiz' | 'followup'>('stages');
+    const [activeTab, setActiveTab] = useState<'stages' | 'quiz' | 'followup' | 'settings'>('stages');
 
     // Form states
     const [isEditing, setIsEditing] = useState(false);
     const [editName, setEditName] = useState('');
     const [editDesc, setEditDesc] = useState('');
+    const [editWebhookUrl, setEditWebhookUrl] = useState('');
+    const [editWebhookEnabled, setEditWebhookEnabled] = useState(false);
 
     // Follow-up Editor states
     const [editingFollowUpId, setEditingFollowUpId] = useState<string | null>(null);
@@ -35,9 +37,15 @@ export function CampaignManager({ onClose }: CampaignManagerProps) {
     useEffect(() => {
         if (selectedCampaign) {
             fetchStages(selectedCampaign.id);
+            setEditName(selectedCampaign.name);
+            setEditDesc(selectedCampaign.description || '');
+            setEditWebhookUrl(selectedCampaign.webhook_url || '');
+            setEditWebhookEnabled(selectedCampaign.webhook_enabled || false);
             setActiveTab('stages');
         } else {
             setStages([]);
+            setEditName('');
+            setEditDesc('');
         }
     }, [selectedCampaign]);
 
@@ -126,7 +134,12 @@ export function CampaignManager({ onClose }: CampaignManagerProps) {
         try {
             const { data, error } = await supabase
                 .from('campaigns')
-                .update({ name: editName, description: editDesc })
+                .update({
+                    name: editName,
+                    description: editDesc,
+                    webhook_url: editWebhookUrl,
+                    webhook_enabled: editWebhookEnabled
+                })
                 .eq('id', selectedCampaign.id)
                 .select()
                 .single();
@@ -136,8 +149,10 @@ export function CampaignManager({ onClose }: CampaignManagerProps) {
             setCampaigns(campaigns.map(c => c.id === selectedCampaign.id ? data : c));
             setSelectedCampaign(data);
             setIsEditing(false);
+            toast.success('Campanha atualizada!');
         } catch (error) {
             console.error('Erro ao atualizar campanha:', error);
+            toast.error('Erro ao atualizar campanha');
         }
     };
 
@@ -473,6 +488,15 @@ export function CampaignManager({ onClose }: CampaignManagerProps) {
                                 >
                                     Config. Acompanhamento
                                 </button>
+                                <button
+                                    className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === 'settings'
+                                        ? 'border-blue-600 text-blue-600'
+                                        : 'border-transparent text-gray-500 hover:text-gray-700'
+                                        }`}
+                                    onClick={() => setActiveTab('settings')}
+                                >
+                                    Configurações
+                                </button>
                             </div>
 
                             {/* Tab Content */}
@@ -714,6 +738,69 @@ export function CampaignManager({ onClose }: CampaignManagerProps) {
                                                 />
                                             </div>
                                         )}
+                                    </div>
+                                )}
+                                {activeTab === 'settings' && (
+                                    <div className="h-full overflow-y-auto p-8 bg-gray-50">
+                                        <div className="max-w-2xl mx-auto bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                                            <div className="p-6 border-b bg-gray-50">
+                                                <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                                                    <span className="material-symbols-outlined text-blue-600">settings</span>
+                                                    Configurações da Campanha
+                                                </h3>
+                                                <p className="text-sm text-gray-500 mt-1">
+                                                    Ajuste as integrações e comportamentos específicos desta campanha.
+                                                </p>
+                                            </div>
+
+                                            <div className="p-6 space-y-8">
+                                                {/* Webhook Section */}
+                                                <div className="space-y-4">
+                                                    <div className="flex items-center justify-between">
+                                                        <div>
+                                                            <h4 className="font-bold text-gray-700">Integração n8n (Webhook)</h4>
+                                                            <p className="text-sm text-gray-500">Envie dados de mensagens para um workflow personalizado.</p>
+                                                        </div>
+                                                        <label className="relative inline-flex items-center cursor-pointer">
+                                                            <input
+                                                                type="checkbox"
+                                                                className="sr-only peer"
+                                                                checked={editWebhookEnabled}
+                                                                onChange={(e) => setEditWebhookEnabled(e.target.checked)}
+                                                            />
+                                                            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                                        </label>
+                                                    </div>
+
+                                                    <div className={`space-y-2 transition-opacity duration-200 ${editWebhookEnabled ? 'opacity-100' : 'opacity-50 pointer-events-none'}`}>
+                                                        <label className="block text-sm font-medium text-gray-700">URL do Webhook</label>
+                                                        <div className="flex gap-2">
+                                                            <input
+                                                                type="url"
+                                                                placeholder="https://sua-instancia.n8n.cloud/webhook/..."
+                                                                className="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                                                value={editWebhookUrl}
+                                                                onChange={(e) => setEditWebhookUrl(e.target.value)}
+                                                            />
+                                                        </div>
+                                                        <p className="text-xs text-info flex items-start gap-1 mt-1">
+                                                            <span className="material-symbols-outlined text-sm">info</span>
+                                                            Se habilitado e configurado, as mensagens enviadas através desta campanha usarão esta URL em vez do padrão global.
+                                                        </p>
+                                                    </div>
+                                                </div>
+
+                                                <div className="pt-6 border-t flex justify-end">
+                                                    <button
+                                                        onClick={handleUpdateCampaign}
+                                                        className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-blue-700 transition-colors shadow-sm flex items-center gap-2"
+                                                    >
+                                                        <span className="material-symbols-outlined text-sm">save</span>
+                                                        Salvar Configurações
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 )}
                             </div>
