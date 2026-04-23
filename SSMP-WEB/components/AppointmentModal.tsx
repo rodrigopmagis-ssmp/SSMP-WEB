@@ -366,15 +366,7 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
             return;
         }
 
-        // 2. Retroactive Check
-        const start = new Date(formData.start_time);
-        const now = new Date();
-        if (start < now && formData.status !== 'completed' && formData.status !== 'cancelled' && formData.status !== 'no_show') {
-            setIsRetroactiveModalOpen(true);
-            return;
-        }
-
-        // 3. Double Booking Check (hard block)
+        // 2. Double Booking Check (hard block) - CHECK THIS FIRST
         try {
             const currentAppointmentId = initialEvent?.resource?.id;
             const { professionalConflict, patientConflict } = await AgendaService.checkAvailability(
@@ -401,6 +393,14 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
         } catch (err: any) {
             console.error('Error checking availability:', err);
             toast.error('Erro ao verificar disponibilidade. Tente novamente.');
+            return;
+        }
+
+        // 3. Retroactive Check
+        const start = new Date(formData.start_time);
+        const now = new Date();
+        if (start < now && formData.status !== 'completed' && formData.status !== 'cancelled' && formData.status !== 'no_show') {
+            setIsRetroactiveModalOpen(true);
             return;
         }
 
@@ -483,18 +483,33 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
     };
 
     const saveWithStatus = async (statusOverride: any, shouldClose: boolean = true) => {
-        // Create a temporary data object merging current form data with override
-        const dataToSave = { ...formData, status: statusOverride };
+        // Double Check availability even in retroactive/override flows
+        try {
+            const currentAppointmentId = initialEvent?.resource?.id;
+            const { professionalConflict, patientConflict } = await AgendaService.checkAvailability(
+                new Date(formData.start_time),
+                new Date(formData.end_time),
+                formData.professional_id,
+                formData.patient_id,
+                currentAppointmentId
+            );
 
-        // We'll mostly duplicate saveAppointment logic or factor it out.
-        // Let's copy-paste the core save logic for safety/speed without big refactor, 
-        // OR better: modify saveAppointment to accept an optional full data object.
-        // Let's go with modifying saveAppointment slightly to read from an argument if provided.
-        // But `saveAppointment` signature is (warnings, reason).
+            if (professionalConflict) {
+                const conflictStart = format(new Date(professionalConflict.start_time), 'HH:mm');
+                const conflictEnd = format(new Date(professionalConflict.end_time), 'HH:mm');
+                toast.error(`Conflito: O profissional já tem um agendamento das ${conflictStart} às ${conflictEnd}.`);
+                return;
+            }
 
-        // Let's try to update state and then call saveAppointment.
-        // Since `saveAppointment` closes over `formData`, we can't just call it immediately after setFormData.
-        // HACK: We will manually invoke what saveAppointment does but with the 'completed' status.
+            if (patientConflict) {
+                const conflictStart = format(new Date(patientConflict.start_time), 'HH:mm');
+                const conflictEnd = format(new Date(patientConflict.end_time), 'HH:mm');
+                toast.error(`Conflito: O paciente já tem um agendamento das ${conflictStart} às ${conflictEnd}.`);
+                return;
+            }
+        } catch (err) {
+            console.error('Error checking availability in override flow:', err);
+        }
 
         try {
             setLoading(true);
