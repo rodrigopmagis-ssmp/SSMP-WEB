@@ -15,6 +15,8 @@ interface UnifiedAgendaModalProps {
     defaultTab?: 'appointment' | 'block';
     editingBlock?: any;
     isReadOnly?: boolean;
+    onEditAppointment?: (appt: any) => void;
+    onViewAppointment?: (appt: any) => void;
 }
 
 const UnifiedAgendaModal: React.FC<UnifiedAgendaModalProps> = ({
@@ -29,7 +31,9 @@ const UnifiedAgendaModal: React.FC<UnifiedAgendaModalProps> = ({
     clinicId,
     defaultTab = 'appointment',
     editingBlock,
-    isReadOnly
+    isReadOnly,
+    onEditAppointment,
+    onViewAppointment
 }) => {
     const [activeTab, setActiveTab] = useState<'appointment' | 'block'>(defaultTab);
 
@@ -134,6 +138,8 @@ const UnifiedAgendaModal: React.FC<UnifiedAgendaModalProps> = ({
                                 initialDate={initialDate ? initialDate.toISOString().split('T')[0] : new Date().toISOString().split('T')[0]}
                                 editingBlock={editingBlock}
                                 isEmbedded={true}
+                                onEditAppointment={onEditAppointment}
+                                onViewAppointment={onViewAppointment}
                             />
                         </div>
                     )}

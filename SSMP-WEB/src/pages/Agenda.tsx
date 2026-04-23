@@ -14,6 +14,7 @@ import { supabase } from '../lib/supabase';
 import { useHolidays } from '../hooks/useHolidays';
 import { useBusinessHours } from '../hooks/useBusinessHours';
 import { useScheduleBlocks } from '../hooks/useScheduleBlocks';
+import AppointmentModal from '../../components/AppointmentModal';
 
 // Setup localizer with pt-BR
 const locales = { 'pt-BR': ptBR };
@@ -106,6 +107,8 @@ const Agenda: React.FC<AgendaProps> = ({ patients, procedures }) => {
     const [isReportOpen, setIsReportOpen] = useState(false);
     const [isExtractOpen, setIsExtractOpen] = useState(false);
     const [isModalReadOnly, setIsModalReadOnly] = useState(false);
+    const [conflictDetailAppt, setConflictDetailAppt] = useState<any>(null);
+    const [isConflictDetailReadOnly, setIsConflictDetailReadOnly] = useState(false);
 
     // Warning Modal State
     const [warningModal, setWarningModal] = useState<{
@@ -938,6 +941,14 @@ const Agenda: React.FC<AgendaProps> = ({ patients, procedures }) => {
                     defaultTab={modalDefaultTab}
                     editingBlock={selectedBlock}
                     isReadOnly={isModalReadOnly}
+                    onEditAppointment={(appt) => {
+                        setConflictDetailAppt(appt);
+                        setIsConflictDetailReadOnly(false);
+                    }}
+                    onViewAppointment={(appt) => {
+                        setConflictDetailAppt(appt);
+                        setIsConflictDetailReadOnly(true);
+                    }}
                 />
             </main>
 
@@ -973,13 +984,37 @@ const Agenda: React.FC<AgendaProps> = ({ patients, procedures }) => {
                     openAppointmentModal(undefined, event, true);
                 }}
             />
-
             {/* Extract Modal */}
             <ProfessionalExtractModal
                 isOpen={isExtractOpen}
                 onClose={() => setIsExtractOpen(false)}
                 professionals={professionals}
             />
+
+            {/* Conflict Detail Modal - Opens over everything to allow return */}
+            {conflictDetailAppt && (
+                <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 backdrop-blur-[2px] p-4">
+                    <AppointmentModal
+                        isOpen={true}
+                        onClose={() => setConflictDetailAppt(null)}
+                        onSuccess={() => {
+                            setConflictDetailAppt(null);
+                            fetchAppointments();
+                        }}
+                        patients={patients}
+                        procedures={procedures}
+                        professionals={professionals}
+                        initialEvent={{
+                            id: conflictDetailAppt.id,
+                            resource: conflictDetailAppt,
+                            start: new Date(conflictDetailAppt.start_time),
+                            end: new Date(conflictDetailAppt.end_time)
+                        }}
+                        clinicId={clinicId}
+                        isReadOnly={isConflictDetailReadOnly}
+                    />
+                </div>
+            )}
         </div>
     );
 };

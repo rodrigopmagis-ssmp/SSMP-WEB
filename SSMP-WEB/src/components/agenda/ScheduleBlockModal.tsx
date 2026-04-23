@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useScheduleBlocks, CreateScheduleBlockData } from '../../hooks/useScheduleBlocks';
 import { useBusinessHours } from '../../hooks/useBusinessHours';
+import { AgendaService, Appointment } from '../../services/AgendaService';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import Toast from '../../../components/ui/Toast';
 
 interface ScheduleBlockModalProps {
@@ -21,6 +24,8 @@ interface ScheduleBlockModalProps {
         reason: string | null;
     };
     isEmbedded?: boolean;
+    onEditAppointment?: (appt: Appointment) => void;
+    onViewAppointment?: (appt: Appointment) => void;
 }
 
 const ScheduleBlockModal: React.FC<ScheduleBlockModalProps> = ({
@@ -31,7 +36,9 @@ const ScheduleBlockModal: React.FC<ScheduleBlockModalProps> = ({
     professionals,
     initialDate,
     editingBlock,
-    isEmbedded
+    isEmbedded,
+    onEditAppointment,
+    onViewAppointment
 }) => {
     const { createScheduleBlock, updateScheduleBlock, deleteScheduleBlock } = useScheduleBlocks(clinicId);
     const { getBusinessHoursForDate } = useBusinessHours(clinicId);
@@ -39,6 +46,8 @@ const ScheduleBlockModal: React.FC<ScheduleBlockModalProps> = ({
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error'; visible: boolean } | null>(null);
     const [saving, setSaving] = useState(false);
     const [deleting, setDeleting] = useState(false);
+    const [conflicts, setConflicts] = useState<Appointment[]>([]);
+    const [showConflictModal, setShowConflictModal] = useState(false);
 
     const [formData, setFormData] = useState({
         title: '',
@@ -122,7 +131,32 @@ const ScheduleBlockModal: React.FC<ScheduleBlockModalProps> = ({
         }));
     };
 
-    const handleSave = async () => {
+    const handleStartTimeChange = (newStartTime: string) => {
+        if (!newStartTime) {
+            setFormData(prev => ({ ...prev, startTime: newStartTime }));
+            return;
+        }
+
+        try {
+            // Parse HH:mm
+            const [hours, minutes] = newStartTime.split(':').map(Number);
+            const date = new Date();
+            date.setHours(hours, minutes, 0, 0);
+            
+            const endDate = addMinutes(date, 30);
+            const newEndTime = format(endDate, 'HH:mm');
+            
+            setFormData(prev => ({ 
+                ...prev, 
+                startTime: newStartTime,
+                endTime: newEndTime
+            }));
+        } catch (err) {
+            setFormData(prev => ({ ...prev, startTime: newStartTime }));
+        }
+    };
+
+    const handleSave = async (force: boolean = false) => {
         if (!formData.title.trim()) {
             setToast({ message: 'Preencha o título do bloqueio', type: 'error', visible: true });
             return;
@@ -135,6 +169,35 @@ const ScheduleBlockModal: React.FC<ScheduleBlockModalProps> = ({
 
         try {
             setSaving(true);
+
+            const startTimeStr = formData.isFullDay ? '00:00:00' : `${formData.startTime}:00`;
+            const endTimeStr = formData.isFullDay ? '23:59:59' : `${formData.endTime}:00`;
+            const startDate = new Date(`${formData.date}T${startTimeStr}`);
+            const endDate = new Date(`${formData.date}T${endTimeStr}`);
+
+            // Verificar conflitos se não for um salvamento forçado
+            if (!force) {
+                let allConflicts: Appointment[] = [];
+                
+                if (formData.isClinicWide) {
+                    // Para clínica toda, buscar todos os agendamentos no período
+                    const appts = await AgendaService.getAppointmentsOverlapping(startDate, endDate);
+                    allConflicts = appts;
+                } else {
+                    // Para profissionais específicos
+                    for (const profId of formData.selectedProfessionals) {
+                        const appts = await AgendaService.getAppointmentsOverlapping(startDate, endDate, profId);
+                        allConflicts = [...allConflicts, ...appts];
+                    }
+                }
+
+                if (allConflicts.length > 0) {
+                    setConflicts(allConflicts);
+                    setShowConflictModal(true);
+                    setSaving(false);
+                    return;
+                }
+            }
 
             const blockData: CreateScheduleBlockData = {
                 date: formData.date,
@@ -376,7 +439,7 @@ const ScheduleBlockModal: React.FC<ScheduleBlockModalProps> = ({
                                         id="block-start-time"
                                         type="time"
                                         value={formData.startTime}
-                                        onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
+                                        onChange={(e) => handleStartTimeChange(e.target.value)}
                                         disabled={formData.isFullDay}
                                         className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:border-purple-500 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                                     />
@@ -443,7 +506,7 @@ const ScheduleBlockModal: React.FC<ScheduleBlockModalProps> = ({
                                 Cancelar
                             </button>
                             <button
-                                onClick={handleSave}
+                                onClick={() => handleSave()}
                                 disabled={saving}
                                 className="flex items-center gap-2 px-7 py-2.5 text-sm font-semibold bg-red-600 hover:bg-red-700 active:bg-red-800 text-white rounded-lg shadow-sm shadow-red-200 dark:shadow-red-900/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                             >
@@ -476,14 +539,14 @@ const ScheduleBlockModal: React.FC<ScheduleBlockModalProps> = ({
             {/* Delete Confirmation Dialog */}
             {
                 showDeleteConfirm && (
-                    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+                    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
                         {/* Backdrop */}
                         <div
                             className="absolute inset-0 bg-black/60 backdrop-blur-sm"
                             onClick={() => setShowDeleteConfirm(false)}
                         />
                         {/* Dialog card */}
-                        <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm p-6 flex flex-col items-center gap-4 border border-gray-100 dark:border-gray-800">
+                        <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm p-6 flex flex-col items-center gap-4 border border-gray-100 dark:border-gray-800 animate-in fade-in zoom-in duration-200">
                             {/* Warning icon */}
                             <div className="w-14 h-14 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
                                 <span className="material-symbols-outlined text-3xl text-red-600 dark:text-red-400">warning</span>
@@ -515,6 +578,91 @@ const ScheduleBlockModal: React.FC<ScheduleBlockModalProps> = ({
                     </div>
                 )
             }
+
+            {/* Conflict Warning Dialog */}
+            {showConflictModal && (
+                <div className="fixed inset-0 z-[75] flex items-center justify-center p-4">
+                    {/* Backdrop */}
+                    <div
+                        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                        onClick={() => setShowConflictModal(false)}
+                    />
+                    {/* Dialog card */}
+                    <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md p-6 flex flex-col gap-5 border border-gray-100 dark:border-gray-800 animate-in fade-in zoom-in duration-200">
+                        <div className="flex items-start gap-4">
+                            <div className="w-12 h-12 shrink-0 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+                                <span className="material-symbols-outlined text-2xl text-amber-600 dark:text-amber-400">warning</span>
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1">Pacientes agendados detectados</h3>
+                                <p className="text-sm text-gray-500 dark:text-gray-400">
+                                    Existem agendamentos no período selecionado para este bloqueio.
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* List of conflicts */}
+                        <div className="max-h-48 overflow-y-auto space-y-2 pr-2">
+                            {conflicts.map(appt => (
+                                <div key={appt.id} className="p-3 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700">
+                                    <div className="flex justify-between items-start mb-1">
+                                        <div className="flex flex-col">
+                                            <span className="text-sm font-bold text-gray-900 dark:text-white">{appt.patient?.name}</span>
+                                            <div className="text-xs text-gray-500 dark:text-gray-400">
+                                                Profissional: {appt.professional?.full_name}
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-xs font-medium px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full uppercase">
+                                                {format(new Date(appt.start_time), 'HH:mm')}
+                                            </span>
+                                            <div className="flex gap-1">
+                                                <button
+                                                    onClick={() => onViewAppointment?.(appt)}
+                                                    title="Visualizar agendamento"
+                                                    className="p-1 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                                >
+                                                    <span className="material-symbols-outlined text-sm">visibility</span>
+                                                </button>
+                                                <button
+                                                    onClick={() => onEditAppointment?.(appt)}
+                                                    title="Editar agendamento"
+                                                    className="p-1 text-purple-600 hover:bg-purple-50 rounded transition-colors"
+                                                >
+                                                    <span className="material-symbols-outlined text-sm">edit</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        <p className="text-xs text-gray-500 dark:text-gray-400 italic">
+                            O profissional atenderá mesmo com o bloqueio ou os pacientes devem ser remanejados?
+                        </p>
+
+                        <div className="flex gap-3 w-full">
+                            <button
+                                onClick={() => setShowConflictModal(false)}
+                                className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setShowConflictModal(false);
+                                    handleSave(true);
+                                }}
+                                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold bg-amber-600 hover:bg-amber-700 text-white rounded-lg shadow-sm shadow-amber-200 dark:shadow-amber-900/30 transition-all"
+                            >
+                                <span className="material-symbols-outlined text-base">check_circle</span>
+                                Confirmar Bloqueio
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </>
     );
 };

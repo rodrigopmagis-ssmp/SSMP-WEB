@@ -311,6 +311,7 @@ export interface UserProfile {
   status: 'pending' | 'approved' | 'rejected';
   clinic_id?: string;
   created_at: string;
+  show_on_agenda?: boolean;
 }
 
 export interface Lead {

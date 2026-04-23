@@ -81,6 +81,37 @@ export const AgendaService = {
     },
 
     /**
+     * Fetches appointments that overlap with a given range.
+     * Overlap formula: appt_start < range_end AND appt_end > range_start
+     */
+    async getAppointmentsOverlapping(start: Date, end: Date, professionalId?: string) {
+        let query = supabase
+            .from('appointments')
+            .select(`
+                *,
+                patient:patients(name),
+                professional:profiles(full_name),
+                procedure:procedures(name)
+            `)
+            .in('status', ['scheduled', 'confirmed', 'completed', 'no_show'])
+            .lt('start_time', end.toISOString())
+            .gt('end_time', start.toISOString());
+
+        if (professionalId && professionalId !== 'all') {
+            query = query.eq('professional_id', professionalId);
+        }
+
+        const { data, error } = await query;
+
+        if (error) {
+            console.error('Error fetching overlapping appointments:', error);
+            throw error;
+        }
+
+        return data as unknown as Appointment[];
+    },
+
+    /**
      * Fetches appointments for a specific patient.
      */
     async getAppointmentsByPatient(patientId: string) {
@@ -197,7 +228,8 @@ export const AgendaService = {
         const { data, error } = await supabase
             .from('profiles')
             .select('*')
-            .in('role', ['doctor', 'master', 'admin', 'biomedico']) // Adjust roles as needed
+            .in('role', ['doctor', 'master', 'admin', 'biomedico'])
+            .eq('show_on_agenda', true)
             .order('full_name');
 
         if (error) {

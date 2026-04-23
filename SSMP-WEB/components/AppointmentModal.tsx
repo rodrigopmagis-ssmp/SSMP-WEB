@@ -248,6 +248,27 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
     const { isHoliday, holidays } = useHolidays(clinicId || undefined);
 
     // Fetch blocks and business hours when modal opens or date changes
+    const handleStartTimeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const newStart = e.target.value;
+        if (!newStart) {
+            setFormData(prev => ({ ...prev, start_time: newStart }));
+            return;
+        }
+
+        try {
+            const startDate = new Date(newStart);
+            const endDate = addMinutes(startDate, 30);
+            
+            setFormData(prev => ({ 
+                ...prev, 
+                start_time: newStart,
+                end_time: format(endDate, "yyyy-MM-dd'T'HH:mm")
+            }));
+        } catch (err) {
+            setFormData(prev => ({ ...prev, start_time: newStart }));
+        }
+    };
+
     const startDateStr = useMemo(() => {
         if (!formData.start_time) return undefined;
         return formData.start_time.split('T')[0];
@@ -867,7 +888,7 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
                                         id="start_time"
                                         type="datetime-local"
                                         value={formData.start_time}
-                                        onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
+                                        onChange={handleStartTimeChange}
                                         className={`w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white ${isReadOnly ? 'bg-gray-100 dark:bg-gray-600 cursor-not-allowed opacity-80' : ''}`}
                                         required
                                         disabled={isReadOnly}
