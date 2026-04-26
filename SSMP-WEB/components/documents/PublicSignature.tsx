@@ -266,6 +266,8 @@ const PublicSignature: React.FC = () => {
               .prose { 
                 max-width: none !important;
                 width: 100% !important;
+                white-space: pre-wrap !important;
+                word-wrap: break-word !important;
               }
               .prose p, .prose h1, .prose h2, .prose h3, .grid, .flex {
                 page-break-inside: avoid !important;

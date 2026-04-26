@@ -542,7 +542,7 @@ const App: React.FC = () => {
           <div className="flex flex-col md:flex-row items-center justify-center gap-2">
             <p className="text-xs text-[#8E8E8E] dark:text-[#A8A8A8]">© 2023 AestheticClinic Patient Follow-up System. Professional recovery tracking made simple.</p>
             <span className="hidden md:inline text-[#DBDBDB] dark:text-[#262626]">|</span>
-            <p className="text-[10px] text-primary/50 font-medium tracking-tight">Última atualização: 26/04/2026 15:10 (Vercel Prod)</p>
+            <p className="text-[10px] text-primary/50 font-medium tracking-tight">Última atualização: 26/04/2026 15:45 (Vercel Prod)</p>
           </div>
         </footer>
       </div>
