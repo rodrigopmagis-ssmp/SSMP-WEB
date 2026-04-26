@@ -192,17 +192,33 @@ const DocumentModal: React.FC<DocumentModalProps> = ({ isOpen, onClose, onSucces
         <div className="p-6 overflow-y-auto flex-1 space-y-6">
           {/* Progress Steps */}
           <div className="flex justify-between relative mb-8 px-10">
-            <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-gray-100 dark:bg-gray-800 -translate-y-1/2 -z-10" />
+            {/* Background Line (Gray) */}
+            <div className="absolute top-1/2 left-14 right-14 h-0.5 bg-gray-100 dark:bg-gray-800 -translate-y-1/2 -z-10" />
+            
+            {/* Progress Line (Active - Primary) */}
+            <div 
+              className="absolute top-1/2 left-14 h-0.5 bg-primary -translate-y-1/2 -z-10 transition-all duration-500 ease-in-out"
+              style={{ 
+                width: `calc(${((step - 1) / 3) * 100}% - 0px)`,
+                maxWidth: 'calc(100% - 112px)' 
+              }}
+            />
+
             {[1, 2, 3, 4].map(s => (
               <div 
                 key={s} 
-                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all duration-300 ${
+                className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-all duration-500 relative z-10 ${
                   step >= s 
-                  ? 'bg-primary text-white scale-110 shadow-lg shadow-primary/20' 
-                  : 'bg-gray-200 dark:bg-gray-800 text-gray-500'
+                  ? 'bg-primary text-white scale-110 shadow-xl shadow-primary/30' 
+                  : 'bg-white dark:bg-gray-800 border-2 border-gray-100 dark:border-gray-700 text-gray-400'
                 }`}
               >
                 {s}
+                {step > s && (
+                  <div className="absolute -right-1 -top-1 w-4 h-4 bg-green-500 rounded-full flex items-center justify-center border-2 border-white dark:border-gray-900 animate-in zoom-in duration-300">
+                    <span className="material-symbols-outlined text-[10px] text-white font-black">check</span>
+                  </div>
+                )}
               </div>
             ))}
           </div>
