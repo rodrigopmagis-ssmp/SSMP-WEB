@@ -127,7 +127,7 @@ export const DocumentService = {
   async getDocumentsByPatient(patientId: string) {
     const { data, error } = await supabase
       .from('patient_documents')
-      .select('*, document_templates(title, subtitle)')
+      .select('*, patients(name, phone, cpf), document_templates(title, subtitle)')
       .eq('patient_id', patientId)
       .order('created_at', { ascending: false });
     
