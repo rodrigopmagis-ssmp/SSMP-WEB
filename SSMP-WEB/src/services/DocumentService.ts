@@ -124,6 +124,20 @@ export const DocumentService = {
     return data;
   },
 
+  async getDocumentsByPatient(patientId: string) {
+    const { data, error } = await supabase
+      .from('patient_documents')
+      .select('*, document_templates(title, subtitle)')
+      .eq('patient_id', patientId)
+      .order('created_at', { ascending: false });
+    
+    if (error) {
+      console.error('Supabase error in getDocumentsByPatient:', error);
+      throw error;
+    }
+    return data;
+  },
+
   async createDocument(doc: Omit<PatientDocument, 'id' | 'created_at'>) {
     const clinic_id = doc.clinic_id || await this._getClinicId();
     const { data, error } = await supabase

@@ -4,6 +4,7 @@ import { Patient, Procedure, PatientTreatment } from '../types';
 import Button from './ui/Button';
 import { CopilotView } from '../src/components/Copilot/CopilotView';
 import PatientMiniCalendar from './PatientMiniCalendar';
+import PatientDocumentsSection from './documents/PatientDocumentsSection';
 
 interface PatientProfileProps {
     patient: Patient;
@@ -277,9 +278,9 @@ const PatientProfile: React.FC<PatientProfileProps> = ({ patient, onBack, onEdit
                         />
                     </div>
                 ) : (
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                        {/* Left Col: Registration Info */}
-                        <div className="lg:col-span-1 space-y-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                        {/* Left Col: Registration Info (3/12) */}
+                        <div className="lg:col-span-3 space-y-6">
                             <PatientMiniCalendar patientId={patient.id} patientName={patient.name} />
                             <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 shadow-sm p-6">
                                 <h3 className="text-gray-900 dark:text-white font-bold text-lg mb-4 flex items-center gap-2">
@@ -394,8 +395,8 @@ const PatientProfile: React.FC<PatientProfileProps> = ({ patient, onBack, onEdit
                             </div>
                         </div>
 
-                        {/* Right Col: Protocol History */}
-                        <div className="lg:col-span-2 space-y-6">
+                        {/* Middle Col: Protocol History (6/12) */}
+                        <div className="lg:col-span-6 space-y-6">
                             <div className="flex items-center justify-between">
                                 <h3 className="text-gray-900 dark:text-white font-bold text-xl flex items-center gap-2">
                                     <span className="material-symbols-outlined text-primary">history</span>
@@ -454,7 +455,13 @@ const PatientProfile: React.FC<PatientProfileProps> = ({ patient, onBack, onEdit
                                 )}
                             </div>
                         </div>
+
+                        {/* Right Col: Documents (3/12) */}
+                        <div className="lg:col-span-3 h-full">
+                            <PatientDocumentsSection patientId={patient.id} />
+                        </div>
                     </div>
+
                 )
             }
             {/* Complaint Modal */}
