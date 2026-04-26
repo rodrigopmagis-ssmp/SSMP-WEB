@@ -177,7 +177,16 @@ export const DocumentService = {
   async signDocument(documentId: string, signatureData: string) {
     const now = new Date().toISOString();
     
-    // 1. Update document status and signature data
+    // 1. Get document to get clinic_id
+    const { data: docData } = await supabase
+      .from('patient_documents')
+      .select('clinic_id')
+      .eq('id', documentId)
+      .single();
+
+    const clinicId = docData?.clinic_id;
+
+    // 2. Update document status and signature data
     const { error: docError } = await supabase
       .from('patient_documents')
       .update({ 
@@ -192,11 +201,12 @@ export const DocumentService = {
       throw docError;
     }
 
-    // 2. Insert signature audit record
+    // 3. Insert signature audit record
     const { error: sigError } = await supabase
       .from('signatures')
       .insert({
         document_id: documentId,
+        clinic_id: clinicId,
         signature_data: signatureData,
         signed_at: now,
         ip_address: 'local-auth',
