@@ -107,50 +107,50 @@ const PatientDocumentSearchModal: React.FC<PatientDocumentSearchModalProps> = ({
               <p className="text-gray-400 max-w-xs mt-2">Tente ajustar seus termos de busca ou filtros para encontrar o que procura.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-3">
               {filteredDocs.map((doc) => (
                 <div 
                   key={doc.id}
-                  className="bg-white dark:bg-gray-900 p-5 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-md transition-all group flex flex-col h-full"
+                  className="bg-white dark:bg-gray-900 p-4 rounded-xl border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-md transition-all group flex items-center gap-4"
                 >
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="p-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 text-primary group-hover:bg-primary group-hover:text-white transition-all">
-                      <span className="material-symbols-outlined">description</span>
-                    </div>
-                    <span className={`text-[10px] font-black uppercase px-2 py-1 rounded-full border ${
-                      doc.status === 'signed' 
-                        ? 'bg-green-50 text-green-700 border-green-100 dark:bg-green-900/20 dark:text-green-400 dark:border-green-900/30' 
-                        : 'bg-amber-50 text-amber-700 border-amber-100 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-900/30'
-                    }`}>
-                      {doc.status === 'signed' ? 'Assinado' : 'Pendente'}
-                    </span>
+                  <div className="p-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 text-primary group-hover:bg-primary group-hover:text-white transition-all shrink-0 flex items-center justify-center">
+                    <span className="material-symbols-outlined">description</span>
                   </div>
                   
-                  <div className="flex-1 min-w-0 mb-4">
-                    <h4 className="font-bold text-gray-900 dark:text-white mb-1 group-hover:text-primary transition-colors truncate">
+                  <div className="flex-1 min-w-0">
+                    <h4 className="font-bold text-gray-900 dark:text-white mb-0.5 group-hover:text-primary transition-colors truncate">
                       {doc.title}
                     </h4>
-                    <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                      <span className="material-symbols-outlined text-sm">calendar_today</span>
-                      {format(new Date(doc.created_at), "dd 'de' MMMM, yyyy", { locale: ptBR })}
+                    <div className="flex items-center gap-4 text-[10px] text-gray-500 dark:text-gray-400">
+                      <span className="flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-[14px]">calendar_today</span>
+                        {format(new Date(doc.created_at), "dd 'de' MMMM, yyyy", { locale: ptBR })}
+                      </span>
+                      <span className={`font-black uppercase px-2 py-0.5 rounded-full border ${
+                        doc.status === 'signed' 
+                          ? 'bg-green-50 text-green-700 border-green-100 dark:bg-green-900/20 dark:text-green-400 dark:border-green-900/30' 
+                          : 'bg-amber-50 text-amber-700 border-amber-100 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-900/30'
+                      }`}>
+                        {doc.status === 'signed' ? 'Assinado' : 'Pendente'}
+                      </span>
                     </div>
                   </div>
 
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 shrink-0">
                     <button
                       onClick={() => setSelectedDoc(doc)}
-                      className="flex-1 py-2.5 text-xs font-bold text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-xl transition-all flex items-center justify-center gap-2"
+                      className="px-4 py-2 text-xs font-bold text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-all flex items-center justify-center gap-2"
                     >
                       <span className="material-symbols-outlined text-lg">visibility</span>
-                      Visualizar
+                      <span className="hidden sm:inline">Visualizar</span>
                     </button>
                     {doc.status !== 'signed' && (
                       <button
                         onClick={() => setDocToSign(doc)}
-                        className="flex-1 py-2.5 text-xs font-bold text-white bg-primary hover:bg-primary/90 rounded-xl shadow-lg shadow-primary/10 transition-all flex items-center justify-center gap-2"
+                        className="px-4 py-2 text-xs font-bold text-white bg-primary hover:bg-primary/90 rounded-lg shadow-lg shadow-primary/10 transition-all flex items-center justify-center gap-2"
                       >
                         <span className="material-symbols-outlined text-lg">edit_note</span>
-                        Assinar
+                        <span className="hidden sm:inline">Assinar</span>
                       </button>
                     )}
                   </div>
