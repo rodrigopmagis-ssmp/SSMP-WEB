@@ -539,7 +539,11 @@ const App: React.FC = () => {
           </main>
         </div>
         <footer className="px-10 py-6 border-t border-[#DBDBDB] dark:border-[#262626] text-center bg-white dark:bg-background-dark">
-          <p className="text-xs text-[#8E8E8E] dark:text-[#A8A8A8]">© 2023 AestheticClinic Patient Follow-up System. Professional recovery tracking made simple.</p>
+          <div className="flex flex-col md:flex-row items-center justify-center gap-2">
+            <p className="text-xs text-[#8E8E8E] dark:text-[#A8A8A8]">© 2023 AestheticClinic Patient Follow-up System. Professional recovery tracking made simple.</p>
+            <span className="hidden md:inline text-[#DBDBDB] dark:text-[#262626]">|</span>
+            <p className="text-[10px] text-primary/50 font-medium tracking-tight">Última atualização: 26/04/2026 15:10 (Vercel Prod)</p>
+          </div>
         </footer>
       </div>
     </ThemeProvider>

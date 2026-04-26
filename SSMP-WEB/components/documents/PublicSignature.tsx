@@ -53,19 +53,38 @@ const PublicSignature: React.FC = () => {
 
       if (err || !data) throw new Error('Documento não encontrado');
       
-      // Fallback para nome do paciente se as colunas novas ou o join falharem
-      if (!data.patients?.name && !data.patient_name && data.content) {
-        const nameMatch = data.content.match(/Paciente:\s*(?:<strong>)?([^<]+)/i);
-        if (nameMatch) {
-          data.patient_name = nameMatch[1].trim();
+      // Fallback robusto para nome do paciente e CPF
+      if (data.content) {
+        if (!data.patients?.name && !data.patient_name) {
+          // Tenta encontrar "Paciente:" seguido de qualquer coisa até o próximo < ou quebra de linha
+          const nameRegexes = [
+            /Paciente:\s*(?:<strong>)?([^<|\n]+)/i,
+            /Nome:\s*(?:<strong>)?([^<|\n]+)/i,
+            /<strong>([^<]+)<\/strong>\s*\(Paciente\)/i
+          ];
+          
+          for (const regex of nameRegexes) {
+            const match = data.content.match(regex);
+            if (match && match[1] && match[1].trim().length > 3) {
+              data.patient_name = match[1].trim().replace(/&nbsp;/g, ' ');
+              break;
+            }
+          }
         }
-      }
 
-      // Fallback para CPF
-      if (!data.patients?.cpf && !data.patient_cpf && data.content) {
-        const cpfMatch = data.content.match(/CPF:\s*(?:<strong>)?([^<]+)/i);
-        if (cpfMatch) {
-          data.patient_cpf = cpfMatch[1].trim();
+        if (!data.patients?.cpf && !data.patient_cpf) {
+          const cpfRegexes = [
+            /CPF:\s*(?:<strong>)?(\d{3}\.?\d{3}\.?\d{3}-?\d{2})/i,
+            /CPF:\s*(?:<strong>)?([^<|\n]+)/i
+          ];
+
+          for (const regex of cpfRegexes) {
+            const match = data.content.match(regex);
+            if (match && match[1]) {
+              data.patient_cpf = match[1].trim().replace(/&nbsp;/g, ' ');
+              break;
+            }
+          }
         }
       }
       
@@ -234,18 +253,31 @@ const PublicSignature: React.FC = () => {
         backgroundColor: '#ffffff',
         windowWidth: 1024,
         onclone: (clonedDoc) => {
-          const el = clonedDoc.getElementById('pdf-capture-container');
-          if (el) {
+            // Injetar estilos CSS para forçar layout de impressão e evitar quebras
+            const style = clonedDoc.createElement('style');
+            style.innerHTML = `
+              #pdf-capture-container { 
+                padding: 0 !important;
+                margin: 0 !important;
+                width: 210mm !important;
+              }
+              .prose { 
+                max-width: none !important;
+                width: 100% !important;
+              }
+              .prose p, .prose h1, .prose h2, .prose h3, .grid, .flex {
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+              }
+              p { margin-bottom: 1rem !important; line-height: 1.6 !important; }
+            `;
+            clonedDoc.head.appendChild(style);
+
             el.style.opacity = '1';
             el.style.height = 'auto';
             el.style.position = 'static';
-            el.style.zIndex = '9999';
-            // Forçar quebras de linha evitarem cortes
-            const blocks = el.querySelectorAll('.prose p, .prose h1, .prose h2, .prose h3, .grid');
-            blocks.forEach((b: any) => {
-              b.style.pageBreakInside = 'avoid';
-              b.style.breakInside = 'avoid';
-            });
+            el.style.display = 'block';
+            el.style.visibility = 'visible';
           }
         }
       });
@@ -387,7 +419,7 @@ const PublicSignature: React.FC = () => {
                 </div>
                 <div className="w-1/3 p-3 bg-[#fdf9f3] border-r border-[#ead9c8]">
                   <p className="text-gray-600 mb-1">CPF:</p>
-                  <p className="font-bold text-gray-900">{doc.patients?.cpf || '-'}</p>
+                  <p className="font-bold text-gray-900">{doc.patients?.cpf || doc.patient_cpf || '-'}</p>
                 </div>
                 <div className="w-1/4 p-3 bg-[#fdf9f3]">
                   <p className="text-gray-600 mb-1">Data:</p>
