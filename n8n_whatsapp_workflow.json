@@ -1,0 +1,60 @@
+{
+  "name": "EvolutionAPI - Envio de Assinatura",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "send-signature-link",
+        "options": {}
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        100,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "SUA_URL_DA_EVOLUTION_API/message/sendText/SUA_INSTANCIA",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "SUA_API_KEY"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"number\": \"{{ $json.body.phoneNumber }}\",\n  \"text\": \"Olá {{ $json.body.patientName }},\\n\\nSua clínica enviou um documento para assinatura digital: *{{ $json.body.documentName }}*\\n\\nClique no link abaixo para assinar:\\n{{ $json.body.signatureUrl }}\\n\\nAtenciosamente,\\nEquipe Dra. Isabela Rossetti\"\n}",
+        "options": {}
+      },
+      "name": "EvolutionAPI",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        350,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "EvolutionAPI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

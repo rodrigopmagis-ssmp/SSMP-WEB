@@ -6,6 +6,8 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { PDFDocument } from 'pdf-lib';
 import { DocumentService } from '../../src/services/DocumentService';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 
 const PublicSignature: React.FC = () => {
@@ -13,7 +15,9 @@ const PublicSignature: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isSigned, setIsSigned] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const sigCanvas = useRef<SignatureCanvas>(null);
+  const documentRef = useRef<HTMLDivElement>(null);
 
   const getDocId = () => {
     const params = new URLSearchParams(window.location.search);
@@ -172,8 +176,16 @@ const PublicSignature: React.FC = () => {
 
       if (docErr) throw docErr;
 
+      // 3. Update local state to show success screen immediately
+      setDoc(prev => ({
+        ...prev,
+        status: 'signed',
+        signed_at: new Date().toISOString(),
+        file_url: finalFileUrl,
+        signature_data: signatureData
+      }));
+      
       setIsSigned(true);
-      alert('Documento assinado com sucesso!');
     } catch (err: any) {
       console.error('Error saving signature:', err);
       alert('Erro ao salvar assinatura: ' + (err.message || 'Erro desconhecido'));
@@ -182,6 +194,220 @@ const PublicSignature: React.FC = () => {
     }
   };
 
+
+  const handleDownloadPDF = async () => {
+    if (doc.file_url && doc.file_url.toLowerCase().includes('.pdf')) {
+      window.open(doc.file_url, '_blank');
+      return;
+    }
+
+    if (!documentRef.current) return;
+    
+    setIsExporting(true);
+    try {
+      const element = documentRef.current;
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff'
+      });
+      
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
+
+      const imgProps = pdf.getImageProperties(imgData);
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      pdf.save(`${doc.title.replace(/\s+/g, '_')}_Assinado.pdf`);
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('Erro ao gerar PDF. Tente novamente.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  if (isSigned) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-4 text-center bg-gray-50 dark:bg-gray-950">
+        <div className="w-full max-w-sm space-y-6">
+          <div className="flex flex-col items-center">
+            <div className="w-20 h-20 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center text-green-600 mb-4 animate-bounce">
+              <span className="material-symbols-outlined text-5xl">check_circle</span>
+            </div>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Documento Assinado!</h1>
+            <p className="text-gray-500 mt-1 text-sm">
+              Obrigado, <span className="font-bold text-gray-700 dark:text-gray-300">{doc.patients?.name || doc.patient_name || 'Paciente'}</span>.
+            </p>
+          </div>
+
+          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 text-sm text-left overflow-hidden shadow-xl shadow-gray-200/50 dark:shadow-none">
+            <div className="h-1.5 w-full bg-green-600" />
+            <div className="p-5 space-y-4">
+              <div>
+                <span className="text-[10px] uppercase font-bold text-gray-400 block mb-0.5">Documento</span>
+                <p className="font-semibold text-gray-900 dark:text-white line-clamp-1">{doc.title}</p>
+              </div>
+              
+              <div className="flex justify-between gap-4">
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-gray-400 block mb-0.5">Data</span>
+                  <p className="text-gray-700 dark:text-gray-300 font-medium">
+                    {format(new Date(doc.signed_at || new Date()), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <span className="text-[10px] uppercase font-bold text-gray-400 block mb-0.5">Status</span>
+                  <p className="text-green-600 font-bold flex items-center justify-end gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-green-600" />
+                    Autenticado
+                  </p>
+                </div>
+              </div>
+
+              <div className="pt-3 border-t border-gray-50 dark:border-gray-800">
+                <span className="text-[10px] uppercase font-bold text-gray-400 block mb-0.5">ID de Autenticidade</span>
+                <p className="font-mono text-[10px] text-gray-400 break-all select-all">{doc.id}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-3 pt-2">
+            <Button 
+              variant="primary" 
+              onClick={handleDownloadPDF} 
+              isLoading={isExporting}
+              className="w-full gap-2 py-6 rounded-2xl text-lg shadow-lg shadow-primary/20"
+            >
+              <span className="material-symbols-outlined">download</span>
+              Baixar Cópia em PDF
+            </Button>
+            
+            <p className="text-xs text-gray-400">
+              Você pode fechar esta aba agora.
+            </p>
+          </div>
+        </div>
+
+        <div className="fixed -left-[10000px] top-0 pointer-events-none">
+          <div 
+            ref={documentRef}
+            className="bg-white p-12 min-h-[297mm] w-[210mm] text-gray-900 flex flex-col"
+          >
+            {/* Papel Timbrado */}
+            <div className="mb-12 border-b-2 border-[#8B7355] pb-6 flex justify-between items-start">
+              <div>
+                <h1 className="text-2xl font-serif font-bold text-gray-900 uppercase tracking-tight flex items-center gap-2">
+                  Dra. Isabela Rossetti
+                  <span className="material-symbols-outlined text-green-600 text-xl">verified</span>
+                </h1>
+                <p className="text-[#8B7355] text-xs font-medium tracking-wide uppercase mt-1">
+                  Estética Avançada
+                </p>
+              </div>
+              <div className="text-right text-[11px] text-gray-500 leading-relaxed font-medium">
+                <p>isarossetti1988@gmail.com</p>
+                <p>+55 (11) 97054-6223</p>
+              </div>
+            </div>
+
+            <div className="mb-10 text-center">
+              <h1 className="text-xl font-bold uppercase tracking-tight text-gray-900">{doc.title}</h1>
+              <div className="mt-6 flex border border-[#ead9c8] rounded-sm overflow-hidden text-left text-[11px] mb-8">
+                <div className="flex-1 p-3 bg-[#fdf9f3] border-r border-[#ead9c8]">
+                  <p className="text-gray-600 mb-1">Paciente:</p>
+                  <p className="font-bold text-gray-900 uppercase">{doc.patients?.name || doc.patient_name || '-'}</p>
+                </div>
+                <div className="w-1/3 p-3 bg-[#fdf9f3] border-r border-[#ead9c8]">
+                  <p className="text-gray-600 mb-1">CPF:</p>
+                  <p className="font-bold text-gray-900">{doc.patients?.cpf || '-'}</p>
+                </div>
+                <div className="w-1/4 p-3 bg-[#fdf9f3]">
+                  <p className="text-gray-600 mb-1">Data:</p>
+                  <p className="font-bold text-gray-900">
+                    {format(new Date(doc.signed_at || new Date()), "dd/MM/yyyy", { locale: ptBR })}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div 
+              className="flex-1 prose max-w-none font-serif text-[15px] text-gray-800 text-justify mb-12"
+              dangerouslySetInnerHTML={{ __html: doc.content || '' }}
+            />
+
+            <div className="mt-auto pt-12 border-t-2 border-[#fdf9f3]">
+              <div className="flex gap-8">
+                <div className="flex-1 p-6 bg-[#fdf9f3] border border-[#ead9c8] rounded-md relative min-h-[160px] flex flex-col justify-end">
+                  {doc.signature_data && (
+                    <div className="absolute top-4 left-4 right-4 bottom-12 flex items-center justify-center">
+                      <img 
+                        src={doc.signature_data} 
+                        alt="Assinatura" 
+                        className="max-h-24 object-contain"
+                      />
+                    </div>
+                  )}
+                  <div className="pt-2 border-t border-[#8B7355]/30 text-center">
+                    <p className="text-[11px] font-bold text-gray-900 uppercase">{doc.patients?.name || doc.patient_name || '-'}</p>
+                    <p className="text-[9px] text-[#8B7355] uppercase mt-0.5">Assinatura do Paciente</p>
+                  </div>
+                </div>
+                <div className="flex-1 p-6 bg-[#fdf9f3] border border-[#ead9c8] rounded-md flex flex-col justify-end">
+                  <div className="text-center">
+                    <div className="mb-4">
+                      <h3 className="text-sm font-bold text-gray-900 uppercase">Dra. Isabela Rossetti</h3>
+                      <p className="text-[10px] text-[#8B7355] font-medium">CRM/SP 123456 • CFM 78910</p>
+                    </div>
+                    <div className="pt-2 border-t border-[#8B7355]/30">
+                      <p className="text-[9px] text-[#8B7355] uppercase">Responsável Técnico</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Authentication Band */}
+            <div className="mt-12 bg-[#F0FDF4] border-t-2 border-green-600 p-8">
+              <div className="flex items-center justify-between gap-8">
+                <div className="flex items-center gap-6 border-r border-green-200 pr-8">
+                  <div className="w-14 h-14 bg-green-600 rounded-full flex items-center justify-center text-white">
+                    <span className="material-symbols-outlined text-3xl">verified_user</span>
+                  </div>
+                  <div>
+                    <h4 className="text-green-800 font-black uppercase text-[13px] tracking-[0.2em] mb-1">Documento Autenticado</h4>
+                    <span className="text-[9px] font-bold text-green-600 uppercase tracking-widest">Protocolo de Segurança Ativo</span>
+                  </div>
+                </div>
+                <div className="flex-1 grid grid-cols-2 gap-x-12 gap-y-3">
+                  <div className="space-y-1">
+                    <p className="text-[9px] text-green-700/60 font-bold uppercase tracking-wider">Data e Hora</p>
+                    <p className="text-[11px] text-gray-700 font-medium">
+                      {doc.signed_at 
+                        ? format(new Date(doc.signed_at), "dd/MM/yyyy 'às' HH:mm:ss", { locale: ptBR })
+                        : format(new Date(), "dd/MM/yyyy 'às' HH:mm:ss", { locale: ptBR })
+                      }
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-[9px] text-green-700/60 font-bold uppercase tracking-wider">ID de Autenticidade</p>
+                    <p className="text-[11px] text-gray-700 font-mono uppercase tracking-tight">{doc.id}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -198,30 +424,6 @@ const PublicSignature: React.FC = () => {
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Ops!</h1>
         <p className="text-gray-500 mt-2">{error || 'Ocorreu um erro ao carregar o documento.'}</p>
         <Button variant="primary" className="mt-6" onClick={() => window.location.reload()}>Tentar novamente</Button>
-      </div>
-    );
-  }
-
-  if (isSigned) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-6 text-center bg-green-50 dark:bg-green-950/20">
-        <div className="w-20 h-20 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center text-green-600 mb-6">
-          <span className="material-symbols-outlined text-5xl">check_circle</span>
-        </div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Documento Assinado!</h1>
-        <p className="text-gray-500 mt-2 max-w-md">
-          Obrigado, {doc.patients?.name}. Sua assinatura foi coletada com sucesso e o documento está agora em processo de finalização.
-        </p>
-        <div className="mt-8 p-4 bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 text-sm text-left w-full max-w-sm">
-          <div className="flex justify-between py-1">
-            <span className="text-gray-500">Documento:</span>
-            <span className="font-medium">{doc.title}</span>
-          </div>
-          <div className="flex justify-between py-1">
-            <span className="text-gray-500">Data:</span>
-            <span className="font-medium">{format(new Date(), "dd/MM/yyyy 'às' H:mm", { locale: ptBR })}</span>
-          </div>
-        </div>
       </div>
     );
   }

@@ -101,8 +101,11 @@ const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({ document, onC
                 {/* Papel Timbrado (Letterhead) */}
                 <div className="mb-12 border-b-2 border-[#8B7355] pb-6 flex justify-between items-start">
                   <div>
-                    <h1 className="text-2xl font-serif font-bold text-gray-900 uppercase tracking-tight">
+                    <h1 className="text-2xl font-serif font-bold text-gray-900 uppercase tracking-tight flex items-center gap-2">
                       Dra. Isabela Rossetti
+                      {document.status === 'signed' && (
+                        <span className="material-symbols-outlined text-green-600 text-xl" title="Documento Assinado">verified</span>
+                      )}
                     </h1>
                     <p className="text-[#8B7355] text-xs font-medium tracking-wide uppercase mt-1">
                       Estética Avançada
@@ -140,19 +143,9 @@ const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({ document, onC
                   </div>
                 </div>
 
-                {/* Document Status Badge (Only if signed) */}
-                {document.status === 'signed' && (
-                  <div className="flex justify-end mb-6">
-                    <div className="text-[10px] uppercase font-black text-green-600 bg-green-50 px-3 py-1 rounded-full border border-green-200 flex items-center gap-1 shadow-sm">
-                      <span className="material-symbols-outlined text-[14px]">verified</span>
-                      Assinado Digitalmente
-                    </div>
-                  </div>
-                )}
-
                 {/* Document Body */}
                 <div 
-                  className="flex-1 prose max-w-none prose-p:leading-relaxed prose-p:mb-6 prose-strong:text-gray-900 dark:prose-invert font-serif text-[15px] text-gray-800 text-justify"
+                  className="flex-1 prose max-w-none prose-p:leading-relaxed prose-p:mb-6 prose-strong:text-gray-900 dark:prose-invert font-serif text-[15px] text-gray-800 text-justify mb-12"
                   dangerouslySetInnerHTML={{ __html: document.content || '' }}
                 />
 
@@ -195,16 +188,65 @@ const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({ document, onC
                       </div>
                     </div>
                   </div>
-
-                  {/* Audit Footer */}
-                  <div className="mt-8 text-center">
-                    <p className="text-[8px] text-gray-400 leading-tight">
-                      Este documento foi gerado eletronicamente e possui validade jurídica.<br />
-                      A assinatura digital é protegida por criptografia e vinculada aos dados biométricos e IP do subscritor.<br />
-                      <span className="font-mono mt-1 block">IDENTIFICADOR: {document.id} | HASH: {document.id.substring(0, 8)}...</span>
-                    </p>
-                  </div>
                 </div>
+
+                {/* New Full-Width Authentication Band */}
+                {document.status === 'signed' && (
+                  <div className="mt-12 -mx-12 -mb-12 bg-[#F0FDF4] border-t-2 border-green-600 p-8 relative overflow-hidden">
+                    {/* Decorative Security Pattern Background */}
+                    <div className="absolute inset-0 opacity-[0.03] pointer-events-none select-none overflow-hidden rotate-1 scale-110">
+                      <div className="flex flex-wrap gap-x-8 gap-y-4 text-[7px] font-black uppercase whitespace-nowrap text-green-900">
+                        {Array(30).fill('AUTENTICADO DIGITALMENTE • SEGURANÇA • INTEGRALIDADE • REGISTRO CLÍNICO • ').join('')}
+                      </div>
+                    </div>
+
+                    <div className="relative z-10 flex items-center justify-between gap-8">
+                      <div className="flex items-center gap-6 border-r border-green-200 pr-8">
+                        <div className="w-14 h-14 bg-green-600 rounded-full flex items-center justify-center text-white shadow-xl shadow-green-600/20">
+                          <span className="material-symbols-outlined text-3xl">verified_user</span>
+                        </div>
+                        <div>
+                          <h4 className="text-green-800 font-black uppercase text-[13px] tracking-[0.2em] mb-1">Documento Autenticado</h4>
+                          <div className="flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                            <span className="text-[9px] font-bold text-green-600 uppercase tracking-widest">Protocolo de Segurança Ativo</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex-1 grid grid-cols-2 gap-x-12 gap-y-3">
+                        <div className="space-y-1">
+                          <p className="text-[9px] text-green-700/60 font-bold uppercase tracking-wider">Data e Hora da Assinatura</p>
+                          <p className="text-[11px] text-gray-700 font-medium flex items-center gap-2">
+                            <span className="material-symbols-outlined text-[14px] text-green-600">schedule</span>
+                            {document.signed_at 
+                              ? format(new Date(document.signed_at), "dd/MM/yyyy 'às' HH:mm:ss", { locale: ptBR })
+                              : format(new Date(document.created_at), "dd/MM/yyyy 'às' HH:mm:ss", { locale: ptBR })
+                            }
+                          </p>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-[9px] text-green-700/60 font-bold uppercase tracking-wider">Identificador de Autenticidade</p>
+                          <p className="text-[11px] text-gray-700 font-mono flex items-center gap-2">
+                            <span className="material-symbols-outlined text-[14px] text-green-600">key</span>
+                            <span className="select-all uppercase tracking-tight">{document.id}</span>
+                          </p>
+                        </div>
+                        <div className="col-span-2 pt-2 mt-2 border-t border-green-200/50">
+                          <p className="text-[8px] text-green-800/50 leading-relaxed max-w-2xl italic">
+                            Este documento foi gerado eletronicamente e possui validade jurídica conforme diretrizes vigentes. 
+                            A assinatura digital é protegida por criptografia assimétrica e vinculada aos dados biométricos do subscritor, garantindo irrefutabilidade e integridade total.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="shrink-0 flex flex-col items-center gap-1 opacity-40">
+                         <span className="material-symbols-outlined text-4xl text-green-800">lock_outline</span>
+                         <span className="text-[7px] font-bold text-green-900 uppercase">Secure Link</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
