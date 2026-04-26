@@ -1113,8 +1113,8 @@ const Agenda: React.FC<AgendaProps> = ({ patients, procedures }) => {
                         <div 
                             className="fixed z-[70] month-summary-popover bg-white rounded-xl shadow-2xl border border-gray-100 p-4 min-w-[300px] max-w-[400px]"
                             style={{ 
-                                top: `${monthPopover.anchorRect?.top}px`, 
-                                left: `Math.min(window.innerWidth - 320, Math.max(20, ${monthPopover.anchorRect?.left}px - 150))` 
+                                top: (monthPopover.anchorRect?.top || 0), 
+                                left: Math.min(window.innerWidth - 320, Math.max(20, (monthPopover.anchorRect?.left || 0) - 150))
                             }}
                         >
                             <div className="flex justify-between items-center mb-4 pb-2 border-bottom border-gray-50">
