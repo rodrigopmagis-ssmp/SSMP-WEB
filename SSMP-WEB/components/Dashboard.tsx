@@ -6,19 +6,77 @@ import { calculateDueDate, getSLAStatus } from '../src/utils/sla';
 interface DashboardProps {
   patients: Patient[];
   procedures: Procedure[];
-  activeTreatments?: PatientTreatment[];
+  treatments?: PatientTreatment[];
   onPatientSelect: (id: string, treatmentId?: string) => void;
   onNewRegistration: () => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ patients, procedures, activeTreatments = [], onPatientSelect, onNewRegistration }) => {
+const Dashboard: React.FC<DashboardProps> = ({ patients, procedures, treatments = [], onPatientSelect, onNewRegistration }) => {
   const [statusFilter, setStatusFilter] = useState<string>('Todos');
+  const [protocolStatusFilter, setProtocolStatusFilter] = useState<string>('active');
   const [procedureFilter, setProcedureFilter] = useState<string>('Todos');
   const [timeFilter, setTimeFilter] = useState<string>('Todos');
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+  const [startDate, setStartDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 30);
+    return d.toISOString().split('T')[0];
+  });
+  const [endDate, setEndDate] = useState(() => new Date().toISOString().split('T')[0]);
+
+  // appliedFilters stores the values actually used for filtering (updated only on search button click)
+  const [appliedFilters, setAppliedFilters] = useState({
+    status: 'Todos',
+    protocolStatus: 'active',
+    procedure: 'Todos',
+    time: 'Todos',
+    startDate: (() => {
+      const d = new Date();
+      d.setDate(d.getDate() - 30);
+      return d.toISOString().split('T')[0];
+    })(),
+    endDate: new Date().toISOString().split('T')[0]
+  });
+
+  const clearFilters = () => {
+    setStatusFilter('Todos');
+    setProtocolStatusFilter('active');
+    setProcedureFilter('Todos');
+    setTimeFilter('Todos');
+    const d = new Date();
+    d.setDate(d.getDate() - 30);
+    const sDate = d.toISOString().split('T')[0];
+    const eDate = new Date().toISOString().split('T')[0];
+    setStartDate(sDate);
+    setEndDate(eDate);
+    
+    // Reset applied filters as well
+    setAppliedFilters({
+      status: 'Todos',
+      protocolStatus: 'active',
+      procedure: 'Todos',
+      time: 'Todos',
+      startDate: sDate,
+      endDate: eDate
+    });
+    setHasLoadedOnce(false);
+  };
+
+  const handleApplyFilters = () => {
+    setAppliedFilters({
+      status: statusFilter,
+      protocolStatus: protocolStatusFilter,
+      procedure: procedureFilter,
+      time: timeFilter,
+      startDate: startDate,
+      endDate: endDate
+    });
+    setHasLoadedOnce(true);
+  };
 
   // Map treatments to display rows (joining with patient data)
   // Map treatments to display rows (joining with patient data)
-  const treatmentRows = activeTreatments.map(treatment => {
+  const treatmentRows = treatments.map(treatment => {
     const patient = patients.find(p => p.id === treatment.patientId);
     if (!patient) return null;
 
@@ -63,63 +121,78 @@ const Dashboard: React.FC<DashboardProps> = ({ patients, procedures, activeTreat
     };
   }).filter((row): row is NonNullable<typeof row> => row !== null);
 
-  // Aplicar filtros combinados
+  // Aplicar filtros combinados - Uses appliedFilters to avoid real-time filtering
   const filteredRows = treatmentRows.filter(row => {
-    // 1. Status Filter
-    if (statusFilter !== 'Todos' && row.dynamicStatus !== statusFilter) return false;
+    // 0. Only show if loaded once
+    if (!hasLoadedOnce) return false;
 
-    // 2. Procedure Filter
-    if (procedureFilter !== 'Todos' && row.treatment.procedureName !== procedureFilter) return false;
+    // 1. Protocol Status Filter
+    if (appliedFilters.protocolStatus !== 'all' && row.treatment.status !== appliedFilters.protocolStatus) return false;
 
-    // 3. Time Filter
-    if (timeFilter !== 'Todos') {
+    // 2. SLA Status Filter
+    if (appliedFilters.status !== 'Todos' && row.dynamicStatus !== appliedFilters.status) return false;
+
+    // 3. Procedure Filter
+    if (appliedFilters.procedure !== 'Todos' && row.treatment.procedureName !== appliedFilters.procedure) return false;
+
+    // 3. Date Range Filter
+    const startAtDate = row.treatment.startedAt.split('T')[0];
+    if (startAtDate < appliedFilters.startDate || startAtDate > appliedFilters.endDate) return false;
+
+    // 4. Time Filter (SLA specific)
+    if (appliedFilters.time !== 'Todos') {
       if (!row.dueDate) return false;
 
       const now = new Date();
       const todayStart = new Date(now);
       todayStart.setHours(0, 0, 0, 0);
 
-      const due = new Date(row.dueDate);
-      const dueStart = new Date(row.dueDate);
-      dueStart.setHours(0, 0, 0, 0);
+      const diffMs = row.dueDate.getTime() - now.getTime();
+      const isSameDay = row.dueDate.getDate() === now.getDate() &&
+        row.dueDate.getMonth() === now.getMonth() &&
+        row.dueDate.getFullYear() === now.getFullYear();
 
-      const diffTime = due.getTime() - now.getTime();
-      // Days difference based on calendar days, not 24h chunks from now
-      const diffDays = Math.ceil((dueStart.getTime() - todayStart.getTime()) / (1000 * 60 * 60 * 24));
-
-      if (timeFilter === '1h') {
-        if (diffTime < 0 || diffTime > 1 * 60 * 60 * 1000) return false;
-      } else if (timeFilter === '4h') {
-        if (diffTime < 0 || diffTime > 4 * 60 * 60 * 1000) return false;
-      } else if (timeFilter === '12h') {
-        if (diffTime < 0 || diffTime > 12 * 60 * 60 * 1000) return false;
-      } else if (timeFilter === 'Hoje') {
-        const isToday = dueStart.getTime() === todayStart.getTime();
-        if (!isToday) return false;
-      } else if (timeFilter === 'Amanha') {
-        const tomorrow = new Date(todayStart);
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        const isTomorrow = dueStart.getTime() === tomorrow.getTime();
-        if (!isTomorrow) return false;
-      } else if (timeFilter === 'Semana') {
-        // Next 7 days
-        if (diffDays < 0 || diffDays > 7) return false;
-      } else if (timeFilter === 'Mes') {
-        // Next 30 days
-        if (diffDays < 0 || diffDays > 30) return false;
+      // Filter by period relative to NOW
+      switch (appliedFilters.time) {
+        case '1h': return diffMs > 0 && diffMs <= 3600000;
+        case '4h': return diffMs > 0 && diffMs <= 14400000;
+        case '12h': return diffMs > 0 && diffMs <= 43200000;
+        case 'Hoje': return isSameDay;
+        case 'Amanha': {
+          const tomorrow = new Date(todayStart);
+          tomorrow.setDate(tomorrow.getDate() + 1);
+          return row.dueDate.getDate() === tomorrow.getDate() &&
+            row.dueDate.getMonth() === tomorrow.getMonth() &&
+            row.dueDate.getFullYear() === tomorrow.getFullYear();
+        }
+        case 'Semana': {
+          const endOfWeek = new Date(todayStart);
+          endOfWeek.setDate(endOfWeek.getDate() + 7);
+          return row.dueDate >= todayStart && row.dueDate <= endOfWeek;
+        }
+        case 'Mes': {
+          const endOfMonth = new Date(todayStart);
+          endOfMonth.setMonth(endOfMonth.getMonth() + 1);
+          return row.dueDate >= todayStart && row.dueDate <= endOfMonth;
+        }
+        default: return true;
       }
     }
 
     return true;
   });
 
-  // Calcular estatísticas
+  const protocolStatusLabel = appliedFilters.protocolStatus === 'active' ? 'Ativos' :
+    appliedFilters.protocolStatus === 'completed' ? 'Concluídos' :
+      appliedFilters.protocolStatus === 'cancelled' ? 'Cancelados' : 'Filtrados';
+
+  // Calcular estatísticas baseadas nos filtros
   const stats = {
-    totalPatients: new Set(activeTreatments.map(t => t.patientId)).size, // Unique patients with active protocols
-    totalOpenProtocols: activeTreatments.length,
-    totalRemainingActions: treatmentRows.reduce((acc, row) => acc + (row.treatment.totalTasks - row.treatment.tasksCompleted), 0),
-    dueToday: treatmentRows.filter(r => r.dynamicStatus === PatientStatus.DUE_TODAY).length,
-    overdue: treatmentRows.filter(r => r.dynamicStatus === PatientStatus.LATE).length,
+    totalPatients: new Set(filteredRows.map(r => r.treatment.patientId)).size,
+    totalOpenProtocols: filteredRows.length,
+    totalRemainingActions: filteredRows.reduce((acc, row) => acc + (row.treatment.totalTasks - row.treatment.tasksCompleted), 0),
+    dueToday: filteredRows.filter(r => r.dynamicStatus === PatientStatus.DUE_TODAY).length,
+    overdue: filteredRows.filter(r => r.dynamicStatus === PatientStatus.LATE).length,
   };
 
   return (
@@ -136,11 +209,18 @@ const Dashboard: React.FC<DashboardProps> = ({ patients, procedures, activeTreat
       {/* Stats Overview - Dense & Readable */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-8">
         <div
-          onClick={() => { setStatusFilter('Todos'); setTimeFilter('Todos'); setProcedureFilter('Todos'); }}
+          onClick={() => {
+            const defaults = { ...appliedFilters, status: 'Todos', time: 'Todos', procedure: 'Todos' };
+            setAppliedFilters(defaults);
+            setStatusFilter('Todos');
+            setTimeFilter('Todos');
+            setProcedureFilter('Todos');
+            setHasLoadedOnce(true);
+          }}
           className="bg-pink-50/40 dark:bg-pink-900/10 rounded-2xl p-4 md:p-6 shadow-sm border border-pink-100/50 dark:border-pink-800/30 flex items-center justify-between hover:shadow-md transition-all cursor-pointer ring-0 hover:ring-2 hover:ring-pink-100 dark:hover:ring-pink-900 active:scale-[0.98]"
         >
           <div>
-            <p className="text-[10px] md:text-xs font-bold text-pink-900/60 dark:text-pink-400 uppercase tracking-wider mb-1">Protocolos Ativos</p>
+            <p className="text-[10px] md:text-xs font-bold text-pink-900/60 dark:text-pink-400 uppercase tracking-wider mb-1">Protocolos {protocolStatusLabel}</p>
             <h3 className="text-2xl md:text-3xl font-black text-gray-800 dark:text-white">{stats.totalOpenProtocols}</h3>
           </div>
           <div className="size-10 md:size-12 rounded-xl bg-pink-100 dark:bg-pink-900/50 flex items-center justify-center text-pink-600 dark:text-pink-400 shadow-inner">
@@ -149,7 +229,14 @@ const Dashboard: React.FC<DashboardProps> = ({ patients, procedures, activeTreat
         </div>
 
         <div
-          onClick={() => { setStatusFilter('Todos'); setTimeFilter('Todos'); setProcedureFilter('Todos'); }}
+          onClick={() => {
+            const defaults = { ...appliedFilters, status: 'Todos', time: 'Todos', procedure: 'Todos' };
+            setAppliedFilters(defaults);
+            setStatusFilter('Todos');
+            setTimeFilter('Todos');
+            setProcedureFilter('Todos');
+            setHasLoadedOnce(true);
+          }}
           className="bg-blue-50/40 dark:bg-blue-900/10 rounded-2xl p-4 md:p-6 shadow-sm border border-blue-100/50 dark:border-blue-800/30 flex items-center justify-between hover:shadow-md transition-all cursor-pointer ring-0 hover:ring-2 hover:ring-blue-100 dark:hover:ring-blue-900 active:scale-[0.98]"
         >
           <div>
@@ -162,7 +249,13 @@ const Dashboard: React.FC<DashboardProps> = ({ patients, procedures, activeTreat
         </div>
 
         <div
-          onClick={() => { setStatusFilter(PatientStatus.DUE_TODAY); setTimeFilter('Todos'); }}
+          onClick={() => {
+            const newFilters = { ...appliedFilters, status: PatientStatus.DUE_TODAY, time: 'Todos' };
+            setAppliedFilters(newFilters);
+            setStatusFilter(PatientStatus.DUE_TODAY);
+            setTimeFilter('Todos');
+            setHasLoadedOnce(true);
+          }}
           className="bg-orange-50/40 dark:bg-orange-900/10 rounded-2xl p-4 md:p-6 shadow-sm border border-orange-100/50 dark:border-orange-800/30 flex items-center justify-between hover:shadow-md transition-all cursor-pointer ring-0 hover:ring-2 hover:ring-orange-100 dark:hover:ring-orange-900 active:scale-[0.98]"
         >
           <div>
@@ -175,7 +268,13 @@ const Dashboard: React.FC<DashboardProps> = ({ patients, procedures, activeTreat
         </div>
 
         <div
-          onClick={() => { setStatusFilter(PatientStatus.LATE); setTimeFilter('Todos'); }}
+          onClick={() => {
+            const newFilters = { ...appliedFilters, status: PatientStatus.LATE, time: 'Todos' };
+            setAppliedFilters(newFilters);
+            setStatusFilter(PatientStatus.LATE);
+            setTimeFilter('Todos');
+            setHasLoadedOnce(true);
+          }}
           className="bg-red-50/40 dark:bg-red-900/10 rounded-2xl p-4 md:p-6 shadow-sm border border-red-100/50 dark:border-red-800/30 flex items-center justify-between hover:shadow-md transition-all cursor-pointer ring-0 hover:ring-2 hover:ring-red-100 dark:hover:ring-red-900 active:scale-[0.98]"
         >
           <div>
@@ -196,15 +295,36 @@ const Dashboard: React.FC<DashboardProps> = ({ patients, procedures, activeTreat
             Protocolos Ativos
           </h3>
 
-          <div className="flex items-center gap-3 flex-wrap justify-end">
+          <div className="flex flex-wrap items-end gap-3 justify-end">
+            {/* Data Inicial */}
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-bold text-gray-500 uppercase ml-1">Data Inicial</label>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="bg-white dark:bg-[#2d181e] border border-gray-300 dark:border-gray-700 rounded-md text-sm font-medium text-gray-700 dark:text-gray-200 py-1 px-2 focus:ring-primary focus:border-primary h-[34px]"
+              />
+            </div>
+
+            {/* Data Final */}
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-bold text-gray-500 uppercase ml-1">Data Final</label>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="bg-white dark:bg-[#2d181e] border border-gray-300 dark:border-gray-700 rounded-md text-sm font-medium text-gray-700 dark:text-gray-200 py-1 px-2 focus:ring-primary focus:border-primary h-[34px]"
+              />
+            </div>
 
             {/* Procedure Filter */}
-            <div className="flex items-center gap-2">
-              <label className="text-xs font-bold text-gray-600 uppercase hidden md:block">Procedimento:</label>
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-bold text-gray-500 uppercase ml-1">Procedimento</label>
               <select
                 value={procedureFilter}
                 onChange={(e) => setProcedureFilter(e.target.value)}
-                className="bg-white dark:bg-[#2d181e] border border-gray-300 dark:border-gray-700 rounded-md text-sm font-medium text-gray-700 dark:text-gray-200 py-1 pl-2 pr-8 focus:ring-primary focus:border-primary max-w-[150px]"
+                className="bg-white dark:bg-[#2d181e] border border-gray-300 dark:border-gray-700 rounded-md text-sm font-medium text-gray-700 dark:text-gray-200 py-1 pl-2 pr-8 focus:ring-primary focus:border-primary max-w-[150px] h-[34px]"
                 aria-label="Filtrar por Procedimento"
               >
                 <option value="Todos">Todos</option>
@@ -215,12 +335,12 @@ const Dashboard: React.FC<DashboardProps> = ({ patients, procedures, activeTreat
             </div>
 
             {/* Time Filter */}
-            <div className="flex items-center gap-2">
-              <label className="text-xs font-bold text-gray-600 uppercase hidden md:block">Vencimento:</label>
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-bold text-gray-500 uppercase ml-1">Vencimento</label>
               <select
                 value={timeFilter}
                 onChange={(e) => setTimeFilter(e.target.value)}
-                className="bg-white dark:bg-[#2d181e] border border-gray-300 dark:border-gray-700 rounded-md text-sm font-medium text-gray-700 dark:text-gray-200 py-1 pl-2 pr-8 focus:ring-primary focus:border-primary"
+                className="bg-white dark:bg-[#2d181e] border border-gray-300 dark:border-gray-700 rounded-md text-sm font-medium text-gray-700 dark:text-gray-200 py-1 pl-2 pr-8 focus:ring-primary focus:border-primary h-[34px]"
                 aria-label="Filtrar por Vencimento"
               >
                 <option value="Todos">Todos</option>
@@ -234,20 +354,53 @@ const Dashboard: React.FC<DashboardProps> = ({ patients, procedures, activeTreat
               </select>
             </div>
 
-            {/* Status Filter */}
-            <div className="flex items-center gap-2">
-              <label className="text-xs font-bold text-gray-600 uppercase hidden md:block">Status:</label>
+            {/* Protocol Status Filter */}
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-bold text-gray-500 uppercase ml-1">Status Protocolo</label>
+              <select
+                value={protocolStatusFilter}
+                onChange={(e) => setProtocolStatusFilter(e.target.value)}
+                className="bg-white dark:bg-[#2d181e] border border-gray-300 dark:border-gray-700 rounded-md text-sm font-medium text-gray-700 dark:text-gray-200 py-1 pl-2 pr-8 focus:ring-primary focus:border-primary h-[34px]"
+                aria-label="Filtrar por Status do Protocolo"
+              >
+                <option value="active">Ativos</option>
+                <option value="completed">Concluídos</option>
+                <option value="cancelled">Cancelados</option>
+                <option value="all">Todos</option>
+              </select>
+            </div>
+
+            {/* SLA Status Filter */}
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-bold text-gray-500 uppercase ml-1">SLA (Atenção)</label>
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="bg-white dark:bg-[#2d181e] border border-gray-300 dark:border-gray-700 rounded-md text-sm font-medium text-gray-700 dark:text-gray-200 py-1 pl-2 pr-8 focus:ring-primary focus:border-primary"
-                aria-label="Filtrar por Status"
+                className="bg-white dark:bg-[#2d181e] border border-gray-300 dark:border-gray-700 rounded-md text-sm font-medium text-gray-700 dark:text-gray-200 py-1 pl-2 pr-8 focus:ring-primary focus:border-primary h-[34px]"
+                aria-label="Filtrar por SLA"
               >
                 <option value="Todos">Todos</option>
                 <option value={PatientStatus.DUE_TODAY}>Atenção</option>
                 <option value={PatientStatus.LATE}>Atrasado</option>
                 <option value={PatientStatus.ON_TIME}>No Prazo</option>
               </select>
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                onClick={clearFilters}
+                className="h-[34px] px-3 flex items-center justify-center rounded-md bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition-all font-bold text-xs uppercase tracking-wider"
+                title="Limpar Filtros"
+              >
+                Limpar
+              </button>
+              <button
+                onClick={handleApplyFilters}
+                className="h-[34px] w-[34px] flex items-center justify-center rounded-md bg-primary text-white hover:bg-primary/90 transition-all shadow-sm"
+                title="Filtrar"
+              >
+                <span className="material-symbols-outlined text-lg">search</span>
+              </button>
             </div>
           </div>
         </div>
@@ -309,7 +462,31 @@ const Dashboard: React.FC<DashboardProps> = ({ patients, procedures, activeTreat
                         </div>
                       </td>
                       <td className="px-6 py-3 border-r border-gray-100 dark:border-white/5 last:border-0">
-                        {dynamicStatus === PatientStatus.LATE && dueDate ? (
+                        {treatment.status === 'completed' ? (
+                          <div className="flex flex-col items-center justify-center p-1.5 rounded-lg border bg-blue-50 border-blue-100 dark:bg-blue-900/10 dark:border-blue-900/30">
+                            <div className="flex items-center gap-1.5 mb-0.5">
+                              <span className="material-symbols-outlined text-blue-500 text-sm">check_circle</span>
+                              <span className="text-[10px] uppercase font-bold tracking-wider text-blue-700 dark:text-blue-400">
+                                Concluído
+                              </span>
+                            </div>
+                            <div className="font-mono text-xs font-bold tracking-tight text-blue-600 dark:text-blue-400">
+                              Finalizado
+                            </div>
+                          </div>
+                        ) : treatment.status === 'cancelled' ? (
+                          <div className="flex flex-col items-center justify-center p-1.5 rounded-lg border bg-gray-50 border-gray-100 dark:bg-gray-900/10 dark:border-gray-900/30">
+                            <div className="flex items-center gap-1.5 mb-0.5">
+                              <span className="material-symbols-outlined text-gray-500 text-sm">cancel</span>
+                              <span className="text-[10px] uppercase font-bold tracking-wider text-gray-700 dark:text-gray-400">
+                                Cancelado
+                              </span>
+                            </div>
+                            <div className="font-mono text-xs font-bold tracking-tight text-gray-600 dark:text-gray-400">
+                              Arquivado
+                            </div>
+                          </div>
+                        ) : dynamicStatus === PatientStatus.LATE && dueDate ? (
                           <div className="flex flex-col items-center justify-center p-1.5 rounded-lg border bg-red-50 border-red-100 dark:bg-red-900/10 dark:border-red-900/30">
                             <div className="flex items-center gap-1.5 mb-0.5">
                               <span className="size-2 rounded-full bg-red-500"></span>
@@ -382,8 +559,14 @@ const Dashboard: React.FC<DashboardProps> = ({ patients, procedures, activeTreat
                 <tr>
                   <td colSpan={5} className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center justify-center text-gray-400">
-                      <span className="material-symbols-outlined text-4xl mb-2 text-gray-300">assignment_late</span>
-                      <p className="text-sm font-medium">Nenhum protocolo encontrado neste filtro.</p>
+                      <span className="material-symbols-outlined text-4xl mb-2 text-gray-300">
+                        {!hasLoadedOnce ? 'manage_search' : 'assignment_late'}
+                      </span>
+                      <p className="text-sm font-medium">
+                        {!hasLoadedOnce 
+                          ? 'Utilize os filtros acima para listar os protocolos.' 
+                          : 'Nenhum protocolo encontrado para os filtros selecionados.'}
+                      </p>
                     </div>
                   </td>
                 </tr>

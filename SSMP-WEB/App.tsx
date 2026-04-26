@@ -42,10 +42,24 @@ const App: React.FC = () => {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [procedures, setProcedures] = useState<Procedure[]>([]);
   const [categories, setCategories] = useState<ProcedureCategory[]>([]);
-  const [activeTreatments, setActiveTreatments] = useState<PatientTreatment[]>([]);
+  const [allTreatments, setAllTreatments] = useState<PatientTreatment[]>([]);
 
   // View State
   const [currentView, setCurrentView] = useState<'dashboard' | 'patients' | 'financial' | 'reports' | 'settings' | 'users' | 'quiz' | 'crm_kanban' | 'lead_details' | 'sales_pipeline' | 'ombudsman' | 'tasks' | 'budgets' | 'agenda' | 'profile' | 'details' | 'register' | 'procedures' | 'procedure_register' | 'protocol_register' | 'signatures' | 'public_signature' | 'document_templates'>(() => {
+    // Mapping of paths to views
+    const path = window.location.pathname;
+    if (path === '/pacientes') return 'patients';
+    if (path === '/protocolos') return 'procedures';
+    if (path === '/crm') return 'crm_kanban';
+    if (path === '/agenda') return 'agenda';
+    if (path === '/ouvidoria') return 'ombudsman';
+    if (path === '/tarefas') return 'tasks';
+    if (path === '/orcamentos') return 'budgets';
+    if (path === '/documentos') return 'signatures';
+    if (path === '/configuracoes') return 'settings';
+    if (path === '/usuarios') return 'users';
+    if (path === '/quiz') return 'quiz';
+
     // Lazy initial state to catch URL parameters on first render
     const params = new URLSearchParams(window.location.search);
     if (params.get('view') === 'quiz' || window.location.pathname === '/quiz') {
@@ -112,6 +126,55 @@ const App: React.FC = () => {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  // Handle Back/Forward buttons
+  useEffect(() => {
+    const handlePopState = (event: PopStateEvent) => {
+      const path = window.location.pathname;
+      const viewMap: Record<string, any> = {
+        '/': 'dashboard',
+        '/pacientes': 'patients',
+        '/protocolos': 'procedures',
+        '/crm': 'crm_kanban',
+        '/agenda': 'agenda',
+        '/ouvidoria': 'ombudsman',
+        '/tarefas': 'tasks',
+        '/orcamentos': 'budgets',
+        '/documentos': 'signatures',
+        '/configuracoes': 'settings',
+        '/usuarios': 'users',
+        '/quiz': 'quiz',
+      };
+      const view = viewMap[path] || 'dashboard';
+      setCurrentView(view);
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  // Sync URL with currentView state
+  useEffect(() => {
+    const viewToPathMap: Record<string, string> = {
+      'dashboard': '/',
+      'patients': '/pacientes',
+      'procedures': '/protocolos',
+      'crm_kanban': '/crm',
+      'agenda': '/agenda',
+      'ombudsman': '/ouvidoria',
+      'tasks': '/tarefas',
+      'budgets': '/orcamentos',
+      'signatures': '/documentos',
+      'settings': '/configuracoes',
+      'users': '/usuarios',
+      'quiz': '/quiz',
+    };
+
+    const path = viewToPathMap[currentView];
+    if (path && window.location.pathname !== path) {
+      window.history.pushState({ view: currentView }, '', path);
+    }
+  }, [currentView]);
 
   // Check Profile Status on Session Change
   useEffect(() => {
@@ -191,9 +254,9 @@ const App: React.FC = () => {
       const loadedCategories = await supabaseService.getProcedureCategories();
       setCategories(loadedCategories);
 
-      // 3. Load Active Treatments
-      const loadedTreatments = await supabaseService.getAllActiveTreatments();
-      setActiveTreatments(loadedTreatments);
+      // 3. Load All Treatments
+      const loadedTreatments = await supabaseService.getAllTreatments();
+      setAllTreatments(loadedTreatments);
 
     } catch (error) {
       console.error('Error loading data:', error);
@@ -281,6 +344,27 @@ const App: React.FC = () => {
   };
 
   const handleNavigateView = (view: any, action?: any) => {
+    // Update URL to match view
+    const viewToPathMap: Record<string, string> = {
+      'dashboard': '/',
+      'patients': '/pacientes',
+      'procedures': '/protocolos',
+      'crm_kanban': '/crm',
+      'agenda': '/agenda',
+      'ombudsman': '/ouvidoria',
+      'tasks': '/tarefas',
+      'budgets': '/orcamentos',
+      'signatures': '/documentos',
+      'settings': '/configuracoes',
+      'users': '/usuarios',
+      'quiz': '/quiz',
+    };
+
+    const path = viewToPathMap[view];
+    if (path && window.location.pathname !== path) {
+      window.history.pushState({ view }, '', path);
+    }
+
     setCurrentView(view);
     if (view === 'ombudsman' && action) {
       setOmbudsmanAction(action);
@@ -361,7 +445,7 @@ const App: React.FC = () => {
         return <Dashboard
           patients={patients}
           procedures={procedures}
-          activeTreatments={activeTreatments}
+          treatments={allTreatments}
           onPatientSelect={navigateToDetails}
           onNewRegistration={() => setCurrentView('register')}
         />;

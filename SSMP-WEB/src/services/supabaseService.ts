@@ -405,11 +405,10 @@ export const supabaseService = {
         return (data || []).map(mapDbToTreatment);
     },
 
-    async getAllActiveTreatments() {
+    async getAllTreatments() {
         const { data, error } = await supabase
             .from('patient_treatments')
             .select('*')
-            .eq('status', 'active') // Fetch only active
             .order('started_at', { ascending: false });
 
         if (error) throw error;
