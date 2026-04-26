@@ -114,6 +114,8 @@ const DocumentModal: React.FC<DocumentModalProps> = ({ isOpen, onClose, onSucces
         template_id: selectedTemplate.id!,
         title: selectedTemplate.title,
         content: content,
+        patient_name: selectedPatient.name,
+        patient_cpf: selectedPatient.cpf || '-',
         file_url: fileUrl,
         signature_link: `${window.location.origin}/sign/temp_id`,
         status: 'pending'

@@ -144,7 +144,9 @@ export const DocumentService = {
       .from('patient_documents')
       .insert({ 
         ...doc, 
-        clinic_id: clinic_id || undefined 
+        clinic_id: clinic_id || undefined,
+        patient_name: (doc as any).patient_name,
+        patient_cpf: (doc as any).patient_cpf
       })
       .select('*, patients(name, phone)')
       .single();

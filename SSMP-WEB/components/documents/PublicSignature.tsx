@@ -206,15 +206,30 @@ const PublicSignature: React.FC = () => {
     setIsExporting(true);
     try {
       const element = documentRef.current;
+      
+      // Forçar o scroll do elemento para o topo antes da captura
+      const originalScrollTop = window.scrollY;
+      window.scrollTo(0, 0);
+
       const canvas = await html2canvas(element, {
         scale: 2,
         useCORS: true,
         logging: false,
         backgroundColor: '#ffffff',
-        width: element.offsetWidth,
-        height: element.offsetHeight
+        windowWidth: 1200, // Forçar largura de desktop para layout consistente
+        onclone: (clonedDoc) => {
+          // Garantir que o elemento clonado esteja visível para o html2canvas
+          const el = clonedDoc.getElementById('pdf-capture-container');
+          if (el) {
+            el.style.opacity = '1';
+            el.style.height = 'auto';
+            el.style.position = 'static';
+          }
+        }
       });
       
+      window.scrollTo(0, originalScrollTop);
+
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF({
         orientation: 'portrait',
@@ -224,20 +239,23 @@ const PublicSignature: React.FC = () => {
 
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = pdf.internal.pageSize.getHeight();
+      
+      // Calcular dimensões da imagem no PDF mantendo a proporção
       const imgWidth = pdfWidth;
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
-      // Se for maior que uma página, precisamos de lógica de múltiplas páginas
       let heightLeft = imgHeight;
       let position = 0;
 
-      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      // Primeira página
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
       heightLeft -= pdfHeight;
 
-      while (heightLeft >= 0) {
+      // Páginas subsequentes
+      while (heightLeft > 0) {
         position = heightLeft - imgHeight;
         pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
         heightLeft -= pdfHeight;
       }
 
@@ -312,7 +330,11 @@ const PublicSignature: React.FC = () => {
           </div>
         </div>
 
-        <div className="absolute top-0 left-0 -z-50 opacity-0 pointer-events-none overflow-hidden h-0">
+        <div 
+          id="pdf-capture-container"
+          className="absolute top-0 left-0 -z-[100] opacity-0 pointer-events-none overflow-visible" 
+          style={{ width: '210mm', height: 'auto' }}
+        >
           <div 
             ref={documentRef}
             className="bg-white p-12 min-h-[297mm] w-[210mm] text-gray-900 flex flex-col"
@@ -453,7 +475,7 @@ const PublicSignature: React.FC = () => {
         </div>
         <div>
           <h1 className="font-bold text-gray-900 dark:text-white line-clamp-1">{doc.title}</h1>
-          <p className="text-xs text-gray-500">Para: {doc.patients?.name}</p>
+          <p className="text-xs text-gray-500">Para: {doc.patients?.name || doc.patient_name || 'Paciente'}</p>
         </div>
       </div>
 

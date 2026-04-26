@@ -904,6 +904,8 @@ export interface PatientDocument {
   template_id?: string;
   title: string;
   content: string;
+  patient_name?: string; // Snapshot for public pages
+  patient_cpf?: string;  // Snapshot for public pages
   file_url?: string;
   signature_link?: string;
   status: 'draft' | 'pending' | 'signed' | 'cancelled';
