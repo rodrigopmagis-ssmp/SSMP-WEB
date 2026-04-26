@@ -4,6 +4,7 @@ import { format, parse, startOfWeek, getDay, isSameDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import { AgendaService, Appointment } from '../services/AgendaService';
+import { Patient, Procedure } from '../../types';
 import AgendaEvent from '../../components/AgendaEvent';
 import MiniCalendar from '../../components/MiniCalendar';
 import AgendaReport from '../components/agenda/AgendaReport';
@@ -109,6 +110,15 @@ const Agenda: React.FC<AgendaProps> = ({ patients, procedures }) => {
     const [isModalReadOnly, setIsModalReadOnly] = useState(false);
     const [conflictDetailAppt, setConflictDetailAppt] = useState<any>(null);
     const [isConflictDetailReadOnly, setIsConflictDetailReadOnly] = useState(false);
+
+    // Popover state for Month View Summary
+    const [monthPopover, setMonthPopover] = useState<{
+        date: Date;
+        title: string;
+        events: any[];
+        type: 'scheduled' | 'confirmed' | 'blocks' | 'holidays';
+        anchorRect: { top: number; left: number } | null;
+    } | null>(null);
 
     // Warning Modal State
     const [warningModal, setWarningModal] = useState<{
@@ -493,25 +503,163 @@ const Agenda: React.FC<AgendaProps> = ({ patients, procedures }) => {
         </div>
     ), []);
 
+    // Custom Month Date Header to show summary badges
+    const CustomMonthDateHeader = useCallback(({ date: cellDate, label, onDrillDown }: any) => {
+        const dayEvents = allEvents.filter(e => isSameDay(e.start, cellDate) && e.type === 'appointment');
+        const dayBlocks = allEvents.filter(e => isSameDay(e.start, cellDate) && (e.type === 'block' || e.type === 'block-banner'));
+        const dayHolidays = allEvents.filter(e => isSameDay(e.start, cellDate) && e.type === 'holiday');
+
+        // Grouping logic for appointments
+        // Purple Clock: scheduled, rescheduled, no_show
+        const scheduledCount = dayEvents.filter(e => ['scheduled', 'rescheduled', 'no_show'].includes(e.resource.status)).length;
+        // Blue Bell: confirmed, completed
+        const confirmedCount = dayEvents.filter(e => ['confirmed', 'completed'].includes(e.resource.status)).length;
+        // Gray Lock: blocks
+        const blocksCount = dayBlocks.length;
+
+        // Birthdays check - Safe comparison for YYYY-MM-DD
+        const birthdaysCount = patients.filter(p => {
+            if (!p.dob) return false;
+            try {
+                const [y, m, d] = p.dob.split('-').map(Number);
+                return d === cellDate.getDate() && (m - 1) === cellDate.getMonth();
+            } catch (e) {
+                return false;
+            }
+        }).length;
+
+        return (
+            <div className="flex flex-col items-center w-full min-h-[70px] py-1 relative">
+                {/* Date and Birthday Icon */}
+                <div className="flex justify-between items-start w-full px-2 mb-2">
+                    <button 
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onDrillDown();
+                        }}
+                        className="text-base font-bold text-gray-800 hover:text-primary hover:bg-primary/5 px-2 py-0.5 rounded-full transition-all mx-auto"
+                        title="Ver visualização do dia"
+                    >
+                        {label}
+                    </button>
+                    {birthdaysCount > 0 && (
+                        <div className="absolute top-1 right-1 pointer-events-none">
+                            <span className="material-symbols-outlined text-pink-400 text-sm animate-pulse" title={`${birthdaysCount} aniversariante(s)`}>
+                                featured_seasonal_and_gifts
+                            </span>
+                        </div>
+                    )}
+                </div>
+
+                {/* Summary Badges */}
+                <div className="flex flex-wrap justify-center gap-1.5 px-1 pb-1">
+                    {scheduledCount > 0 && (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                const rect = e.currentTarget.getBoundingClientRect();
+                                setMonthPopover({
+                                    date: cellDate,
+                                    title: 'Agendamentos Previstos',
+                                    type: 'scheduled',
+                                    events: dayEvents.filter(ev => ['scheduled', 'rescheduled', 'no_show'].includes(ev.resource.status)),
+                                    anchorRect: { top: rect.bottom + window.scrollY, left: rect.left + window.scrollX }
+                                });
+                            }}
+                            className="flex items-center gap-1 px-1.5 py-0.5 bg-purple-50 text-purple-600 rounded-full border border-purple-100 shadow-sm transition-all hover:scale-105 hover:bg-purple-100" 
+                            title="Clique para ver lista"
+                        >
+                            <span className="material-symbols-outlined text-[13px]">schedule</span>
+                            <span className="text-[10px] font-bold">{scheduledCount}</span>
+                        </button>
+                    )}
+                    {confirmedCount > 0 && (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                const rect = e.currentTarget.getBoundingClientRect();
+                                setMonthPopover({
+                                    date: cellDate,
+                                    title: 'Confirmados / Realizados',
+                                    type: 'confirmed',
+                                    events: dayEvents.filter(ev => ['confirmed', 'completed'].includes(ev.resource.status)),
+                                    anchorRect: { top: rect.bottom + window.scrollY, left: rect.left + window.scrollX }
+                                });
+                            }}
+                            className="flex items-center gap-1 px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded-full border border-blue-100 shadow-sm transition-all hover:scale-105 hover:bg-blue-100" 
+                            title="Clique para ver lista"
+                        >
+                            <span className="material-symbols-outlined text-[13px]">notifications</span>
+                            <span className="text-[10px] font-bold">{confirmedCount}</span>
+                        </button>
+                    )}
+                    {blocksCount > 0 && (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                const rect = e.currentTarget.getBoundingClientRect();
+                                setMonthPopover({
+                                    date: cellDate,
+                                    title: 'Bloqueios de Horário',
+                                    type: 'blocks',
+                                    events: dayBlocks,
+                                    anchorRect: { top: rect.bottom + window.scrollY, left: rect.left + window.scrollX }
+                                });
+                            }}
+                            className="flex items-center gap-1 px-1.5 py-0.5 bg-gray-50 text-gray-500 rounded-full border border-gray-100 shadow-sm transition-all hover:scale-105 hover:bg-gray-100" 
+                            title="Clique para ver lista"
+                        >
+                            <span className="material-symbols-outlined text-[13px]">lock</span>
+                            <span className="text-[10px] font-bold">{blocksCount}</span>
+                        </button>
+                    )}
+                    {dayHolidays.length > 0 && (
+                        <div className="flex items-center gap-1 px-1.5 py-0.5 bg-amber-50 text-amber-600 rounded-full border border-amber-100 shadow-sm" title={dayHolidays[0].title}>
+                            <span className="material-symbols-outlined text-[13px]">event_note</span>
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+    }, [allEvents, patients, onDrillDown]);
+
     return (
         <div className="flex h-screen bg-white overflow-hidden relative">
             <style>{`
-                .rbc-time-gutter .rbc-time-slot {
-                    background-color: transparent !important;
-                    background-image: none !important;
-                    opacity: 1 !important;
+                /* Estilos para a Visualização Mensal */
+                .rbc-month-view .rbc-month-row {
+                    min-height: 100px;
                 }
-                /* Fundo contínuo para a coluna do dia */
-                .rbc-day-slot {
+                .rbc-month-view .rbc-day-bg {
+                    border-right: 1px solid #f1f5f9;
+                }
+                .rbc-month-view .rbc-header {
+                    padding: 12px 0;
+                    background: #f8fafc;
+                    font-weight: 600;
+                    color: #64748b;
+                    text-transform: uppercase;
+                    font-size: 0.75rem;
+                }
+                .rbc-month-view .rbc-date-cell {
+                    padding: 0;
+                    text-align: center;
+                }
+                .rbc-month-view .rbc-button-link {
+                    width: 100%;
+                }
+                .rbc-month-view .rbc-off-range-bg {
                     background-color: #f8fafc !important;
-                    background-image: repeating-linear-gradient(45deg, transparent, transparent 12px, #e2e8f0 12px, #e2e8f0 24px) !important;
+                    background-image: repeating-linear-gradient(45deg, transparent, transparent 12px, #f1f5f9 12px, #f1f5f9 24px) !important;
+                    opacity: 0.5;
                 }
-                .rbc-day-slot.rbc-today {
-                    background-color: #eff6ff !important;
+                /* Ajuste para o popover flutuante */
+                .month-summary-popover {
+                    animation: popover-fade-in 0.2s ease-out;
                 }
-                /* Slots individuais */
-                .rbc-time-slot {
-                    border-top: 1px solid #f1f5f9;
+                @keyframes popover-fade-in {
+                    from { opacity: 0; transform: translateY(-10px); }
+                    to { opacity: 1; transform: translateY(0); }
                 }
             `}</style>
             {/* Mobile Sidebar Overlay */}
@@ -806,6 +954,10 @@ const Agenda: React.FC<AgendaProps> = ({ patients, procedures }) => {
                                     }
                                     return <AgendaEvent {...props} />;
                                 },
+                                month: {
+                                    dateHeader: CustomMonthDateHeader,
+                                    event: () => null // Hide individual events in month view to show summary only
+                                }
                             }}
                             formats={{
                                 timeGutterFormat: 'HH:mm',
@@ -950,6 +1102,102 @@ const Agenda: React.FC<AgendaProps> = ({ patients, procedures }) => {
                         setIsConflictDetailReadOnly(true);
                     }}
                 />
+
+                {/* Month Summary Popover */}
+                {monthPopover && (
+                    <>
+                        <div 
+                            className="fixed inset-0 z-[60]" 
+                            onClick={() => setMonthPopover(null)} 
+                        />
+                        <div 
+                            className="fixed z-[70] month-summary-popover bg-white rounded-xl shadow-2xl border border-gray-100 p-4 min-w-[300px] max-w-[400px]"
+                            style={{ 
+                                top: `${monthPopover.anchorRect?.top}px`, 
+                                left: `Math.min(window.innerWidth - 320, Math.max(20, ${monthPopover.anchorRect?.left}px - 150))` 
+                            }}
+                        >
+                            <div className="flex justify-between items-center mb-4 pb-2 border-bottom border-gray-50">
+                                <div>
+                                    <h4 className="text-sm font-bold text-gray-900">{monthPopover.title}</h4>
+                                    <p className="text-[10px] text-gray-500 uppercase tracking-wider">{format(monthPopover.date, "EEEE, dd 'de' MMMM", { locale: ptBR })}</p>
+                                </div>
+                                <button 
+                                    onClick={() => setMonthPopover(null)}
+                                    className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+                                >
+                                    <span className="material-symbols-outlined text-sm">close</span>
+                                </button>
+                            </div>
+
+                            <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1 custom-scrollbar">
+                                {monthPopover.events.length > 0 ? (
+                                    monthPopover.events.map((ev, idx) => {
+                                        const statusLabelMap: Record<string, string> = {
+                                            'scheduled': 'Agendado',
+                                            'confirmed': 'Confirmado',
+                                            'completed': 'Realizado',
+                                            'cancelled': 'Cancelado',
+                                            'no_show': 'Falta',
+                                            'rescheduled': 'Remarcado'
+                                        };
+                                        
+                                        const statusColorMap: Record<string, string> = {
+                                            'scheduled': 'bg-blue-50 text-blue-600',
+                                            'confirmed': 'bg-green-50 text-green-600',
+                                            'completed': 'bg-gray-50 text-gray-600',
+                                            'cancelled': 'bg-red-50 text-red-600',
+                                            'no_show': 'bg-slate-50 text-slate-600',
+                                            'rescheduled': 'bg-purple-50 text-purple-600'
+                                        };
+
+                                        const status = ev.resource?.status || 'scheduled';
+
+                                        return (
+                                            <div 
+                                                key={idx}
+                                                onClick={() => {
+                                                    setMonthPopover(null);
+                                                    handleSelectEvent(ev);
+                                                }}
+                                                className="flex items-center justify-between p-2 hover:bg-gray-50 rounded-lg cursor-pointer transition-colors border border-transparent hover:border-gray-100"
+                                            >
+                                                <div className="flex flex-col">
+                                                    <span className="text-xs font-semibold text-gray-800">
+                                                        {ev.resource?.patient?.name || 'Paciente s/ nome'}
+                                                    </span>
+                                                    <div className="flex items-center gap-2 mt-0.5">
+                                                        <span className="text-[10px] text-gray-500 font-medium bg-gray-100 px-1.5 rounded">
+                                                            {format(ev.start, 'HH:mm')} – {format(ev.end, 'HH:mm')}
+                                                        </span>
+                                                        <span className={`text-[9px] font-bold uppercase px-1.5 rounded py-0.5 ${statusColorMap[status] || 'bg-gray-50'}`}>
+                                                            {statusLabelMap[status] || status}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <span className="material-symbols-outlined text-gray-400 text-sm">chevron_right</span>
+                                            </div>
+                                        );
+                                    })
+                                ) : (
+                                    <p className="text-xs text-gray-400 text-center py-4 italic">Nenhum item encontrado.</p>
+                                )}
+                            </div>
+
+                            <button
+                                onClick={() => {
+                                    setMonthPopover(null);
+                                    setView(Views.DAY);
+                                    setDate(monthPopover.date);
+                                }}
+                                className="w-full mt-4 py-2 text-[10px] font-bold text-primary uppercase tracking-widest hover:bg-primary/5 rounded-lg border border-dashed border-primary/20 transition-all flex items-center justify-center gap-2"
+                            >
+                                <span className="material-symbols-outlined text-sm">calendar_view_day</span>
+                                Ver Visualização do Dia
+                            </button>
+                        </div>
+                    </>
+                )}
             </main>
 
             {/* Warning Modal */}
