@@ -53,6 +53,22 @@ const PublicSignature: React.FC = () => {
 
       if (err || !data) throw new Error('Documento não encontrado');
       
+      // Fallback para nome do paciente se as colunas novas ou o join falharem
+      if (!data.patients?.name && !data.patient_name && data.content) {
+        const nameMatch = data.content.match(/Paciente:\s*(?:<strong>)?([^<]+)/i);
+        if (nameMatch) {
+          data.patient_name = nameMatch[1].trim();
+        }
+      }
+
+      // Fallback para CPF
+      if (!data.patients?.cpf && !data.patient_cpf && data.content) {
+        const cpfMatch = data.content.match(/CPF:\s*(?:<strong>)?([^<]+)/i);
+        if (cpfMatch) {
+          data.patient_cpf = cpfMatch[1].trim();
+        }
+      }
+      
       if (data.status === 'signed') {
         setIsSigned(true);
       }
@@ -207,55 +223,60 @@ const PublicSignature: React.FC = () => {
     try {
       const element = documentRef.current;
       
-      // Forçar o scroll do elemento para o topo antes da captura
+      // Garantir que estamos no topo para a captura
       const originalScrollTop = window.scrollY;
       window.scrollTo(0, 0);
 
       const canvas = await html2canvas(element, {
-        scale: 2,
+        scale: 3, // Aumentar escala para melhor qualidade
         useCORS: true,
         logging: false,
         backgroundColor: '#ffffff',
-        windowWidth: 1200, // Forçar largura de desktop para layout consistente
+        windowWidth: 1024,
         onclone: (clonedDoc) => {
-          // Garantir que o elemento clonado esteja visível para o html2canvas
           const el = clonedDoc.getElementById('pdf-capture-container');
           if (el) {
             el.style.opacity = '1';
             el.style.height = 'auto';
             el.style.position = 'static';
+            el.style.zIndex = '9999';
+            // Forçar quebras de linha evitarem cortes
+            const blocks = el.querySelectorAll('.prose p, .prose h1, .prose h2, .prose h3, .grid');
+            blocks.forEach((b: any) => {
+              b.style.pageBreakInside = 'avoid';
+              b.style.breakInside = 'avoid';
+            });
           }
         }
       });
       
       window.scrollTo(0, originalScrollTop);
 
-      const imgData = canvas.toDataURL('image/png');
+      const imgData = canvas.toDataURL('image/jpeg', 0.95);
       const pdf = new jsPDF({
         orientation: 'portrait',
         unit: 'mm',
-        format: 'a4'
+        format: 'a4',
+        compress: true
       });
 
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = pdf.internal.pageSize.getHeight();
-      
-      // Calcular dimensões da imagem no PDF mantendo a proporção
       const imgWidth = pdfWidth;
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
       let heightLeft = imgHeight;
       let position = 0;
 
-      // Primeira página
-      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
+      // Adicionar primeira página
+      pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
       heightLeft -= pdfHeight;
 
-      // Páginas subsequentes
+      // Adicionar páginas extras se necessário
       while (heightLeft > 0) {
         position = heightLeft - imgHeight;
         pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
+        pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
         heightLeft -= pdfHeight;
       }
 
@@ -333,11 +354,12 @@ const PublicSignature: React.FC = () => {
         <div 
           id="pdf-capture-container"
           className="absolute top-0 left-0 -z-[100] opacity-0 pointer-events-none overflow-visible" 
-          style={{ width: '210mm', height: 'auto' }}
+          style={{ width: '210mm' }}
         >
           <div 
             ref={documentRef}
-            className="bg-white p-12 min-h-[297mm] w-[210mm] text-gray-900 flex flex-col"
+            className="bg-white p-12 w-[210mm] text-gray-900 flex flex-col"
+            style={{ minHeight: '297mm' }}
           >
             {/* Papel Timbrado */}
             <div className="mb-12 border-b-2 border-[#8B7355] pb-6 flex justify-between items-start">
