@@ -188,7 +188,7 @@ const SignatureList: React.FC<SignatureListProps> = ({ onViewChange }) => {
               <th className="px-6 py-4 w-10"><input type="checkbox" className="rounded" /></th>
               <th className="px-6 py-4">Nome + Signatários</th>
               <th className="px-6 py-4 text-center">Criado em</th>
-              <th className="px-6 py-4 text-center">Enviado em</th>
+              <th className="px-6 py-4 text-center">Assinado em</th>
               <th className="px-6 py-4">Status</th>
               <th className="px-6 py-4 w-10"></th>
             </tr>
@@ -210,7 +210,7 @@ const SignatureList: React.FC<SignatureListProps> = ({ onViewChange }) => {
                   <td className="px-6 py-4"><input type="checkbox" className="rounded" /></td>
                   <td className="px-6 py-4">
                     <div className="flex flex-col">
-                      <span className="font-bold text-gray-900 dark:text-white">{doc.title}</span>
+                      <span className="text-sm font-bold text-gray-900 dark:text-white leading-tight mb-1">{doc.title}</span>
                       <span className="text-sm text-green-600 flex items-center gap-1">
                         <div className="w-1.5 h-1.5 rounded-full bg-green-600" />
                         {doc.patients?.name}
@@ -221,7 +221,7 @@ const SignatureList: React.FC<SignatureListProps> = ({ onViewChange }) => {
                     {format(new Date(doc.created_at), "dd/MM/yyyy 'às' H:mm", { locale: ptBR })}
                   </td>
                   <td className="px-6 py-4 text-center text-sm text-gray-500">
-                    {doc.sent_at ? format(new Date(doc.sent_at), "dd/MM/yyyy 'às' H:mm", { locale: ptBR }) : '-'}
+                    {doc.signed_at ? format(new Date(doc.signed_at), "dd/MM/yyyy 'às' H:mm", { locale: ptBR }) : '-'}
                   </td>
                   <td className="px-6 py-4">
                     <span className={`px-3 py-1 rounded-full text-xs font-bold ${getStatusColor(doc.status)}`}>
