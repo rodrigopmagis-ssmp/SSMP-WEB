@@ -120,6 +120,12 @@ const Header: React.FC<HeaderProps> = ({ currentView, onViewChange, onNewRegistr
             >
               Orçamentos
             </button>
+            <button
+              className={`${currentView === 'signatures' ? 'text-primary border-b-2 border-primary' : 'text-[#1b0d11] dark:text-[#fcf8f9] font-medium'} text-sm leading-normal pb-1 transition-all`}
+              onClick={() => onViewChange('signatures')}
+            >
+              Assinaturas
+            </button>
           </nav>
 
           <div className="flex items-center gap-2 md:gap-4">
@@ -226,6 +232,7 @@ const Header: React.FC<HeaderProps> = ({ currentView, onViewChange, onNewRegistr
               { id: 'tasks', label: 'Tarefas', icon: 'check_circle' },
               { id: 'ombudsman', label: 'Ouvidoria', icon: 'campaign' },
               { id: 'budgets', label: 'Orçamentos', icon: 'request_quote' },
+              { id: 'signatures', label: 'Assinaturas', icon: 'draw' },
             ].map(item => (
               <button
                 key={item.id}

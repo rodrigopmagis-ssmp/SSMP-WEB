@@ -883,3 +883,41 @@ export interface DashboardCRMMetrics {
   }[];
 }
 
+
+export interface DocumentTemplate {
+  id: string;
+  clinic_id: string;
+  title: string;
+  subtitle?: string;
+  content: string;
+  type: 'text' | 'pdf';
+  file_url?: string;
+  variable_mapping?: Record<string, { x: number; y: number; page: number }>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PatientDocument {
+  id: string;
+  clinic_id: string;
+  patient_id: string;
+  template_id?: string;
+  title: string;
+  content: string;
+  file_url?: string;
+  signature_link?: string;
+  status: 'draft' | 'pending' | 'signed' | 'cancelled';
+  sent_at?: string;
+  signed_at?: string;
+  signature_data?: string;
+  created_at: string;
+}
+
+export interface Signature {
+  id: string;
+  document_id: string;
+  signature_data: string;
+  ip_address?: string;
+  user_agent?: string;
+  signed_at: string;
+}

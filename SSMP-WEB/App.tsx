@@ -29,6 +29,10 @@ import { BudgetsPage } from './src/pages/Budgets';
 import Agenda from './src/pages/Agenda';
 import { ThemeProvider } from './lib/theme';
 import { Toaster } from 'react-hot-toast';
+import SignatureList from './components/documents/SignatureList';
+import PublicSignature from './components/documents/PublicSignature';
+import TemplateManager from './components/documents/TemplateManager';
+
 
 const App: React.FC = () => {
   const [session, setSession] = useState<Session | null>(null);
@@ -41,7 +45,17 @@ const App: React.FC = () => {
   const [activeTreatments, setActiveTreatments] = useState<PatientTreatment[]>([]);
 
   // View State
-  const [currentView, setCurrentView] = useState<'dashboard' | 'patients' | 'financial' | 'reports' | 'settings' | 'users' | 'quiz' | 'crm_kanban' | 'lead_details' | 'sales_pipeline' | 'ombudsman' | 'tasks' | 'budgets' | 'agenda' | 'profile' | 'details' | 'register' | 'procedures' | 'procedure_register' | 'protocol_register'>('dashboard');
+  const [currentView, setCurrentView] = useState<'dashboard' | 'patients' | 'financial' | 'reports' | 'settings' | 'users' | 'quiz' | 'crm_kanban' | 'lead_details' | 'sales_pipeline' | 'ombudsman' | 'tasks' | 'budgets' | 'agenda' | 'profile' | 'details' | 'register' | 'procedures' | 'procedure_register' | 'protocol_register' | 'signatures' | 'public_signature' | 'document_templates'>(() => {
+    // Lazy initial state to catch URL parameters on first render
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('view') === 'quiz' || window.location.pathname === '/quiz') {
+      return 'quiz';
+    }
+    if (params.get('signature_id') || window.location.pathname.startsWith('/sign/')) {
+      return 'public_signature';
+    }
+    return 'dashboard';
+  });
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [selectedProcedureId, setSelectedProcedureId] = useState<string | null>(null);
   const [selectedTreatmentId, setSelectedTreatmentId] = useState<string | undefined>(undefined);
@@ -75,10 +89,12 @@ const App: React.FC = () => {
 
     initAuth();
 
-    // Check URL URLSearchParams for view=quiz OR pathname /quiz
+    // Check URL URLSearchParams for view=quiz OR pathname /quiz (Fallback for view changes)
     const params = new URLSearchParams(window.location.search);
     if (params.get('view') === 'quiz' || window.location.pathname === '/quiz') {
-      setCurrentView('quiz');
+      if (currentView !== 'quiz') setCurrentView('quiz');
+    } else if (params.get('signature_id') || window.location.pathname.startsWith('/sign/')) {
+      if (currentView !== 'public_signature') setCurrentView('public_signature');
     }
 
     const {
@@ -192,12 +208,19 @@ const App: React.FC = () => {
     return <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900"><span className="material-symbols-outlined animate-spin text-primary text-4xl">progress_activity</span></div>;
   }
 
-  if (!session && currentView !== 'quiz') {
-    // Determine if we should be in quiz view based on URL even if not yet set in state (avoid flicker)
+  if (!session && currentView !== 'quiz' && currentView !== 'public_signature') {
+    // Determine if we should be in quiz or signature view based on URL even if not yet set in state (avoid flicker)
     if (window.location.pathname === '/quiz') {
       return (
         <ThemeProvider>
           <LeadQuiz />
+        </ThemeProvider>
+      );
+    }
+    if (window.location.pathname.startsWith('/sign/')) {
+      return (
+        <ThemeProvider>
+          <PublicSignature />
         </ThemeProvider>
       );
     }
@@ -207,7 +230,7 @@ const App: React.FC = () => {
 
 
   // Blocking UI for Pending/Rejected Users
-  if ((buildingAccess === 'pending' || buildingAccess === 'rejected') && currentView !== 'quiz') {
+  if ((buildingAccess === 'pending' || buildingAccess === 'rejected') && currentView !== 'quiz' && currentView !== 'public_signature') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-4">
         <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-2xl shadow-xl overflow-hidden border border-gray-100 dark:border-gray-700 text-center p-8">
@@ -240,7 +263,7 @@ const App: React.FC = () => {
   }
 
   // Wait for profile check before showing dashboard (prevents flash of content)
-  if (buildingAccess === 'checking' && currentView !== 'quiz') {
+  if (buildingAccess === 'checking' && currentView !== 'quiz' && currentView !== 'public_signature') {
     return <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900"><span className="material-symbols-outlined animate-spin text-primary text-4xl">verified_user</span></div>;
   }
 
@@ -461,18 +484,26 @@ const App: React.FC = () => {
         return <BudgetsPage />;
       case 'agenda':
         return <Agenda patients={patients} procedures={procedures} />;
+      case 'document_templates':
+        return <TemplateManager onBack={() => setCurrentView('signatures')} />;
+      case 'signatures':
+        return <SignatureList onViewChange={setCurrentView} />;
+      case 'public_signature':
+        return <PublicSignature />;
       // return <UserManagement onBack={() => setCurrentView('dashboard')} />;
       default:
         return <Dashboard patients={patients} procedures={procedures} onPatientSelect={navigateToProfile} onNewRegistration={() => { setEditingPatient(null); setCurrentView('register'); }} />;
     }
   };
 
-  // Special render for Quiz (Full Screen, no Sidebar/Header)
-  if (currentView === 'quiz') {
+  // Special render for Quiz or Public Signature (Full Screen, no Sidebar/Header)
+  if (currentView === 'quiz' || currentView === 'public_signature') {
     return (
       <ThemeProvider>
         <Toaster position="top-right" />
-        {renderView()}
+        <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+          {renderView()}
+        </div>
       </ThemeProvider>
     );
   }

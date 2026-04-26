@@ -1,0 +1,90 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "send-signature-link",
+        "options": {}
+      },
+      "id": "webhook-signature",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $node[\"Webhook\"].json.body;\nlet phone = body.whatsapp.replace(/\\D/g, \'\');\n\n// Garante o DDI 55 se não houver\nif (phone.length <= 11) {\n  phone = \'55\' + phone;\n}\n\nreturn {\n  number: phone,\n  message: `Olá *${body.patient_name}*,\\n\\nVocê tem um documento aguardando sua assinatura clínica.\\n\\nPor favor, acesse o link abaixo para visualizar e assinar:\\n${body.signature_link}\\n\\nAtenciosamente,\\nEquipe Clínica`\n};"
+      },
+      "id": "format-data",
+      "name": "Format Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [470, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://SUA_URL_EVOLUTION_API/message/sendText/SUA_INSTANCIA",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "SUA_API_KEY"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "number",
+              "value": "={{$node[\"Format Message\"].json.number}}"
+            },
+            {
+              "name": "text",
+              "value": "={{$node[\"Format Message\"].json.message}}"
+            },
+            {
+              "name": "linkPreview",
+              "value": "true"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "evolution-api-send",
+      "name": "Evolution API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [690, 300]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Format Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Message": {
+      "main": [
+        [
+          {
+            "node": "Evolution API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
