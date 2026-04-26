@@ -916,6 +916,7 @@ export interface PatientDocument {
 export interface Signature {
   id: string;
   document_id: string;
+  clinic_id?: string;
   signature_data: string;
   ip_address?: string;
   user_agent?: string;
