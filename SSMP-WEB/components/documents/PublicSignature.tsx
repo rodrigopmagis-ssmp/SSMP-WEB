@@ -45,8 +45,8 @@ const PublicSignature: React.FC = () => {
         .from('patient_documents')
         .select(`
           *,
-          patients (name, cpf),
-          template:document_templates (variable_mapping)
+          patients(name, cpf),
+          template:document_templates(variable_mapping)
         `)
         .eq('id', id)
         .single();
@@ -210,7 +210,9 @@ const PublicSignature: React.FC = () => {
         scale: 2,
         useCORS: true,
         logging: false,
-        backgroundColor: '#ffffff'
+        backgroundColor: '#ffffff',
+        width: element.offsetWidth,
+        height: element.offsetHeight
       });
       
       const imgData = canvas.toDataURL('image/png');
@@ -220,11 +222,25 @@ const PublicSignature: React.FC = () => {
         format: 'a4'
       });
 
-      const imgProps = pdf.getImageProperties(imgData);
       const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      const imgWidth = pdfWidth;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      // Se for maior que uma página, precisamos de lógica de múltiplas páginas
+      let heightLeft = imgHeight;
+      let position = 0;
+
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pdfHeight;
+
+      while (heightLeft >= 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pdfHeight;
+      }
+
       pdf.save(`${doc.title.replace(/\s+/g, '_')}_Assinado.pdf`);
     } catch (error) {
       console.error('Error generating PDF:', error);
@@ -296,7 +312,7 @@ const PublicSignature: React.FC = () => {
           </div>
         </div>
 
-        <div className="fixed -left-[10000px] top-0 pointer-events-none">
+        <div className="absolute top-0 left-0 -z-50 opacity-0 pointer-events-none overflow-hidden h-0">
           <div 
             ref={documentRef}
             className="bg-white p-12 min-h-[297mm] w-[210mm] text-gray-900 flex flex-col"
