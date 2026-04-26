@@ -253,6 +253,8 @@ const PublicSignature: React.FC = () => {
         backgroundColor: '#ffffff',
         windowWidth: 1024,
         onclone: (clonedDoc) => {
+          const el = clonedDoc.getElementById('pdf-capture-container');
+          if (el) {
             // Injetar estilos CSS para forçar layout de impressão e evitar quebras
             const style = clonedDoc.createElement('style');
             style.innerHTML = `
