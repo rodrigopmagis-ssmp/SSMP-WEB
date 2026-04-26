@@ -191,35 +191,44 @@ const DocumentModal: React.FC<DocumentModalProps> = ({ isOpen, onClose, onSucces
 
         <div className="p-6 overflow-y-auto flex-1 space-y-6">
           {/* Progress Steps */}
-          <div className="flex justify-between relative mb-8 px-10">
-            {/* Background Line (Gray) */}
-            <div className="absolute top-1/2 left-14 right-14 h-0.5 bg-gray-100 dark:bg-gray-800 -translate-y-1/2 -z-10" />
-            
-            {/* Progress Line (Active - Primary) */}
-            <div 
-              className="absolute top-1/2 left-14 h-0.5 bg-primary -translate-y-1/2 -z-10 transition-all duration-500 ease-in-out"
-              style={{ 
-                width: `calc(${((step - 1) / 3) * 100}% - 0px)`,
-                maxWidth: 'calc(100% - 112px)' 
-              }}
-            />
-
-            {[1, 2, 3, 4].map(s => (
-              <div 
-                key={s} 
-                className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-all duration-500 relative z-10 ${
-                  step >= s 
-                  ? 'bg-primary text-white scale-110 shadow-xl shadow-primary/30' 
-                  : 'bg-white dark:bg-gray-800 border-2 border-gray-100 dark:border-gray-700 text-gray-400'
-                }`}
-              >
-                {s}
-                {step > s && (
-                  <div className="absolute -right-1 -top-1 w-4 h-4 bg-green-500 rounded-full flex items-center justify-center border-2 border-white dark:border-gray-900 animate-in zoom-in duration-300">
-                    <span className="material-symbols-outlined text-[10px] text-white font-black">check</span>
+          <div className="flex items-center justify-between mb-8 px-4">
+            {[1, 2, 3, 4].map((s, i) => (
+              <React.Fragment key={s}>
+                {/* Connecting Line with Arrowhead */}
+                {i > 0 && (
+                  <div className="flex-1 flex items-center px-1 group relative">
+                    <div className={`h-1 w-full rounded-full transition-all duration-500 ${
+                      step >= s ? 'bg-primary shadow-sm' : 'bg-gray-100 dark:bg-gray-800'
+                    }`} />
+                    <div 
+                      className={`absolute right-0 top-1/2 -translate-y-1/2 transition-all duration-500 ${
+                        step >= s ? 'text-primary scale-110' : 'text-gray-200 dark:text-gray-700'
+                      }`}
+                      style={{ right: '-4px' }}
+                    >
+                      <span className="material-symbols-outlined text-[16px] font-black" style={{ fontVariationSettings: "'FILL' 1" }}>
+                        chevron_right
+                      </span>
+                    </div>
                   </div>
                 )}
-              </div>
+                
+                {/* Step Circle */}
+                <div 
+                  className={`w-12 h-12 rounded-full flex items-center justify-center text-base font-bold transition-all duration-500 relative z-10 shrink-0 ${
+                    step >= s 
+                    ? 'bg-primary text-white scale-110 shadow-xl shadow-primary/30' 
+                    : 'bg-white dark:bg-gray-800 border-2 border-gray-100 dark:border-gray-700 text-gray-400'
+                  }`}
+                >
+                  {s}
+                  {step > s && (
+                    <div className="absolute -right-1 -top-1 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center border-2 border-white dark:border-gray-900 animate-in zoom-in duration-300 shadow-md">
+                      <span className="material-symbols-outlined text-[12px] text-white font-black">check</span>
+                    </div>
+                  )}
+                </div>
+              </React.Fragment>
             ))}
           </div>
 
