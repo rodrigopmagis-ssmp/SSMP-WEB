@@ -167,3 +167,19 @@
   z-index: 49;
   pointer-events: none;
 }
+/* Hide Weekends in Month View */
+.hide-weekends .rbc-month-view .rbc-header:nth-child(1),
+.hide-weekends .rbc-month-view .rbc-header:nth-child(7),
+.hide-weekends .rbc-month-view .rbc-day-bg:nth-child(1),
+.hide-weekends .rbc-month-view .rbc-day-bg:nth-child(7),
+.hide-weekends .rbc-month-view .rbc-date-cell:nth-child(1),
+.hide-weekends .rbc-month-view .rbc-date-cell:nth-child(7) {
+  display: none !important;
+}
+
+.hide-weekends .rbc-month-view .rbc-header,
+.hide-weekends .rbc-month-view .rbc-day-bg,
+.hide-weekends .rbc-month-view .rbc-date-cell {
+  flex-basis: 20% !important;
+  max-width: 20% !important;
+}

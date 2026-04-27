@@ -53,6 +53,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
         try {
             await supabaseService.updateUserProfile(editingUser.id, {
                 full_name: editingUser.full_name,
+                phone: editingUser.phone,
                 role: editingUser.role,
                 clinic_id: editingUser.clinic_id,
                 show_on_agenda: editingUser.show_on_agenda
@@ -261,6 +262,16 @@ const UserManagement: React.FC<UserManagementProps> = ({ onBack }) => {
                                     value={editingUser.email || ''}
                                     disabled
                                     className="w-full px-3 py-2 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-500 cursor-not-allowed"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Telefone (WhatsApp)</label>
+                                <input
+                                    type="text"
+                                    placeholder="(00) 00000-0000"
+                                    value={editingUser.phone || ''}
+                                    onChange={(e) => setEditingUser({ ...editingUser, phone: e.target.value })}
+                                    className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
                                 />
                             </div>
                             <div>

@@ -307,6 +307,7 @@ export interface UserProfile {
   id: string;
   email: string;
   full_name?: string;
+  phone?: string;
   role: 'master' | 'admin' | 'doctor' | 'receptionist';
   status: 'pending' | 'approved' | 'rejected';
   clinic_id?: string;

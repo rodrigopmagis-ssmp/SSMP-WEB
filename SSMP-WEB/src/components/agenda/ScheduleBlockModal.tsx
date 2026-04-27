@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useScheduleBlocks, CreateScheduleBlockData } from '../../hooks/useScheduleBlocks';
 import { useBusinessHours } from '../../hooks/useBusinessHours';
 import { AgendaService, Appointment } from '../../services/AgendaService';
-import { format } from 'date-fns';
+import { format, addDays, addMinutes, parseISO, isAfter, isBefore, isEqual } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import Toast from '../../../components/ui/Toast';
 
@@ -55,9 +55,11 @@ const ScheduleBlockModal: React.FC<ScheduleBlockModalProps> = ({
         isClinicWide: false,
         observations: '',
         date: initialDate || new Date().toISOString().split('T')[0],
+        endDate: initialDate || new Date().toISOString().split('T')[0],
         startTime: '09:00',
         endTime: '18:00',
-        isFullDay: false
+        isFullDay: false,
+        isPeriod: false
     });
 
     useEffect(() => {
@@ -68,12 +70,14 @@ const ScheduleBlockModal: React.FC<ScheduleBlockModalProps> = ({
                 isClinicWide: editingBlock.is_clinic_wide,
                 observations: editingBlock.reason || '',
                 date: editingBlock.date,
+                endDate: editingBlock.date,
                 startTime: editingBlock.start_time?.slice(0, 5) || '09:00',
                 endTime: editingBlock.end_time?.slice(0, 5) || '18:00',
-                isFullDay: editingBlock.is_full_day
+                isFullDay: editingBlock.is_full_day,
+                isPeriod: false
             });
         } else if (initialDate) {
-            setFormData(prev => ({ ...prev, date: initialDate }));
+            setFormData(prev => ({ ...prev, date: initialDate, endDate: initialDate }));
         }
     }, [editingBlock, initialDate]);
 
@@ -179,20 +183,37 @@ const ScheduleBlockModal: React.FC<ScheduleBlockModalProps> = ({
             if (!force) {
                 let allConflicts: Appointment[] = [];
                 
-                if (formData.isClinicWide) {
-                    // Para clínica toda, buscar todos os agendamentos no período
-                    const appts = await AgendaService.getAppointmentsOverlapping(startDate, endDate);
-                    allConflicts = appts;
+                const datesToCheck = [];
+                if (formData.isPeriod) {
+                    let current = parseISO(formData.date);
+                    const end = parseISO(formData.endDate);
+                    while (isBefore(current, end) || isEqual(current, end)) {
+                        datesToCheck.push(format(current, 'yyyy-MM-dd'));
+                        current = addDays(current, 1);
+                    }
                 } else {
-                    // Para profissionais específicos
-                    for (const profId of formData.selectedProfessionals) {
-                        const appts = await AgendaService.getAppointmentsOverlapping(startDate, endDate, profId);
+                    datesToCheck.push(formData.date);
+                }
+
+                for (const d of datesToCheck) {
+                    const dStart = new Date(`${d}T${startTimeStr}`);
+                    const dEnd = new Date(`${d}T${endTimeStr}`);
+                    
+                    if (formData.isClinicWide) {
+                        const appts = await AgendaService.getAppointmentsOverlapping(dStart, dEnd);
                         allConflicts = [...allConflicts, ...appts];
+                    } else {
+                        for (const profId of formData.selectedProfessionals) {
+                            const appts = await AgendaService.getAppointmentsOverlapping(dStart, dEnd, profId);
+                            allConflicts = [...allConflicts, ...appts];
+                        }
                     }
                 }
 
                 if (allConflicts.length > 0) {
-                    setConflicts(allConflicts);
+                    // Remover duplicatas
+                    const uniqueConflicts = allConflicts.filter((v, i, a) => a.findIndex(t => t.id === v.id) === i);
+                    setConflicts(uniqueConflicts);
                     setShowConflictModal(true);
                     setSaving(false);
                     return;
@@ -214,18 +235,39 @@ const ScheduleBlockModal: React.FC<ScheduleBlockModalProps> = ({
                 await updateScheduleBlock(editingBlock.id, blockData);
                 setToast({ message: 'Bloqueio atualizado com sucesso!', type: 'success', visible: true });
             } else {
-                // Create new blocks (one for each professional if not clinic-wide)
-                if (formData.isClinicWide) {
-                    await createScheduleBlock(blockData);
+                // Create new blocks
+                const datesToBlock = [];
+                if (formData.isPeriod) {
+                    let current = parseISO(formData.date);
+                    const end = parseISO(formData.endDate);
+                    
+                    while (isBefore(current, end) || isEqual(current, end)) {
+                        datesToBlock.push(format(current, 'yyyy-MM-dd'));
+                        current = addDays(current, 1);
+                    }
                 } else {
-                    for (const professionalId of formData.selectedProfessionals) {
-                        await createScheduleBlock({
-                            ...blockData,
-                            professional_id: professionalId
-                        });
+                    datesToBlock.push(formData.date);
+                }
+
+                for (const date of datesToBlock) {
+                    const currentBlockData = { ...blockData, date };
+                    
+                    if (formData.isClinicWide) {
+                        await createScheduleBlock(currentBlockData);
+                    } else {
+                        for (const professionalId of formData.selectedProfessionals) {
+                            await createScheduleBlock({
+                                ...currentBlockData,
+                                professional_id: professionalId
+                            });
+                        }
                     }
                 }
-                setToast({ message: 'Bloqueio criado com sucesso!', type: 'success', visible: true });
+                
+                const successMsg = datesToBlock.length > 1 
+                    ? `Bloqueio de ${datesToBlock.length} dias criado com sucesso!`
+                    : 'Bloqueio criado com sucesso!';
+                setToast({ message: successMsg, type: 'success', visible: true });
             }
 
             setTimeout(() => {
@@ -413,69 +455,97 @@ const ScheduleBlockModal: React.FC<ScheduleBlockModalProps> = ({
 
                         {/* Data */}
                         <div>
-                            <h3 className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-4">Data</h3>
+                            <div className="flex items-center justify-between mb-4">
+                                <h3 className="text-sm font-bold text-gray-700 dark:text-gray-300">Data e Horário</h3>
+                                {!editingBlock && (
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            onClick={() => setFormData({ ...formData, isPeriod: !formData.isPeriod })}
+                                            type="button"
+                                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${formData.isPeriod ? 'bg-purple-500' : 'bg-gray-300 dark:bg-gray-600'}`}
+                                        >
+                                            <span className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${formData.isPeriod ? 'translate-x-5' : 'translate-x-1'}`} />
+                                        </button>
+                                        <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Bloquear período</span>
+                                    </div>
+                                )}
+                            </div>
 
-                            <div className="grid grid-cols-3 gap-4">
-                                {/* Dia */}
-                                <div>
-                                    <label htmlFor="block-date" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                        Dia*
-                                    </label>
-                                    <input
-                                        id="block-date"
-                                        type="date"
-                                        value={formData.date}
-                                        onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                                        className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:border-purple-500 outline-none"
-                                    />
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                <div className={formData.isPeriod ? "grid grid-cols-2 gap-3" : ""}>
+                                    <div>
+                                        <label htmlFor="block-date" className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                                            {formData.isPeriod ? 'Data Início*' : 'Data*'}
+                                        </label>
+                                        <input
+                                            id="block-date"
+                                            type="date"
+                                            value={formData.date}
+                                            onChange={(e) => setFormData({ 
+                                                ...formData, 
+                                                date: e.target.value,
+                                                endDate: !formData.isPeriod || isAfter(parseISO(formData.endDate), parseISO(e.target.value)) ? formData.endDate : e.target.value
+                                            })}
+                                            className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:border-purple-500 outline-none text-sm"
+                                        />
+                                    </div>
+                                    {formData.isPeriod && (
+                                        <div>
+                                            <label htmlFor="block-end-date" className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                                                Data Fim*
+                                            </label>
+                                            <input
+                                                id="block-end-date"
+                                                type="date"
+                                                value={formData.endDate}
+                                                min={formData.date}
+                                                onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                                                className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:border-purple-500 outline-none text-sm"
+                                            />
+                                        </div>
+                                    )}
                                 </div>
 
-                                {/* Início */}
-                                <div>
-                                    <label htmlFor="block-start-time" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                        Início*
-                                    </label>
-                                    <input
-                                        id="block-start-time"
-                                        type="time"
-                                        value={formData.startTime}
-                                        onChange={(e) => handleStartTimeChange(e.target.value)}
-                                        disabled={formData.isFullDay}
-                                        className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:border-purple-500 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-                                    />
-                                </div>
-
-                                {/* Fim */}
-                                <div>
-                                    <label htmlFor="block-end-time" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                        Fim*
-                                    </label>
-                                    <input
-                                        id="block-end-time"
-                                        type="time"
-                                        value={formData.endTime}
-                                        onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
-                                        disabled={formData.isFullDay}
-                                        className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:border-purple-500 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-                                    />
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label htmlFor="block-start-time" className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                                            Início*
+                                        </label>
+                                        <input
+                                            id="block-start-time"
+                                            type="time"
+                                            value={formData.startTime}
+                                            onChange={(e) => handleStartTimeChange(e.target.value)}
+                                            disabled={formData.isFullDay}
+                                            className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:border-purple-500 outline-none disabled:opacity-50 text-sm"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label htmlFor="block-end-time" className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                                            Fim*
+                                        </label>
+                                        <input
+                                            id="block-end-time"
+                                            type="time"
+                                            value={formData.endTime}
+                                            onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
+                                            disabled={formData.isFullDay}
+                                            className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:border-purple-500 outline-none disabled:opacity-50 text-sm"
+                                        />
+                                    </div>
                                 </div>
                             </div>
 
                             {/* Dia inteiro toggle */}
-                            <div className="flex items-center gap-2 mt-4">
+                            <div className="flex items-center gap-2">
                                 <button
                                     onClick={() => setFormData({ ...formData, isFullDay: !formData.isFullDay })}
                                     type="button"
-                                    aria-label={formData.isFullDay ? "Desativar dia inteiro" : "Ativar dia inteiro"}
-                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${formData.isFullDay ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'
-                                        }`}
+                                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${formData.isFullDay ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'}`}
                                 >
-                                    <span
-                                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formData.isFullDay ? 'translate-x-6' : 'translate-x-1'
-                                            }`}
-                                    />
+                                    <span className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${formData.isFullDay ? 'translate-x-5' : 'translate-x-1'}`} />
                                 </button>
-                                <span className="text-sm text-gray-700 dark:text-gray-300">Dia inteiro</span>
+                                <span className="text-xs text-gray-700 dark:text-gray-300">Dia inteiro</span>
                             </div>
                         </div>
                     </div>

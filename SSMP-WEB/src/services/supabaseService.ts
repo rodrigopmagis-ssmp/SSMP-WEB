@@ -1238,7 +1238,7 @@ export const supabaseService = {
     async getEmployees() {
         const { data, error } = await supabase
             .from('profiles')
-            .select('id, full_name, role, email')
+            .select('id, full_name, role, email, phone')
             .in('role', ['admin', 'master', 'receptionist', 'doctor', 'manager'])
             .order('full_name');
 

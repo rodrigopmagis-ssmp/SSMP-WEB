@@ -21,6 +21,7 @@ interface AppointmentModalProps {
     defaultPatientId?: string;
     isEmbedded?: boolean;
     isReadOnly?: boolean;
+    defaultProfessionalId?: string;
 }
 
 const CancelOptionsModal = ({ isOpen, onClose, onReschedule, onCancel }: { isOpen: boolean, onClose: () => void, onReschedule: () => void, onCancel: () => void }) => {
@@ -71,11 +72,11 @@ const ExceptionModal = ({ isOpen, warnings, onClose, onConfirm }: { isOpen: bool
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
                 <div className="p-6">
                     <div className="flex items-center gap-3 mb-4 text-amber-600 dark:text-amber-400">
-                        <span className="material-symbols-outlined text-3xl">warning</span>
-                        <h3 className="text-lg font-bold text-gray-900 dark:text-white">Atenção</h3>
+                        <span className="material-symbols-outlined text-3xl">info</span>
+                        <h3 className="text-lg font-bold text-gray-900 dark:text-white">Confirmação de Agendamento</h3>
                     </div>
                     <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                        Existem conflitos ou avisos para este agendamento:
+                        Deseja realmente confirmar este agendamento com as seguintes observações?
                     </p>
                     <ul className="list-disc list-inside space-y-1 mb-6 text-sm text-gray-600 dark:text-gray-400 bg-amber-50 dark:bg-amber-900/10 p-3 rounded-lg border border-amber-100 dark:border-amber-900/30">
                         {warnings.map((w, i) => (
@@ -87,13 +88,13 @@ const ExceptionModal = ({ isOpen, warnings, onClose, onConfirm }: { isOpen: bool
                             onClick={onClose}
                             className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                         >
-                            Voltar e Corrigir
+                            Alterar Data
                         </button>
                         <button
                             onClick={onConfirm}
                             className="px-4 py-2 text-sm font-medium text-white bg-amber-500 hover:bg-amber-600 rounded-lg transition-colors"
                         >
-                            Ignorar e Salvar
+                            Confirmar Agendamento
                         </button>
                     </div>
                 </div>
@@ -193,7 +194,8 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
     isPatientFixed,
     defaultPatientId,
     isEmbedded,
-    isReadOnly
+    isReadOnly,
+    defaultProfessionalId
 }) => {
     const [loading, setLoading] = useState(false);
     const [formData, setFormData] = useState({
@@ -670,7 +672,7 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
                 const end = addMinutes(start, 30); // Default 30 min duration
                 setFormData({
                     patient_id: defaultPatientId || '',
-                    professional_id: '',
+                    professional_id: defaultProfessionalId || '',
                     procedure_id: '',
                     start_time: format(start, "yyyy-MM-dd'T'HH:mm"),
                     end_time: format(end, "yyyy-MM-dd'T'HH:mm"),
